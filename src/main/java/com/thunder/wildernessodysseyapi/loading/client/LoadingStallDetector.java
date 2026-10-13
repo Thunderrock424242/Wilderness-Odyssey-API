@@ -14,6 +14,9 @@ import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.client.gui.screens.ProgressScreen;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.neoforged.api.distmarker.Dist;
@@ -62,6 +65,13 @@ public final class LoadingStallDetector {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Pre event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        WorldLoadFailureHandler.isWaitingForShutdown();
+        if (!WorldLoadFailureHandler.isStartingServer() && !WorldLoadFailureHandler.isFailing()
+                && classify(minecraft.screen) == LoadingScreenPhase.TERRAIN && worldLoadTimedOut()) {
+            WorldLoadFailureHandler.fail(minecraft);
+            return;
+        }
         observeCurrentScreen();
     }
 
@@ -74,10 +84,15 @@ public final class LoadingStallDetector {
     /** Arms the worker before screen initialization or a following synchronous load can block. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onScreenOpening(ScreenEvent.Opening event) {
+        Screen next = event.getNewScreen();
+        if ((next instanceof SelectWorldScreen || next instanceof CreateWorldScreen || next instanceof JoinMultiplayerScreen)
+                && WorldLoadFailureHandler.isWaitingForShutdown()) {
+            event.setNewScreen(WorldLoadFailureHandler.screen(true));
+            return;
+        }
         if (!ENABLED) {
             return;
         }
-        Screen next = event.getNewScreen();
         LoadingScreenPhase phase = classify(next);
         if (phase != null) {
             observe(next, phase, System.nanoTime());
@@ -88,6 +103,11 @@ public final class LoadingStallDetector {
 
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        // doWorldLoad disconnects the empty client before starting its server.
+        // NeoForge emits LoggingOut even with no player; preserve this load's timer.
+        if (WorldLoadFailureHandler.isStartingServer()) {
+            return;
+        }
         stop("Client connection closed");
     }
 
@@ -125,7 +145,7 @@ public final class LoadingStallDetector {
     }
 
     private static void observeCurrentScreen() {
-        if (!ENABLED) {
+        if (!ENABLED || WorldLoadFailureHandler.isFailing()) {
             return;
         }
         long now = System.nanoTime();
@@ -161,7 +181,28 @@ public final class LoadingStallDetector {
             progress = accessor.wildernessOdysseyApi$getProgressListener().getProgress();
         }
         observedPhase = phase;
-        monitor.observe(phase.label(), progress, now);
+        // Datapack validation from the world-creation editor is diagnostic work,
+        // not initial world entry. An existing world deadline still survives it.
+        boolean validatingPacks = screen instanceof GenericMessageScreen
+                && screen.getTitle().getContents() instanceof TranslatableContents message
+                && message.getKey().equals("dataPack.validation.working");
+        monitor.observe(phase.label(), progress, now,
+                phase.isWorldLoad() && Minecraft.getInstance().level == null && !validatingPacks);
+    }
+
+    /** The startup mixin checks the same monotonic deadline even in a non-rendering wait. */
+    public static boolean worldLoadTimedOut() {
+        return monitor != null && monitor.worldLoadTimedOut();
+    }
+
+    public static void beginWorldLoad() {
+        if (ENABLED) {
+            observe(Minecraft.getInstance().screen, LoadingScreenPhase.WORLD_PREPARATION, System.nanoTime());
+        }
+    }
+
+    public static void finishTimedOutLoad() {
+        stop(LoadingProfileMonitor.TIMEOUT_OUTCOME);
     }
 
     private static LoadingScreenPhase classify(Screen screen) {

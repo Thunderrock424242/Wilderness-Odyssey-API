@@ -34,6 +34,9 @@ public final class LoadingProfileMonitor implements AutoCloseable {
     private static final long FINAL_REPORT_MINIMUM_NANOS = TimeUnit.SECONDS.toNanos(10);
     private static final int MAX_CAPTURED_THREADS = 128;
     private static final int MAX_REPORTS = 10;
+    private static final long WORLD_WARNING_NANOS = TimeUnit.MINUTES.toNanos(5);
+    private static final long WORLD_FAILURE_NANOS = TimeUnit.MINUTES.toNanos(10);
+    public static final String TIMEOUT_OUTCOME = "World loading failed after 10 minutes";
     private static final DateTimeFormatter FILE_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
             .withZone(ZoneId.systemDefault());
     private final Path reportDirectory;
@@ -54,6 +57,8 @@ public final class LoadingProfileMonitor implements AutoCloseable {
     private long lastReportNanos;
     private boolean samplingFailureLogged;
     private boolean lastSaveFailed;
+    private boolean worldWarningLogged;
+    private boolean worldFailureLogged;
 
     public LoadingProfileMonitor(Path reportDirectory, Function<StackTraceElement, String> ownerResolver,
                                  List<String> loadedMods, long reportDelayMillis) {
@@ -75,6 +80,13 @@ public final class LoadingProfileMonitor implements AutoCloseable {
     }
 
     public synchronized void observe(String phase, int progress, long nowNanos) {
+        boolean worldLoad = Arrays.stream(LoadingScreenPhase.values())
+                .anyMatch(stage -> stage.isWorldLoad() && stage.label().equals(phase));
+        observe(phase, progress, nowNanos, worldLoad);
+    }
+
+    /** The client excludes dimension changes; an overlay during an armed load keeps its deadline. */
+    public synchronized void observe(String phase, int progress, long nowNanos, boolean worldLoad) {
         if (closed) {
             return;
         }
@@ -83,19 +95,30 @@ public final class LoadingProfileMonitor implements AutoCloseable {
         long id = newOperation ? ++nextId : previous.id();
         long started = newOperation ? nowNanos : previous.startedNanos();
         Instant timestamp = newOperation ? Instant.now() : previous.timestamp();
-        observation.set(new Observation(id, started, nowNanos, timestamp, phase, progress, "Loading"));
+        Long worldStarted = newOperation ? null : previous.worldStartedNanos();
+        if (worldStarted == null && worldLoad) {
+            worldStarted = nowNanos;
+        }
+        observation.set(new Observation(id, started, nowNanos, timestamp, phase, progress, "Loading", worldStarted));
     }
 
     public synchronized void stop(String outcome) {
         Observation previous = observation.get();
         if (previous != null && previous.phase() != null) {
             observation.set(new Observation(previous.id(), previous.startedNanos(), System.nanoTime(),
-                    previous.timestamp(), null, -1, outcome));
+                    previous.timestamp(), null, -1, worldLoadTimedOut() ? TIMEOUT_OUTCOME : outcome, previous.worldStartedNanos()));
         }
     }
 
     public Status status() {
         return status;
+    }
+
+    /** Checked only for the currently observed operation, so a delayed worker cannot abort a retry. */
+    public synchronized boolean worldLoadTimedOut() {
+        Observation latest = observation.get();
+        return latest != null && latest.phase() != null && latest.worldStartedNanos() != null
+                && System.nanoTime() - latest.worldStartedNanos() >= WORLD_FAILURE_NANOS;
     }
 
     /** Stops sampling and queues one final flush without waiting on the game thread. */
@@ -111,14 +134,11 @@ public final class LoadingProfileMonitor implements AutoCloseable {
     }
 
     private void pollSafely() {
-        if (samplingFailureLogged) {
-            return;
-        }
         try {
             poll();
         } catch (RuntimeException | LinkageError exception) {
             if (!samplingFailureLogged) {
-                ModConstants.LOGGER.warn("[Loading profiler] JVM sampling unavailable; loading continues normally.", exception);
+                ModConstants.LOGGER.warn("[Loading profiler] Diagnostic collection failed; the world-loading deadline remains active.", exception);
                 samplingFailureLogged = true;
             }
             // Do not let a failed diagnostic task retain an active session or
@@ -146,14 +166,40 @@ public final class LoadingProfileMonitor implements AutoCloseable {
             reportFile = reportDirectory.resolve("loading-profile-" + FILE_TIME.format(latest.timestamp()) + "-" + latest.id() + ".log");
             lastReportNanos = latest.startedNanos();
             lastSaveFailed = false;
+            worldWarningLogged = false;
+            worldFailureLogged = false;
             ModConstants.LOGGER.info("[Loading profiler] Started automatic loading diagnostics.");
         }
         session.observe(latest.phase(), latest.progress(), latest.observedNanos());
-        session.sample(captureThreads());
+        if (!samplingFailureLogged) {
+            try {
+                session.sample(captureThreads());
+            } catch (RuntimeException | LinkageError exception) {
+                samplingFailureLogged = true;
+                ModConstants.LOGGER.warn("[Loading profiler] JVM sampling unavailable; world-loading deadlines remain active.", exception);
+            }
+        }
         var snapshot = session.snapshot(now);
-        if (snapshot.elapsedNanos() >= reportDelayNanos && now - lastReportNanos >= REPORT_INTERVAL_NANOS) {
+        long worldElapsed = latest.worldStartedNanos() == null ? 0 : Math.max(0, now - latest.worldStartedNanos());
+        if (!worldWarningLogged && latest.worldStartedNanos() != null && worldElapsed >= WORLD_WARNING_NANOS) {
+            worldWarningLogged = true;
             lastReportNanos = now;
-            lastSaveFailed = !save(now, "Loading still in progress");
+            lastSaveFailed = !save(now, "World loading exceeded 5 minutes");
+            ModConstants.LOGGER.warn("[World loading] World loading exceeded 5 minutes. Stage: {}; progress: {}. "
+                            + "The load will fail at 10 minutes. Diagnostic report: {}\n{}",
+                    latest.phase(), latest.progress(), reportFile.toAbsolutePath(),
+                    session.report(now, "World loading exceeded 5 minutes", loadedMods));
+        }
+        if (!worldFailureLogged && latest.worldStartedNanos() != null && worldElapsed >= WORLD_FAILURE_NANOS) {
+            worldFailureLogged = true;
+            lastReportNanos = now;
+            lastSaveFailed = !save(now, TIMEOUT_OUTCOME);
+            ModConstants.LOGGER.error("[World loading] {}. Failed to load world. Try creating a new world, "
+                            + "or contact the modpack developers and submit an issue report. Diagnostic report: {}\n{}",
+                    TIMEOUT_OUTCOME, reportFile.toAbsolutePath(), session.report(now, TIMEOUT_OUTCOME, loadedMods));
+        } else if (snapshot.elapsedNanos() >= reportDelayNanos && now - lastReportNanos >= REPORT_INTERVAL_NANOS) {
+            lastReportNanos = now;
+            lastSaveFailed = !save(now, worldFailureLogged ? TIMEOUT_OUTCOME : "Loading still in progress");
         }
         status = new Status(true, snapshot, reportFile.equals(lastSavedReport) ? lastSavedReport : null, lastSaveFailed);
     }
@@ -193,6 +239,18 @@ public final class LoadingProfileMonitor implements AutoCloseable {
 
     private void finish(long now, String outcome) {
         var snapshot = session.snapshot(now);
+        if (TIMEOUT_OUTCOME.equals(outcome) && !worldFailureLogged) {
+            // The client can reach its safe cancellation point between worker
+            // polls. Preserve the failure in latest.log even if it already closed
+            // the screen before this worker's ten-minute sampling pass.
+            worldFailureLogged = true;
+            ModConstants.LOGGER.error("[World loading] {}. Failed to load world. Try creating a new world, "
+                            + "or contact the modpack developers and submit an issue report. Diagnostic report: {}\n{}",
+                    TIMEOUT_OUTCOME, reportFile.toAbsolutePath(), session.report(now, TIMEOUT_OUTCOME, loadedMods));
+        }
+        if (worldFailureLogged) {
+            outcome = TIMEOUT_OUTCOME;
+        }
         boolean saveFailed = false;
         if (snapshot.elapsedNanos() >= FINAL_REPORT_MINIMUM_NANOS || reportFile.equals(lastSavedReport)) {
             saveFailed = !save(now, outcome);
@@ -240,7 +298,7 @@ public final class LoadingProfileMonitor implements AutoCloseable {
     }
 
     private record Observation(long id, long startedNanos, long observedNanos, Instant timestamp,
-                               String phase, int progress, String outcome) {
+                               String phase, int progress, String outcome, Long worldStartedNanos) {
     }
 
     public record Status(boolean active, LoadingProfileSession.Snapshot snapshot, Path report, boolean saveFailed) {

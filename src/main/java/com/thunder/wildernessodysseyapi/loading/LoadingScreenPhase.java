@@ -26,6 +26,11 @@ public enum LoadingScreenPhase {
         return translation;
     }
 
+    /** Initial world entry has a deadline; generic progress/save and launcher resources do not. */
+    public boolean isWorldLoad() {
+        return this != RESOURCES && this != WORLD_OPERATION;
+    }
+
     /** Returns null for messages that do not identify a world/resource load. */
     public static LoadingScreenPhase fromMessageKey(String key) {
         return switch (key) {

@@ -130,6 +130,16 @@ temporary query failure. Existing shader contracts, wave-mirror tests, surface
 handoff tests, and regional-weather tests provide regression coverage. Use the
 normal Gradle pipeline and its existing offline JUnit runtime for focused tests.
 
+The native mesh handoff owns surface visibility independently of shoreline wave
+damping. A one-block pool or irrigation row has only boundary vertices: those
+vertices keep waves pinned while retaining the water material's coverage and
+opacity. The captured-scene composition and no-capture translucent fallback both
+preserve this rule. `WaterSurfaceCoverageRenderTest` renders the production
+fragment shader into a hidden 4x4 OpenGL target and checks actual pixels for
+1x1, 1x8, and 8x1 water, plus open-water and foreground-occlusion controls. It is
+tagged `gpu` and skips when a desktop OpenGL 3.2 context cannot be created; a
+skip is not pixel proof.
+
 Live acceptance remains necessary:
 
 | Configuration | Observe |
@@ -139,6 +149,7 @@ Live acceptance remains necessary:
 | Enable, disable, and change packs in a loaded world | Correct mesh handoff and rebuild, no stale scene textures, no accumulating GPU resources |
 | Paused game with camera rotation; resize; resource reload | Reflections follow the rendered camera; underwater capture remains from the same frame |
 | Calm/storm/shore/underwater/structure views | Regional weather drives appearance; wave and immersion behavior remain coherent |
+| One-block pools and irrigation rows in both directions, including a chunk boundary | Water stays visible after bucket filling, camera movement, and resource reload; farmland hydration and bucket pickup still work |
 | Dedicated server and two clients with different graphics | Server starts without optional render mods; volume, buoyancy, and weather agree |
 
 Benchmark the same seed, camera route, resolution, view distance, and graphics

@@ -130,6 +130,89 @@ class LoadingProfileMonitorTest {
         return monitor;
     }
 
+    @Test
+    void warnsAtFiveMinutesEvenWhenPeriodicReportsWereDelayed() throws Exception {
+        var monitor = new LoadingProfileMonitor(directory, new LoadingModAttribution(Map.of()), List.of(), 3_600_000);
+        monitors.add(monitor);
+        monitor.observe("Generating spawn", 42, System.nanoTime() - TimeUnit.SECONDS.toNanos(301));
+        await(() -> monitor.status().report() != null);
+        String report = Files.readString(monitor.status().report());
+        assertTrue(report.contains("World loading exceeded 5 minutes"));
+        assertTrue(report.contains("Stage: Generating spawn"));
+        assertTrue(report.contains("42%"));
+        assertTrue(report.contains("[Latest Thread Stacks"));
+    }
+
+    @Test
+    void failsAtTenMinutesWithoutFurtherClientHeartbeats() throws Exception {
+        try (var monitor = monitor()) {
+            monitor.observe("Generating spawn", 25, System.nanoTime() - TimeUnit.SECONDS.toNanos(601));
+            await(() -> monitor.status().report() != null);
+            assertTrue(Files.readString(monitor.status().report()).contains("World loading failed after 10 minutes"));
+        }
+    }
+
+    @Test
+    void resourceLoadingAloneDoesNotFailAfterTenMinutes() throws Exception {
+        try (var monitor = monitor()) {
+            monitor.observe("Resource loading", -1, System.nanoTime() - TimeUnit.SECONDS.toNanos(601));
+            await(() -> monitor.status().report() != null);
+            assertFalse(Files.readString(monitor.status().report()).contains("World loading failed"));
+        }
+    }
+
+    @Test
+    void warningAndFailureUseTotalWorldLoadTimeAcrossStageAndProgressChanges() {
+        try (var monitor = monitor()) {
+            monitor.observe("Reading world data", -1, System.nanoTime() - TimeUnit.SECONDS.toNanos(601));
+            monitor.observe("Generating spawn", 99, System.nanoTime());
+            assertTrue(monitor.worldLoadTimedOut());
+            monitor.observe("Receiving terrain", -1, System.nanoTime());
+            assertTrue(monitor.worldLoadTimedOut());
+        }
+    }
+
+    @Test
+    void cancellationClearsTheDeadlineAndRetryStartsWithAFullBudget() {
+        try (var monitor = monitor()) {
+            monitor.observe("Generating spawn", 10, System.nanoTime() - TimeUnit.SECONDS.toNanos(601));
+            assertTrue(monitor.worldLoadTimedOut());
+            monitor.stop("Cancelled");
+            assertFalse(monitor.worldLoadTimedOut());
+            monitor.observe("Reading world data", -1, System.nanoTime());
+            assertFalse(monitor.worldLoadTimedOut());
+        }
+    }
+
+    @Test
+    void doesNotFailAWorldBeforeTenMinutes() {
+        try (var monitor = monitor()) {
+            monitor.observe("Generating spawn", 10, System.nanoTime() - TimeUnit.SECONDS.toNanos(599));
+            assertFalse(monitor.worldLoadTimedOut());
+        }
+    }
+
+    @Test
+    void resourceOverlayPreservesAnArmedWorldDeadlineButLauncherResourcesDoNotConsumeIt() {
+        try (var monitor = monitor()) {
+            monitor.observe("Resource loading", -1, System.nanoTime() - TimeUnit.MINUTES.toNanos(15));
+            monitor.observe("Reading world data", -1, System.nanoTime());
+            assertFalse(monitor.worldLoadTimedOut());
+            monitor.stop("Cancelled");
+            monitor.observe("Reading world data", -1, System.nanoTime() - TimeUnit.SECONDS.toNanos(601));
+            monitor.observe("Resource loading", -1, System.nanoTime(), false);
+            assertTrue(monitor.worldLoadTimedOut());
+        }
+    }
+
+    @Test
+    void dimensionTravelDoesNotArmAWorldStartupDeadline() {
+        try (var monitor = monitor()) {
+            monitor.observe("Receiving terrain", -1, System.nanoTime() - TimeUnit.SECONDS.toNanos(601), false);
+            assertFalse(monitor.worldLoadTimedOut());
+        }
+    }
+
     private static void await(BooleanSupplier condition) throws InterruptedException {
         long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) {

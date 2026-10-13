@@ -1,8 +1,12 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.EntityWaterCompat;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.EntityWaterState;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.WaterEntrySplashPolicy;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
@@ -24,6 +28,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(Entity.class)
 public abstract class EntityWaterParityMixin {
+
+    /**
+     * The sound event exposes a position rather than the entering entity, so
+     * gate the two native sound calls before water contact resets fall distance.
+     * Particles and the gameplay SPLASH event keep their native behavior.
+     */
+    @WrapOperation(method = "doWaterSplashEffect", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/entity/Entity;playSound(Lnet/minecraft/sounds/SoundEvent;FF)V"), require = 2)
+    private void wildernessOdysseyApi$limitEntrySplashSound(
+            Entity entity, SoundEvent sound, float volume, float pitch, Operation<Void> original
+    ) {
+        if (WaterEntrySplashPolicy.shouldPlay(entity)) {
+            original.call(entity, sound, volume, pitch);
+        }
+    }
 
     /** Makes vanilla movement and swim-pose logic follow the animated surface. */
     @Inject(method = "isInWater", at = @At("RETURN"), cancellable = true)

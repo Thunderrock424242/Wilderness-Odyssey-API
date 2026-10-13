@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
@@ -196,6 +197,8 @@ public final class LocalizedPrecipitationRenderer {
             rainSoundTime = 0;
         }
         BlockPos soundPos = null;
+        boolean soundOnWater = false;
+        double soundIntensity = 0.0;
         ParticleStatus particleStatus = minecraft.options.particles().get();
         int attempts = Minecraft.useFancyGraphics() ? 100 : 50;
         if (particleStatus == ParticleStatus.DECREASED) {
@@ -245,6 +248,11 @@ public final class LocalizedPrecipitationRenderer {
             }
 
             soundPos = surfacePos.below();
+            FluidState fluidState = levelReader.getFluidState(soundPos);
+            // Sound selection is independent of the particle setting. Rain is
+            // a quiet droplet bed, never an entity-entry splash.
+            soundOnWater = surfaceType.usesRainInteractions() && fluidState.is(FluidTags.WATER);
+            soundIntensity = intensity;
             if (particleStatus == ParticleStatus.MINIMAL) {
                 break;
             }
@@ -252,7 +260,6 @@ public final class LocalizedPrecipitationRenderer {
             double localX = random.nextDouble();
             double localZ = random.nextDouble();
             BlockState blockState = levelReader.getBlockState(soundPos);
-            FluidState fluidState = levelReader.getFluidState(soundPos);
             VoxelShape shape = blockState.getCollisionShape(levelReader, soundPos);
             double collisionHeight = shape.max(Direction.Axis.Y, localX, localZ);
             double fluidHeight = fluidState.getHeight(levelReader, soundPos);
@@ -299,9 +306,19 @@ public final class LocalizedPrecipitationRenderer {
 
         if (usesRainSound && soundPos != null && random.nextInt(3) < rainSoundTime++) {
             rainSoundTime = 0;
-            if (soundPos.getY() > cameraPos.getY() + 1
+            boolean covered = soundPos.getY() > cameraPos.getY() + 1
                     && levelReader.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, cameraPos).getY()
-                    > Mth.floor(cameraPos.getY())) {
+                    > Mth.floor(cameraPos.getY());
+            if (soundOnWater) {
+                level.playLocalSound(
+                        soundPos,
+                        ModSoundEvents.RAIN_ON_WATER.get(),
+                        SoundSource.WEATHER,
+                        (covered ? 0.07F : 0.14F) * (0.45F + 0.55F * (float) soundIntensity),
+                        covered ? 0.8F : 1.0F,
+                        false
+                );
+            } else if (covered) {
                 level.playLocalSound(
                         soundPos,
                         SoundEvents.WEATHER_RAIN_ABOVE,

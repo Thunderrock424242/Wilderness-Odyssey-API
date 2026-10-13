@@ -18,6 +18,7 @@ public final class WaterSimulationConfig {
     public static ModConfigSpec.BooleanValue ENABLE_VANILLA_BUCKET_COMPAT;
     public static ModConfigSpec.BooleanValue ENABLE_VANILLA_BOAT_COMPAT;
     public static ModConfigSpec.BooleanValue ENABLE_ENTITY_WATER_COMPAT;
+    public static ModConfigSpec.DoubleValue MINIMUM_SPLASH_FALL_DISTANCE_BLOCKS;
     public static ModConfigSpec.BooleanValue ENABLE_ENTITY_HYDRODYNAMICS;
     public static ModConfigSpec.DoubleValue ENTITY_BUOYANCY_SCALE;
     public static ModConfigSpec.DoubleValue ENTITY_DRAG_SCALE;
@@ -107,6 +108,9 @@ public final class WaterSimulationConfig {
         ENABLE_ENTITY_WATER_COMPAT = builder
                 .comment("Maintain centralized custom-water contact, submersion, eye, depth, current, and transition state for entities.")
                 .define("enableEntityWaterCompat", true);
+        MINIMUM_SPLASH_FALL_DISTANCE_BLOCKS = builder
+                .comment("Minimum dry fall distance in blocks for an entity entry splash sound. Fish never emit entry splashes; rain and surf use separate ambience.")
+                .defineInRange("minimumSplashFallDistanceBlocks", 3.0, 3.0, 64.0);
         ENABLE_ENTITY_HYDRODYNAMICS = builder
                 .comment("Apply server-authoritative multi-point buoyancy, fluid-relative drag, currents, and bounded SPH/shoreline forces to boats, items, and living entities.")
                 .define("enableEntityHydrodynamics", true);
@@ -335,6 +339,11 @@ public final class WaterSimulationConfig {
     /** Returns whether centralized entity water-state sampling is active. */
     public static boolean entityWaterCompatEnabled() {
         return wildernessWaterEnabled() && ENABLE_ENTITY_WATER_COMPAT.get();
+    }
+
+    /** Returns the synchronized server threshold for native entity splash audio, in blocks. */
+    public static double minimumSplashFallDistanceBlocks() {
+        return MINIMUM_SPLASH_FALL_DISTANCE_BLOCKS.get();
     }
 
     /** Returns whether server-authoritative entity hydrodynamic forces are active. */

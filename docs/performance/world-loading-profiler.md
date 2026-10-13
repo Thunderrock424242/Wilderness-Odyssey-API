@@ -4,6 +4,20 @@ Wilderness Odyssey automatically samples long client/world loads. No chat comman
 
 The loading diagnostics panel is hidden by default. Automatic sampling and local reports remain enabled. When explicitly enabled, the panel shows elapsed time, the current stage, spawn percentage when available, the time since the visible stage/percentage last changed, and frequently sampled active code on recognized loading screens. It appears after the first worker sampling pass. Resource overlays are monitored even when they cover the underlying panel.
 
+## Five-minute warning and ten-minute world failure
+
+Initial world loading has a wall-clock deadline, measured with the monotonic JVM clock across world-data/resource preparation, integrated-server startup, spawn generation, and initial terrain reception. Stage changes, percentage changes and continuing client frames do not restart it. Launcher resource loading alone, generic progress/save screens and dimension travel within an already open world do not arm this deadline. A resource overlay appearing during an already armed world load keeps the deadline running.
+
+At five minutes, a one-time WARN in `logs/latest.log` includes the current stage, visible progress, sampled thread stacks and the bounded loading diagnostic report. A report is written even if the optional periodic-report threshold is longer than five minutes. At ten minutes, an ERROR records the failure and another diagnostic snapshot. These checks run on the existing independent worker even without further client ticks or frames.
+
+The client fails the loading operation at its next safe cancellation point and presents **Failed to load world** with a **Back to Title Screen** button. The message says:
+
+> The world took longer than 10 minutes to load. Try creating a new world, or contact the modpack developers and submit an issue report. Include logs/latest.log and the loading report from logs/loading-stalls.
+
+Integrated-server startup exits before opening its local connection. A cooperative server stop request unwinds spawn preparation at a native server wait boundary. Native server cleanup still owns saving, chunk I/O, resource closure and releasing the world lock. The timeout never deletes a save. World selection/creation and multiplayer entry are blocked while this cleanup is still running, preventing overlapping server and registry lifecycles; the failure screen explains the wait. Ordinary server crashes retain their normal crash behavior.
+
+This is not forced thread termination. A JVM/process crash or a third-party method permanently blocking the render thread cannot display a new screen. Early synchronous data/resource work must return to Minecraft before its timeout screen can be presented. A server permanently blocked outside its cooperative wait boundary may keep the save locked; the menu stays available after the client startup wait is cancelled, but another world must wait for cleanup or a Minecraft restart. The independent diagnostics remain useful for an issue report. No unsafe background world writes, thread stopping or premature world-lock release are used.
+
 ## Finding a report
 
 Inside the launcher's Minecraft instance folder, open:
@@ -42,7 +56,7 @@ This retains the old threshold override, now bounded to 1–60 minutes. Integer 
 -Dwilderness.loadingstall.enabled=false
 ```
 
-This disables the diagnostic worker and loading panel for an overhead comparison.
+This disables the diagnostic worker, loading panel and five/ten-minute world-loading guard for an overhead comparison. The guard is enabled by default and is independent of panel visibility and the periodic-report delay.
 
 ## Ownership and overhead
 
@@ -50,7 +64,7 @@ This disables the diagnostic worker and loading panel for an overhead comparison
 
 The server-lifetime shared async pools are unavailable during early world loading, so this diagnostic has one client-lifetime daemon worker. It uses a single fixed-delay task, collects stacks only during recognized loads, and stops at client shutdown without blocking the game thread. Sampling normally runs once per second, with at most 128 captured stacks of 48 frames per pass. History is capped at 128 threads, 256 sites, and 16 stages; exclusions are reported. Reports include at most 32 recent stacks. Saved files are replaced via a temporary sibling file and atomic move where supported.
 
-The sole new mixin is a client-only read accessor for `LevelLoadingScreen`'s existing progress listener, because screen events have no public spawn-percentage getter. It does not modify generation, chunk tickets, loading order, or gameplay state.
+The client-only `LevelLoadingScreen` accessor reads spawn progress because screen events have no public percentage getter. The client startup mixin wraps `doWorldLoad` and cancels only its progress-listener/spawn-readiness waits or rejects a load before server ownership transfers. Screen events cannot unwind those synchronous startup loops. An integrated-server mixin suppresses the whole-client delayed crash only for our timeout exception; the native server crash report and cleanup still run. A common server mixin mirrors the base server's volatile stop request and checks for cancellation at `waitUntilNextTick`; `IntegratedServer.halt(false)` is unsuitable here because it first blocks on queued server work. The stop check does not abort native final saving. No client classes are referenced by the common mixin, and no dedicated-server watchdog is introduced.
 
 ## Validation
 
@@ -59,7 +73,7 @@ The sole new mixin is a client-only read accessor for `LevelLoadingScreen`'s exi
 .\gradlew.bat build -PcodexBuildDir=.codex-build --no-parallel
 ```
 
-The focused tests cover stage/progress tracking, ownership, waiting versus runnable samples, CPU counter availability/reset, history bounds, threshold parsing, independent saving without client heartbeats, cancellation/new-session isolation, report retention, write failures, and shutdown flushing/termination.
+The focused tests cover stage/progress tracking, ownership, waiting versus runnable samples, CPU counter availability/reset, history bounds, threshold parsing, independent saving without client heartbeats, five/ten-minute diagnostic reports, total deadline preservation across phases/progress/overlays, cancellation/retry isolation, launcher/dimension exclusions, report retention, write failures, and shutdown flushing/termination. Compilation and these tests do not establish live timeout-screen or native shutdown behavior.
 
 Live acceptance remains separate from unit tests and packaging:
 
@@ -69,3 +83,5 @@ Live acceptance remains separate from unit tests and packaging:
 4. Reproduce a blocked client thread after loading has armed. Check that heartbeat age rises and the local report continues updating. A frozen render thread cannot refresh the panel.
 5. Compare equivalent loads with diagnostics disabled. Measure overhead before making a performance claim.
 6. Check dedicated-server startup separately: the client event bridge and client accessor must remain unloaded.
+7. In a disposable launcher profile, reproduce an initial world load lasting five minutes, then ten minutes. Check the one-time warning and its stacks at five minutes, the error/report at ten minutes, the failure message and return-to-title button, and that another world can load after native server cleanup finishes. Check a stall before the spawn-progress listener is published as well as spawn generation and initial terrain reception. Preserve the report and test a second load to confirm its timer starts fresh.
+8. During a timed-out server's delayed shutdown, try world selection and multiplayer entry. Confirm the waiting message appears until the native server thread exits. Check that normal completed loads, dimension travel, resource reloads and Save & Quit retain their existing behavior. Client freezes outside the cancellation boundaries require a separate blocked-thread acceptance check; do not infer recovery from the clock/report unit tests.

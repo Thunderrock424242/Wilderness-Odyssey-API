@@ -83,29 +83,38 @@
   "coast_wash_soft": {
     "category": "ambient",
     "sounds": [
-      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0, "pitch": 0.98 },
-      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 0.90, "pitch": 1.0 }
+      { "name": "wildernessodysseyapi:ambient/coast_wash_soft_1", "type": "file" },
+      { "name": "wildernessodysseyapi:ambient/coast_wash_soft_2", "type": "file" }
     ]
   },
   "coast_break": {
     "category": "ambient",
     "sounds": [
-      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0 },
-      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 1.0, "pitch": 0.92 }
+      { "name": "wildernessodysseyapi:ambient/coast_break_1", "type": "file" },
+      { "name": "wildernessodysseyapi:ambient/coast_break_2", "type": "file" }
     ]
   },
   "coast_break_rocky": {
     "category": "ambient",
     "sounds": [
-      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 1.0, "pitch": 0.82 },
-      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0, "pitch": 0.86 }
+      { "name": "wildernessodysseyapi:ambient/coast_break_rocky_1", "type": "file" },
+      { "name": "wildernessodysseyapi:ambient/coast_break_rocky_2", "type": "file" }
     ]
   },
   "coast_break_storm": {
     "category": "weather",
     "sounds": [
-      { "name": "minecraft:entity.generic.splash", "type": "event", "volume": 1.0, "pitch": 0.76 },
-      { "name": "minecraft:entity.player.splash.high_speed", "type": "event", "volume": 1.0, "pitch": 0.80 }
+      { "name": "wildernessodysseyapi:ambient/coast_break_storm_1", "type": "file" },
+      { "name": "wildernessodysseyapi:ambient/coast_break_storm_2", "type": "file" }
+    ]
+  },
+  "rain_on_water": {
+    "category": "weather",
+    "subtitle": "subtitles.wildernessodysseyapi.rain_on_water",
+    "sounds": [
+      { "name": "wildernessodysseyapi:ambient/rain_on_water_1", "type": "file" },
+      { "name": "wildernessodysseyapi:ambient/rain_on_water_2", "type": "file" },
+      { "name": "wildernessodysseyapi:ambient/rain_on_water_3", "type": "file" }
     ]
   }
 }

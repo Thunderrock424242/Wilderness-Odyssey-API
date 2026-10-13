@@ -598,26 +598,27 @@ void main() {
     ) * ColorModulator.a * mix(0.78, 1.28, opacityControl);
     fallbackAlpha = min(0.98, fallbackAlpha + foam * 0.08);
     fallbackAlpha = min(0.995, fallbackAlpha + iceCoverage * 0.72);
-    float loadedFrontier = smoothstep(0.08, 0.55, surfaceContinuity);
 
     if (capturedScene) {
         // Refraction/transmission already incorporate the captured background.
-        // Resolve frontier coverage inside this completed color and replace the
-        // framebuffer pixel opaquely, avoiding a second alpha composition.
+        // The mesh handoff already owns this physically verified water surface.
+        // Shore damping pins waves; it cannot remove coverage, since every
+        // vertex of a one-block irrigation row is a pinned boundary vertex.
+        // Replace the completed pixel opaquely to avoid a second composition.
         vec3 capturedBackground = texture(SceneColor, screenUv).rgb;
-        float captureCoverage = clamp(loadedFrontier * ColorModulator.a, 0.0, 1.0);
+        float captureCoverage = clamp(ColorModulator.a, 0.0, 1.0);
         vec3 completedColor = mix(capturedBackground, color, captureCoverage);
         fragColor = vec4(completedColor, 1.0);
     } else {
         // Resource reloads and unsupported scene capture still retain a safe
         // conventional translucent path. The stock water sprite may color this
         // fallback, but its alpha never owns custom-surface geometry coverage.
+        float fallbackDetail = smoothstep(0.08, 0.55, surfaceContinuity);
         vec3 fallbackTexture = texture(Sampler0, texCoord0).rgb * vertexColor.rgb;
         vec3 fallbackEnvironment = environmentReflection(reflectedRay, fresnel, sea);
-        vec3 fallbackColor = mix(fallbackEnvironment, color, loadedFrontier);
-        fallbackColor = mix(fallbackTexture, fallbackColor, loadedFrontier);
+        vec3 fallbackColor = mix(fallbackEnvironment, color, fallbackDetail);
+        fallbackColor = mix(fallbackTexture, fallbackColor, fallbackDetail);
         fallbackColor = mix(fallbackColor, FogColor.rgb, fogFactor);
-        fallbackAlpha *= mix(0.18, 1.0, loadedFrontier);
         fragColor = vec4(fallbackColor, fallbackAlpha);
     }
 }

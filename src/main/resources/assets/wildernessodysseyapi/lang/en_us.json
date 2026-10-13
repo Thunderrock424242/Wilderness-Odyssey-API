@@ -1,4 +1,5 @@
 {
+  "subtitles.wildernessodysseyapi.rain_on_water": "Rain patters on water",
   "itemGroup.wildernessodysseyapi": "Wilderness Odyssey API",
   "message.wildernessodysseyapi.cloak_enabled": "Cloak engaged.",
   "message.wildernessodysseyapi.cloak_disabled": "Cloak disengaged.",
@@ -301,6 +302,9 @@
   "loading.wildernessodysseyapi.sampling": "Collecting loading diagnostics...",
   "loading.wildernessodysseyapi.saved": "Diagnostics saved in logs/loading-stalls",
   "loading.wildernessodysseyapi.save_failed": "Could not save diagnostics. Check logs/latest.log for details.",
+  "loading.wildernessodysseyapi.failed.title": "Failed to load world",
+  "loading.wildernessodysseyapi.failed.message": "The world took longer than 10 minutes to load. Try creating a new world, or contact the modpack developers and submit an issue report. Include logs/latest.log and the loading report from logs/loading-stalls.",
+  "loading.wildernessodysseyapi.failed.waiting": "The previous world is still shutting down safely. Please wait before loading another world. If shutdown cannot finish, restart Minecraft and include the loading report with your issue.",
   "loading.wildernessodysseyapi.stage.resources": "Loading resources",
   "loading.wildernessodysseyapi.stage.world_data": "Reading world data",
   "loading.wildernessodysseyapi.stage.world_resources": "Preparing world resources",

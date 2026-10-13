@@ -57,7 +57,8 @@
     "SurfaceWaterAnimalSpawnMixin",
     "TropicalFishSpawnMixin",
     "WalkNodeEvaluatorWaterMixin",
-    "WaterProjectionMutationMixin"
+    "WaterProjectionMutationMixin",
+    "WorldLoadServerCancellationMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -75,9 +76,11 @@
     "GerstnerWaveRenderMixin",
     "GlStateManagerGpuProfilerMixin",
     "IrisWaterMaterialBridgeMixin",
+    "IntegratedServerWorldLoadFailureMixin",
     "LegacyIrisWaterMaterialBridgeMixin",
     "LevelLoadingScreenAccessor",
     "LevelRendererLocalizedWeatherMixin",
+    "MinecraftWorldLoadDeadlineMixin",
     "RenderChunkRegionAccessor",
     "RenderSystemGpuDiagnosticsMixin",
     "SimpleTextureGpuProfilerMixin",

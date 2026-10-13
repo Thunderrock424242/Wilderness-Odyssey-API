@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -68,21 +69,42 @@ class CoastalClientResourcesTest {
     }
 
     @Test
-    void everyCrashAlternativeIsAnAudibleWaterImpact() throws IOException {
+    void coastalAudioUsesItsOwnPlayableAssetsInsteadOfEntitySplashes() throws IOException {
         JsonObject sounds = readJson(
                 "src/main/resources/assets/wildernessodysseyapi/sounds.json");
         for (String soundName : List.of(
                 "coast_wash_soft", "coast_break", "coast_break_rocky", "coast_break_storm")) {
             JsonArray alternatives = sounds.getAsJsonObject(soundName).getAsJsonArray("sounds");
             assertTrue(alternatives.size() > 0, soundName);
-            alternatives.forEach(alternative -> {
+            for (var alternative : alternatives) {
                 JsonObject sound = alternative.getAsJsonObject();
-                assertEquals("event", sound.get("type").getAsString(), soundName);
-                assertTrue(List.of("minecraft:entity.generic.splash",
-                        "minecraft:entity.player.splash.high_speed").contains(
-                        sound.get("name").getAsString()), soundName);
-                assertTrue(sound.get("volume").getAsFloat() >= 0.85f, soundName);
-            });
+                assertEquals("file", sound.get("type").getAsString(), soundName);
+                assertPlayableLocalAsset(sound.get("name").getAsString());
+            }
+        }
+    }
+
+    @Test
+    void rainOnWaterHasSeparatePlayableDropletAssets() throws IOException {
+        JsonObject sounds = readJson("src/main/resources/assets/wildernessodysseyapi/sounds.json");
+        assertTrue(sounds.has("rain_on_water"), "Water rain must have its own sound event");
+        JsonArray alternatives = sounds.getAsJsonObject("rain_on_water").getAsJsonArray("sounds");
+        assertTrue(alternatives.size() >= 2, "Water rain needs variation between short droplet beds");
+        for (var alternative : alternatives) {
+            JsonObject sound = alternative.getAsJsonObject();
+            assertEquals("file", sound.get("type").getAsString());
+            assertPlayableLocalAsset(sound.get("name").getAsString());
+        }
+    }
+
+    private static void assertPlayableLocalAsset(String name) throws IOException {
+        assertTrue(name.startsWith("wildernessodysseyapi:ambient/"), name);
+        Path root = Path.of(System.getProperty("wildernessodysseyapi.projectDir", System.getProperty("user.dir")));
+        Path asset = root.resolve("src/main/resources/assets/wildernessodysseyapi/sounds/"
+                + name.substring(name.indexOf(':') + 1) + ".ogg");
+        assertTrue(Files.isRegularFile(asset), "Missing audio asset: " + name);
+        try (var input = Files.newInputStream(asset)) {
+            assertEquals("OggS", new String(input.readNBytes(4), StandardCharsets.US_ASCII), name);
         }
     }
 
