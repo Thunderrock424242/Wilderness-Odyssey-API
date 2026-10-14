@@ -140,6 +140,17 @@ fragment shader into a hidden 4x4 OpenGL target and checks actual pixels for
 tagged `gpu` and skips when a desktop OpenGL 3.2 context cannot be created; a
 skip is not pixel proof.
 
+The stock liquid renderer uses the water tag for both internal-face culling and
+its sampled-cell/above-cell height comparisons. Vanilla water (including aquatic
+flora and melting ice) and Wilderness water keep distinct gameplay identities,
+but share a continuous fallback mesh. `WaterFluidRenderContinuityTest` checks
+the comparison with registered source/flowing fluids in the normal FML JUnit
+runtime, including air/lava boundaries and preservation of an existing renderer
+match. The JUnit launch uses the server mixin side, so it does not exercise the
+client injection or reproduce a player's dark shoreline or ceiling patch. The
+native Minecraft sampler was separately checked before the fix: mixed water
+returned zero height, or 8/9 height beneath a different water fluid above.
+
 Live acceptance remains necessary:
 
 | Configuration | Observe |
@@ -150,6 +161,7 @@ Live acceptance remains necessary:
 | Paused game with camera rotation; resize; resource reload | Reflections follow the rendered camera; underwater capture remains from the same frame |
 | Calm/storm/shore/underwater/structure views | Regional weather drives appearance; wave and immersion behavior remain coherent |
 | One-block pools and irrigation rows in both directions, including a chunk boundary | Water stays visible after bucket filling, camera movement, and resource reload; farmland hydration and bucket pickup still work |
+| Mixed vanilla/Wilderness water around ice, flora, and overhangs | No depressed fallback corners or internal height gaps; compare before and after a neighboring block update |
 | Dedicated server and two clients with different graphics | Server starts without optional render mods; volume, buoyancy, and weather agree |
 
 Benchmark the same seed, camera route, resolution, view distance, and graphics
