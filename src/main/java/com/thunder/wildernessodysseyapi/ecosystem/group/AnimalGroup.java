@@ -39,6 +39,7 @@ public final class AnimalGroup {
     private GroupBehavior requestedState;
     private BlockPos requestedDestination;
     private long revision;
+    private long completedInteractionRevision = Long.MIN_VALUE;
     private long nextLeaderDecisionAt;
     private long nextValidationAt;
     private DecisionSource decisionSource = DecisionSource.LEADER;
@@ -188,6 +189,7 @@ public final class AnimalGroup {
      * @param escapeTarget shared broad escape target selected by the threat system
      */
     public void reportThreat(BlockPos threatPosition, UUID threatEntityId, BlockPos escapeTarget) {
+        completedInteractionRevision = Long.MIN_VALUE;
         this.threatPosition = immutable(threatPosition);
         this.threatEntityId = threatEntityId;
         this.state = GroupBehavior.FLEE;
@@ -207,6 +209,11 @@ public final class AnimalGroup {
     /** Returns the change revision used to stagger follower reactions. */
     public long revision() {
         return revision;
+    }
+
+    /** Identifies the normally completed leader interaction that local members may finish. */
+    public long completedInteractionRevision() {
+        return completedInteractionRevision;
     }
 
     boolean matches(ResourceLocation profileId, ResourceLocation entityTypeId) {
@@ -281,6 +288,7 @@ public final class AnimalGroup {
         foodAvailability = 0.0;
         threatened = false;
         waterTarget = null;
+        completedInteractionRevision = Long.MIN_VALUE;
         revision++;
     }
 
@@ -293,6 +301,9 @@ public final class AnimalGroup {
     ) {
         this.state = state == null ? GroupBehavior.IDLE : state;
         this.destination = immutable(destination);
+        if (this.state != GroupBehavior.IDLE) {
+            completedInteractionRevision = Long.MIN_VALUE;
+        }
         if (this.state != GroupBehavior.SEEK_WATER || waterTarget != null
                 && !waterTarget.approachPosition().equals(destination)) {
             waterTarget = null;
@@ -310,14 +321,27 @@ public final class AnimalGroup {
         recordDecision(gameTime, decisionInterval);
     }
 
-    /** Clears a completed leader decision unless a newer request has replaced it. */
+    /** Clears a leader decision without allowing interrupted member interactions to finish. */
     public void clearDecisionIfRevision(long expectedRevision) {
         if (revision != expectedRevision || decisionSource != DecisionSource.LEADER) {
             return;
         }
         state = GroupBehavior.IDLE;
         destination = null;
+        completedInteractionRevision = Long.MIN_VALUE;
         revision++;
+    }
+
+    /**
+     * Releases the shared decision after normal completion while allowing already-started
+     * member interactions to finish their own duration. A newer request always wins.
+     */
+    public void completeInteractionIfRevision(long expectedRevision) {
+        if (revision != expectedRevision || decisionSource != DecisionSource.LEADER) {
+            return;
+        }
+        clearDecisionIfRevision(expectedRevision);
+        completedInteractionRevision = expectedRevision;
     }
 
     private void recordDecision(long gameTime, long decisionInterval) {

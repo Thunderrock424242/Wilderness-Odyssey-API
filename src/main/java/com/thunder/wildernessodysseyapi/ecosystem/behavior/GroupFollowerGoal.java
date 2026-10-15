@@ -93,7 +93,7 @@ public final class GroupFollowerGoal extends Goal {
         boolean holdingInteraction = interactions.update(
                 candidateGroup, resolvedLeader.get(), resolvedProfile.get(), gameTime);
         boolean activeDecision = candidateGroup.state() != GroupBehavior.IDLE;
-        if (!activeDecision && leaderDistanceSquared <= followDistance * followDistance) {
+        if (!activeDecision && !holdingInteraction && leaderDistanceSquared <= followDistance * followDistance) {
             return false;
         }
         if (activeDecision
@@ -130,11 +130,12 @@ public final class GroupFollowerGoal extends Goal {
             return false;
         }
         long gameTime = animal.level().getGameTime();
+        if (interactions.update(group, leader, profile, gameTime)) {
+            observedRevision = group.revision();
+            return true;
+        }
         if (group.revision() != observedRevision) {
             return false;
-        }
-        if (interactions.update(group, leader, profile, gameTime)) {
-            return true;
         }
         if (group.state() == GroupBehavior.ALERT) {
             return true;

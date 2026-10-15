@@ -13,6 +13,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.PathfinderMob;
 
+import java.util.Objects;
 import java.util.UUID;
 
 /** Completes cheap individual actions against a leader's shared decision and destination. */
@@ -23,6 +24,10 @@ final class GroupMemberInteractions {
     private long revision = Long.MIN_VALUE;
     private long startedAt = Long.MIN_VALUE;
     private boolean completed;
+    private GroupBehavior action = GroupBehavior.IDLE;
+    private BlockPos destination;
+    private boolean finishingLeaderInteraction;
+    private long completedLeaderRevision = Long.MIN_VALUE;
     private EnvironmentalContext.WaterTarget waterTarget;
     private long nextWaterCheckAt;
 
@@ -36,19 +41,38 @@ final class GroupMemberInteractions {
         if (!(animal.level() instanceof ServerLevel level)) {
             return false;
         }
-        if (!group.id().equals(groupId) || revision != group.revision()) {
+        boolean changedGroup = !group.id().equals(groupId);
+        if (changedGroup || revision != group.revision()) {
+            boolean sameAction = !changedGroup && action == group.state()
+                    && Objects.equals(destination, group.destination());
+            boolean finishingStartedAction = !changedGroup && !completed && startedAt != Long.MIN_VALUE
+                    && group.state() == GroupBehavior.IDLE
+                    && group.completedInteractionRevision()
+                    == (finishingLeaderInteraction ? completedLeaderRevision : revision);
+            if (!sameAction && !finishingStartedAction) {
+                interrupt();
+                startedAt = Long.MIN_VALUE;
+                action = group.state();
+                destination = group.destination();
+                completed = false;
+                waterTarget = group.waterTarget();
+                nextWaterCheckAt = 0L;
+                finishingLeaderInteraction = false;
+                completedLeaderRevision = Long.MIN_VALUE;
+            } else if (finishingStartedAction) {
+                // Normal leader completion releases only its own action. A
+                // member already at the destination keeps its individual clock.
+                finishingLeaderInteraction = true;
+                completedLeaderRevision = group.completedInteractionRevision();
+            }
             groupId = group.id();
             revision = group.revision();
-            startedAt = Long.MIN_VALUE;
-            completed = false;
-            waterTarget = group.waterTarget();
-            nextWaterCheckAt = 0L;
         }
         if (completed) {
             return false;
         }
-        if (group.state() == GroupBehavior.SEEK_WATER && profile.drinking().enabled()) {
-            BlockPos approach = group.destination();
+        if (action == GroupBehavior.SEEK_WATER && profile.drinking().enabled()) {
+            BlockPos approach = destination;
             if (approach == null || animal.distanceToSqr(approach.getCenter()) > 2.25) {
                 interrupt();
                 return false;
@@ -79,7 +103,7 @@ final class GroupMemberInteractions {
             }
             return true;
         }
-        if (group.state() == GroupBehavior.REST) {
+        if (action == GroupBehavior.REST) {
             if (animal.distanceToSqr(leader) > profile.herd().preferredDistance() * profile.herd().preferredDistance()) {
                 interrupt();
                 return false;
@@ -92,10 +116,10 @@ final class GroupMemberInteractions {
             }
             return true;
         }
-        if (group.state() == GroupBehavior.FEED && !profile.predator().enabled()
+        if (action == GroupBehavior.FEED && !profile.predator().enabled()
                 && group.foodAvailability() >= profile.environment().minimumFoodForForage()
-                && group.destination() != null
-                && animal.distanceToSqr(group.destination().getCenter()) <= 4.0) {
+                && destination != null
+                && animal.distanceToSqr(destination.getCenter()) <= 4.0) {
             needs.restoreHunger(0.12);
             complete();
         }
@@ -130,7 +154,20 @@ final class GroupMemberInteractions {
     /** Interruption cannot count travel, panic, or another goal as drinking/rest time. */
     void interrupt() {
         if (!completed) {
+            if (startedAt != Long.MIN_VALUE
+                    && (action == GroupBehavior.SEEK_WATER && needs.behavior() == EcosystemBehaviorState.DRINK
+                    || action == GroupBehavior.REST && needs.behavior() == EcosystemBehaviorState.REST)) {
+                needs.idle();
+            }
             startedAt = Long.MIN_VALUE;
+        }
+        if (finishingLeaderInteraction) {
+            // A higher-priority goal or lost proximity ends this final local
+            // continuation; an idle group cannot start it again afterward.
+            action = GroupBehavior.IDLE;
+            destination = null;
+            finishingLeaderInteraction = false;
+            completedLeaderRevision = Long.MIN_VALUE;
         }
     }
 }

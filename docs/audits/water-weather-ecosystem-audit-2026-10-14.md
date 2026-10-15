@@ -3,11 +3,103 @@
 Date: October 14, 2026. Branch: `in-dev`. Reviewed HEAD:
 `6e6c585bd7b474ede553e9d21a61510c2b9e72b3`, including the existing working tree.
 
-This is an audit, not a remediation. No gameplay source, tests, configuration,
-world saves, or existing modified files were changed by the audit. Findings are
-verified against source control flow; their gameplay triggers were not reproduced
-in a running world. Prior audit results were used for orientation and were not
-counted as current validation.
+The original October 14 audit was read-only. Its findings and source line numbers
+below describe that audited revision. The user subsequently approved correcting
+all thirteen findings; the October 15 remediation follow-up records the resulting
+source changes and new validation separately. Prior audit results supplied
+orientation and are not counted as current validation.
+
+## Remediation follow-up — October 15, 2026
+
+The corrections retain the existing subsystem owners, packet/save schemas,
+loaded-only access, and bounded scheduling. No existing world was migrated or
+implicitly converted. Runtime regression worlds use disposable, separately named
+directories through `-PauditGameTestRun=<name>`; shared or player worlds are not
+deleted to obtain a clean test run.
+
+| Finding | Focused correction | Regression coverage |
+| --- | --- | --- |
+| F01 | Reject unowned fluid-bearing flow destinations and legacy displacement adoption in `CanonicalWater`. Preserve the explicit canonical bubble-column transition. | `WaterAuditGameTests`: gravity and lateral legacy boundaries, accepted block-placement callback, full/partial/empty bubble projection, exact retained volume. |
+| F02 | Initial-choice configuration no longer disables runtime feature helpers; level-owning hydrology, ocean, SPH, entity, and synchronization paths check persisted authority. | Actual level-tick handler with persisted enabled mode and startup setting false; finite parcel conservation and feature-switch checks. |
+| F03 | Vanilla precipitation cannot create collectible snow over supported modeled hydrology. | Real mixed-in `ServerLevel.tickPrecipitation`: unmodeled control accumulates, modeled SWE remains unchanged, existing snow remains intact. |
+| F04 | SavedData lookup preserves membership. Authority capture/commit and vanilla command maintenance trim history with active protection; command admission invalidates old autonomous work and bounds expiry bookkeeping. | Real capture/calculate/apply for active81/cap64, saved64, lookup stability, dormant cleanup, zero-interest cap64, disjoint command travel, and unchanged clear-command invalidation. |
+| F05 | Followers advance individual needs using shared immutable observations and execute local drink/rest/forage interactions through the existing follower goal. Equivalent decisions preserve progress; normal leader completion allows only already-started actions to finish. | Needs advance without another expensive decision; shared drinking/rest; delayed normal completion, equivalent decision revisions, urgent interruption, and cancellation after the completion decision is cleared. |
+| F06 | Existing group manager recovers a missing, suspended, or tamed owner through bounded membership without changing another system's NoAI state. Caller is excluded before the recruitment size limit. | Real suspended-leader recovery and preserved NoAI; two-member discovery with the caller included in the candidate list. |
+| F07 | Revalidate cached targets for the requesting profile, loaded water, dry approach, swimming/depth, and current flood/current conditions. Recheck at interaction start and while drinking. | Real cached swimming target rejected for a non-swimming requester; shared drinking fixture validates its live shoreline target. Dynamic flood/current changes remain a manual acceptance case. |
+| F08 | Use the occupied chunk water-surface height directly. | `WaterCoverageSamplingGameTests`: actual loaded shallow-water columns and dry-bed control. |
+| F09 | Sample vegetation at the occupied ground surface separately from subsurface soil and canopy. | `HydrologyTerrainSamplingGameTests`: real chunk heightmaps over grass versus bare dirt. |
+| F10 | Ground forage probes use the existing bounded no-leaves heightmap path. | Equivalent grass floor beneath a continuous two-layer leaf canopy remains available forage. |
+| F11 | Cold participates in shelter discovery, controller execution, and safe release conditions. | Real covered/exposed positions; clear cold discovery and SEEK_SHELTER; cold hold followed by warm delayed release. |
+| F12 | Validate habitat at the final candidate before spawn finalization, insertion, or population debit. | `DistantWildlifeHabitatGameTests`: final insertion boundary rejects an unsuitable candidate. |
+| F13 | Stagger disturbances across the scheduler's actual ten-tick slots. | `SevereWeatherCadenceTest`: IDs1–10 each receive one opportunity per1200 ticks; off-cadence calls do not publish. |
+
+Independent water/weather review found and corrected the partial bubble-column
+and long vanilla-command retention edge cases. Ecosystem review found the
+normal-completion/revision timing gap. Both final source reviews approved the
+corrections without remaining actionable findings in their reviewed scope.
+The valid lifecycle red run executed 81 tests and failed only the two intended
+lifecycle assertions. The final compiled source passed all 83 required GameTests
+in the fresh `final-green-2` run; the command completed successfully. Earlier
+attempts exposed test isolation and scheduled-callback fixture problems; those
+attempts are not passing evidence.
+
+Reproduce the complete loaded-world check from the repository root:
+
+```powershell
+.\gradlew.bat runGameTestServer '-PcodexBuildDir=.codex-build' --no-parallel '-PauditGameTestRun=final-green-2' '-Dforge.enabledGameTestNamespaces=wildernessodysseyapi,wildernessodysseyapi_weather_tests,wildernessodysseyapi_environment_tests'
+```
+
+Use a new `auditGameTestRun` name for a new disposable world. Evidence is in
+`.codex-build/run-audit-final-green-2/logs/latest.log`; both lifecycle assertions,
+the added interruption/cancellation cases, and the water/weather cases executed.
+The final run used JDK 21 and the checkout's updated Gradle 9.8.1 wrapper. The
+checkout advanced externally to `b0018da6` during a pause, with earlier repairs
+already in Git history; final lifecycle, fixture, and documentation changes were
+then applied on that state. Separate wrapper changes and staged crash-log cleanup
+were preserved.
+
+An earlier broader root unit run completed 1,611 tests with 3 failures, 0 errors,
+and 4 skips.
+Two untouched `AnomalyPostResourceTest` methods read source resources relative to
+ModDev's working directory; `OpenGlDeprecationBoundaryTest` reports existing
+anomaly/rift OpenGL callers outside its expected set. These are separate from the
+audited subsystem regressions. The earlier water/weather-only unit run passed
+696 tests in 164 suites with no failures, errors, or skips; it predates the final
+follower lifecycle correction and is not presented as a final full-suite pass.
+
+Final validation results:
+
+| Check | Result and scope |
+| --- | --- |
+| Source compilation | Passed through the final GameTest and packaging invocations. |
+| Loaded-world regression run | All 83 required tests passed in `final-green-2`; successful Gradle exit. |
+| Final focused unit rerun | Blocked before completed test results by native JVM failures, described below. |
+| Root packaging | `.\gradlew.bat :build '-PcodexBuildDir=.codex-build' --no-parallel` passed. This repository's root build depends on `assemble`; it does not run JUnit. |
+| JAR inspection | The four final ecosystem lifecycle classes plus `CanonicalWater` and `WeatherAuthority` match the compiled class bytes. Mixin configuration and both namespaced `water_flow` fixtures are present. |
+| Diff and preservation | Remediation paths passed `git diff --check`. The four original dirty files were verified against their saved patch before the checkout advanced. Separate wrapper files matched their continuation-time hashes; staged crash-log cleanup was preserved. |
+
+The final focused `:test` invocation selected `watersystem.*`, `weather.*`,
+`ecosystem.*`, `environment.*`, and `vegetation.*` under the normal Gradle runner.
+Its JVM exited with `EXCEPTION_ACCESS_VIOLATION` during mod loading in compiled
+Guava `LocalCache$WeakAccessEntry.setPreviousInAccessQueue`, before test results.
+One process-scoped `JAVA_TOOL_OPTIONS=-Xint` diagnostic retry also exited natively
+in `jvm.dll`, this time during `generateStructures` before unit tests began. The
+temporary option was restored; no persistent JVM, dependency, permission, or
+security setting was changed. These failures are recorded as blocked unit
+validation, without asserting a hardware, JIT, or gameplay-source root cause.
+
+Local evidence is preserved under `.codex-build/audit-remediation/`:
+`focused-unit-jvm-crash.log`, `focused-interpreted-jvm-crash.log`,
+`full-unit-anomaly-failures.xml`, `full-unit-rendering-failure.xml`,
+`final-gametest-green.log`, and `final-jar-inspection.json`.
+
+The generated artifact is `.codex-build/libs/wildernessodysseyapi-5.0.0.jar`,
+SHA-256 `88dbd13a5f748266cbe38eea446a34d86f0b12b66001f5467dc505df9bd6b738`.
+
+Client visuals, shader combinations, live two-client synchronization, existing
+world restart behavior, moving flood/current hazards, biome-border population
+transitions, and representative long-session performance still require gameplay
+acceptance. The documented feature limits later in this report remain unchanged.
 
 ## Intended behavior and ownership
 

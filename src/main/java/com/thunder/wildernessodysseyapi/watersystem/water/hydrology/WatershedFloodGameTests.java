@@ -43,9 +43,16 @@ public final class WatershedFloodGameTests {
                 "Regression fixture could not record the original vegetation"
         );
 
-        int removed = TemporaryFloodManager.recede(level, new WatershedSavedData(), 1);
+        // Other tests may retain legitimate displacement claims in this shared
+        // level. Allow the bounded fair queue to reach this test's own claim.
+        WatershedSavedData watersheds = new WatershedSavedData();
+        int removed = 0;
+        int maximumPasses = ledger.size();
+        for (int pass = 0; pass < maximumPasses && ledger.ownedUnits(position.asLong()) > 0; pass++) {
+            removed += TemporaryFloodManager.recede(level, watersheds, 1);
+        }
         helper.assertTrue(
-                removed == 1
+                removed >= 1
                         && level.getBlockState(position).is(Blocks.SHORT_GRASS)
                         && ledger.ownedUnits(position.asLong()) == 0,
                 "Flood recession did not restore the exact replaceable block state; removed=" + removed

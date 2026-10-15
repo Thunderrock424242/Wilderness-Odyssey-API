@@ -191,6 +191,15 @@ public final class EcosystemRemediationGameTests {
 
     @GameTest(template = "water_flow", batch = "ecosystem_follower_lifecycle", timeoutTicks = 300)
     public static void delayedFollowerFinishesRestAfterLeaderGoalStops(GameTestHelper helper) throws Exception {
+        assertDelayedFollowerRest(helper, false);
+    }
+
+    @GameTest(template = "water_flow", batch = "ecosystem_follower_lifecycle", timeoutTicks = 300)
+    public static void clearingCompletedGroupDecisionCancelsFinishingFollowerRest(GameTestHelper helper) throws Exception {
+        assertDelayedFollowerRest(helper, true);
+    }
+
+    private static void assertDelayedFollowerRest(GameTestHelper helper, boolean interruptAfterLeader) throws Exception {
         Fixture fixture = new Fixture(helper, false);
         try {
             Cow first = fixture.cow(4, 2, 4);
@@ -226,12 +235,21 @@ public final class EcosystemRemediationGameTests {
                 // completion/stop, with a member that begins its own rest later.
                 helper.runAfterDelay(25L, () ->
                         follower.goalSelector.addGoal(3, new GroupFollowerGoal(follower)));
+                if (interruptAfterLeader) {
+                    helper.runAfterDelay(profile.environment().restDurationTicks() + 10L, () -> {
+                        helper.assertTrue(leaderStopped[0] && followerNeeds.interactionStartedAt() != 0L,
+                                "Fixture must interrupt a member already finishing after normal leader completion");
+                        group.clearDecisionIfRevision(group.revision());
+                    });
+                }
                 helper.runAfterDelay(profile.environment().restDurationTicks() + 90L, () -> {
                     try {
                         helper.assertTrue(leaderStopped[0] && leaderNeeds.rest() < 0.75F,
                                 "Fixture leader did not finish through its normal goal lifecycle");
-                        helper.assertTrue(followerNeeds.rest() < 0.75F,
-                                "Delayed follower lost its local rest when the leader goal stopped");
+                        helper.assertTrue(interruptAfterLeader ? followerNeeds.rest() >= 0.79F : followerNeeds.rest() < 0.75F,
+                                interruptAfterLeader
+                                        ? "A cleared completion decision allowed a finishing follower to restore rest"
+                                        : "Delayed follower lost its local rest when the leader goal stopped");
                         helper.succeed();
                     } finally {
                         fixture.close();
@@ -248,6 +266,34 @@ public final class EcosystemRemediationGameTests {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    @GameTest(template = "water_flow", batch = "ecosystem_follower_interrupt", timeoutTicks = 300)
+    public static void urgentGroupDecisionInterruptsFollowerRest(GameTestHelper helper) {
+        Fixture fixture = new Fixture(helper, false);
+        Cow first = fixture.cow(4, 2, 4);
+        Cow second = fixture.cow(6, 2, 4);
+        fixture.whenRegistered(() -> {
+            AnimalGroup group = fixture.group(first);
+            Cow follower = group.getLeader().equals(first.getUUID()) ? second : first;
+            AnimalNeedsState needs = follower.getData(ModAttachments.ANIMAL_NEEDS);
+            needs.setNeeds(0.0, 0.0, 0.8, 0.0, 0.0);
+            int duration = SpeciesBehaviorProfileManager.profileFor(follower).orElseThrow()
+                    .environment().restDurationTicks();
+            group.publishLeaderDecision(GroupBehavior.REST, null, fixture.level.getGameTime(), 1_000L);
+            follower.goalSelector.addGoal(3, new GroupFollowerGoal(follower));
+            helper.runAfterDelay(duration / 2L, () -> group.reportThreat(
+                    follower.blockPosition(), null, follower.blockPosition().east(4)));
+            helper.runAfterDelay(duration + 90L, () -> {
+                try {
+                    helper.assertTrue(needs.rest() >= 0.79F,
+                            "An urgent shared flight decision allowed interrupted rest to complete");
+                    helper.succeed();
+                } finally {
+                    fixture.close();
+                }
+            });
+        });
     }
 
     @GameTest(template = "water_flow", batch = "ecosystem_follower_revisions", timeoutTicks = 300)
@@ -357,18 +403,18 @@ public final class EcosystemRemediationGameTests {
                                 "A follower at shared safe water did not finish drinking");
                         needs.setNeeds(needs.thirst(), needs.hunger(), 0.8, 0.0, 0.0);
                         group.publishLeaderDecision(GroupBehavior.REST, null, fixture.level.getGameTime(), 1_000L);
-                        helper.runAfterDelay(180L, () -> {
-                            try {
-                                helper.assertTrue(needs.rest() < 0.75F,
-                                        "A follower did not recover rest from the shared resting decision");
-                                helper.succeed();
-                            } finally {
-                                fixture.close();
-                            }
-                        });
                     } catch (Throwable failure) {
                         fixture.close();
                         throw failure;
+                    }
+                });
+                helper.runAfterDelay(330L, () -> {
+                    try {
+                        helper.assertTrue(needs.rest() < 0.75F,
+                                "A follower did not recover rest from the shared resting decision");
+                        helper.succeed();
+                    } finally {
+                        fixture.close();
                     }
                 });
             });
@@ -451,7 +497,9 @@ public final class EcosystemRemediationGameTests {
 
         private void whenRegistered(CheckedAction action) {
             long initialVisible = animals.stream().filter(animal -> level.getEntity(animal.getUUID()) == animal).count();
-            helper.runAfterDelay(2L, () -> {
+            // Sequence callbacks run after the scheduled-runnable map has been
+            // traversed, so action fixtures may safely register later assertions.
+            helper.startSequence().thenExecuteAfter(2, () -> {
                 boolean previousZones = EcosystemConfig.SIMULATION_ZONES_ENABLED.get();
                 try {
                     helper.assertTrue(animals.stream().allMatch(animal -> level.getEntity(animal.getUUID()) == animal),

@@ -57,6 +57,7 @@ public final class EcosystemBehaviorGoal extends Goal {
     private long inheritedRevision = Long.MIN_VALUE;
     private EnvironmentalContext.WaterTarget activeWaterTarget;
     private long nextWaterSafetyCheckAt;
+    private boolean completedGroupInteraction;
 
     public EcosystemBehaviorGoal(PathfinderMob animal) {
         this.animal = animal;
@@ -262,6 +263,7 @@ public final class EcosystemBehaviorGoal extends Goal {
 
     @Override
     public void start() {
+        completedGroupInteraction = false;
         attackDelay = 0;
         nextNavigationUpdateAt = 0L;
         EcosystemBehaviorState behavior = needs.behavior();
@@ -349,8 +351,13 @@ public final class EcosystemBehaviorGoal extends Goal {
         activeWaterTarget = null;
         nextWaterSafetyCheckAt = 0L;
         if (activeGroup != null) {
-            activeGroup.clearDecisionIfRevision(activeGroupRevision);
+            if (completedGroupInteraction) {
+                activeGroup.completeInteractionIfRevision(activeGroupRevision);
+            } else {
+                activeGroup.clearDecisionIfRevision(activeGroupRevision);
+            }
         }
+        completedGroupInteraction = false;
         activeGroup = null;
         activeGroupRevision = Long.MIN_VALUE;
         if (needs.behavior() != EcosystemBehaviorState.IDLE) {
@@ -641,6 +648,7 @@ public final class EcosystemBehaviorGoal extends Goal {
                 : needs.interactionStartedAt();
         if (gameTime - startedAt >= activeProfile.drinking().durationTicks()) {
             needs.restoreThirst(activeProfile.drinking().thirstRestored());
+            completedGroupInteraction = true;
             needs.idle();
         }
     }
@@ -709,6 +717,7 @@ public final class EcosystemBehaviorGoal extends Goal {
                     && target != null
                     && animal.distanceToSqr(target.getCenter()) <= 4.0) {
                 needs.restoreHunger(0.12);
+                completedGroupInteraction = true;
             }
             needs.idle();
             needs.scheduleEvaluation(gameTime + 5L + Math.floorMod(animal.getId(), 12));
@@ -722,6 +731,7 @@ public final class EcosystemBehaviorGoal extends Goal {
                 : activeProfile.environment().restDurationTicks();
         if (gameTime - needs.actionStartedAt() >= duration) {
             needs.recoverRest(needs.behavior() == EcosystemBehaviorState.SLEEP ? 0.45 : 0.20);
+            completedGroupInteraction = true;
             needs.idle();
         }
     }
@@ -830,6 +840,17 @@ public final class EcosystemBehaviorGoal extends Goal {
         if (!activeProfile.environment().supports(inherited)
                 && inherited != EcosystemBehaviorState.ALERT) {
             inherited = EcosystemBehaviorState.IDLE;
+        }
+        // A local member owns arrival and duration once it starts interacting.
+        // Idle publication after leader completion or an equivalent refresh
+        // must not replace that member's action clock or attachment state.
+        if (needs.interactionStartedAt() != 0L
+                && (needs.behavior() == EcosystemBehaviorState.DRINK
+                || needs.behavior() == EcosystemBehaviorState.REST)
+                && (inherited == EcosystemBehaviorState.IDLE || inherited == needs.behavior())) {
+            needs.setDiagnostics("finishing local group interaction", needs.weatherResponse(),
+                    "follower members=" + group.memberCount(), simulationLod);
+            return;
         }
         if (inherited == EcosystemBehaviorState.IDLE) {
             needs.idle();

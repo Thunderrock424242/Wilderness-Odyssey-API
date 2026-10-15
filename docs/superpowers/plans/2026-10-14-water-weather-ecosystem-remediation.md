@@ -39,13 +39,13 @@ Likely files: `CanonicalWater`, `WaterSimulationConfig`, `WildernessFluidRegistr
 new dedicated GameTest classes. Preserve the already modified water safety
 GameTest and debug-command files.
 
-- [ ] Add regression coverage for vanilla/custom gravity and lateral boundaries,
+- [x] Add regression coverage for vanilla/custom gravity and lateral boundaries,
   persisted mode with a changed startup setting, shallow surface water, and
   grass-versus-bare soil admission.
-- [ ] Run the smallest selected regressions and record failing behavior.
-- [ ] Reject unowned fluid-bearing destinations; make runtime budgets agree with
+- [x] Run the smallest selected regressions and record failing behavior.
+- [x] Reject unowned fluid-bearing destinations; make runtime budgets agree with
   persisted authority; sample occupied surface water and vegetation correctly.
-- [ ] Run focused tests, then loaded-world regressions; inspect compatibility gates.
+- [x] Run focused tests, then loaded-world regressions; inspect compatibility gates.
 
 ## Task 2: Ecosystem needs, owner lifecycle, targets, and habitat
 
@@ -57,17 +57,17 @@ Likely files: `EcosystemBehaviorGoal`, `GroupFollowerGoal`, `AnimalGroupManager`
 `CachedFoodAvailabilityService`, `DefaultEcosystemBehaviorController`,
 `DistantWildlifeManager`, and focused unit/GameTest coverage.
 
-- [ ] Add failing regressions for follower need progression/action completion,
+- [x] Add failing regressions for follower need progression/action completion,
   suspended leader recovery, unsafe cached water, canopy forage, clear cold
   shelter discovery/execution/release, and final candidate habitat rejection.
-- [ ] Have root execute red tests before production changes for each batch.
-- [ ] Implement cheap per-animal physiology and completion using shared group
+- [x] Have root execute red tests before production changes for each batch.
+- [x] Implement cheap per-animal physiology and completion using shared group
   decisions; preserve leader ownership of expensive context work.
-- [ ] Reassign ineligible group owners through existing lifecycle paths.
-- [ ] Revalidate drinking targets and abilities at reuse and interaction start.
-- [ ] Use bounded ground forage probes, connect cold shelter behavior, and check
+- [x] Reassign ineligible group owners through existing lifecycle paths.
+- [x] Revalidate drinking targets and abilities at reuse and interaction start.
+- [x] Use bounded ground forage probes, connect cold shelter behavior, and check
   final materialization habitat before insertion/debit.
-- [ ] Run focused unit and loaded-world regressions through root; self-review.
+- [x] Run focused unit and loaded-world regressions through root; self-review.
 
 ## Task 3: Weather snow ownership, batch retention, and severe cadence
 
@@ -77,20 +77,24 @@ root runs all tests. Findings F03, F04, F13. No water/ecosystem edits.
 Likely files: `ServerLevelLocalizedPrecipitationMixin`, `AtmosphereSavedData`,
 `WeatherAuthority`, `SevereWeatherScheduler`, and focused JUnit/GameTests.
 
-- [ ] Add failing regressions for modeled snow through real vanilla precipitation,
+- [x] Add failing regressions for modeled snow through real vanilla precipitation,
   active footprint exceeding a valid retention cap, and severe IDs 1-10.
-- [ ] Have root execute red tests before production changes.
-- [ ] Preserve modeled SWE ownership, prevent lookup-time destructive trimming,
+- [x] Have root execute red tests before production changes.
+- [x] Preserve modeled SWE ownership, prevent lookup-time destructive trimming,
   and schedule disturbance opportunities in the scheduler's actual time slots.
-- [ ] Run focused unit and loaded-world regressions through root; self-review.
+- [x] Run focused unit and loaded-world regressions through root; self-review.
 
 ## Task 4: Integration, independent review, and report
 
-- [ ] Compile the affected source and run selected root subsystem tests.
-- [ ] Run the applicable GameTest namespaces serially and confirm tests actually execute.
-- [ ] Obtain independent review of conservation, lifecycle, and cross-system behavior;
+- [x] Compile the affected source and run selected root subsystem tests.
+- [x] Run the applicable GameTest namespaces serially and confirm tests actually execute.
+- [x] Obtain independent review of conservation, lifecycle, and cross-system behavior;
   correct actionable findings and rerun affected checks.
-- [ ] Run root packaging if needed for mixin/GameTest/resource integration.
-- [ ] Update the audit with a correction/coverage matrix and exact evidence.
-- [ ] Review diffs for unrelated changes, generated output, temporary diagnostics,
+- [x] Run root packaging if needed for mixin/GameTest/resource integration.
+- [x] Update the audit with a correction/coverage matrix and exact evidence.
+- [x] Review diffs for unrelated changes, generated output, temporary diagnostics,
   secrets, and machine-specific paths. Report manual client/modpack limits honestly.
+
+## Completion evidence
+
+All thirteen source findings corrected. Final fresh runtime: 83/83 required GameTests passed. Independent water/weather and ecosystem source review approved. Root :build passed; relevant JAR class bytes and fixtures verified. Final focused JUnit was attempted but blocked by two native JVM failures before completed results (normal runner and temporary interpreter diagnostic); the earlier full root suite had three unrelated failures. No final full-suite pass is claimed. See the audit follow-up for exact evidence and remaining gameplay acceptance.
