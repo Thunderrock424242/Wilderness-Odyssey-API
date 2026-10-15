@@ -321,24 +321,26 @@ public final class WaterSimulationConfig {
     private WaterSimulationConfig() {
     }
 
-    /** Returns whether the pack-level Wilderness water master switch is enabled. */
+    /** Returns the initial choice; runtime admission uses the world's persisted mode. */
     public static boolean wildernessWaterEnabled() {
         return ENABLE_WILDERNESS_ODYSSEY_WATER.get();
     }
 
+    // Runtime owners combine these feature switches/budgets with
+    // WildernessWaterRules.isEnabled(level), the persisted world authority.
     /** Returns whether successful bucket interactions may update custom authority. */
     public static boolean vanillaBucketCompatEnabled() {
-        return wildernessWaterEnabled() && ENABLE_VANILLA_BUCKET_COMPAT.get();
+        return ENABLE_VANILLA_BUCKET_COMPAT.get();
     }
 
     /** Returns whether vanilla boats may consume custom buoyancy/current state. */
     public static boolean vanillaBoatCompatEnabled() {
-        return wildernessWaterEnabled() && ENABLE_VANILLA_BOAT_COMPAT.get();
+        return ENABLE_VANILLA_BOAT_COMPAT.get();
     }
 
     /** Returns whether centralized entity water-state sampling is active. */
     public static boolean entityWaterCompatEnabled() {
-        return wildernessWaterEnabled() && ENABLE_ENTITY_WATER_COMPAT.get();
+        return ENABLE_ENTITY_WATER_COMPAT.get();
     }
 
     /** Returns the synchronized server threshold for native entity splash audio, in blocks. */
@@ -383,17 +385,17 @@ public final class WaterSimulationConfig {
 
     /** Returns whether exact fishing-effect checks recognize Wilderness water. */
     public static boolean fishingCompatEnabled() {
-        return wildernessWaterEnabled() && ENABLE_FISHING_COMPAT.get();
+        return ENABLE_FISHING_COMPAT.get();
     }
 
     /** Returns whether explicit structure water markers convert during placement. */
     public static boolean structureWaterMarkersEnabled() {
-        return wildernessWaterEnabled() && ENABLE_STRUCTURE_WATER_MARKERS.get();
+        return ENABLE_STRUCTURE_WATER_MARKERS.get();
     }
 
     /** Returns whether the transactional NeoForge fluid-handler bridge is enabled. */
     public static boolean fluidHandlerCompatEnabled() {
-        return wildernessWaterEnabled() && ENABLE_FLUID_HANDLER_COMPAT.get();
+        return ENABLE_FLUID_HANDLER_COMPAT.get();
     }
 
     /** Returns whether Create-local water recognition and world transfer reconciliation are enabled. */
@@ -403,7 +405,7 @@ public final class WaterSimulationConfig {
 
     /** Returns the active local-cell flow budget for one server tick. */
     public static int localFlowCellsPerTick() {
-        return wildernessWaterEnabled() ? LOCAL_FLOW_CELLS_PER_TICK.get() : 0;
+        return LOCAL_FLOW_CELLS_PER_TICK.get();
     }
 
     /** Soft server-thread flow budget, checked between cell transactions. */
@@ -423,18 +425,17 @@ public final class WaterSimulationConfig {
 
     /** Returns how many high-level water-body regions may update in one dimension tick. */
     public static int waterBodyUpdatesPerTick() {
-        return wildernessWaterEnabled() ? WATER_BODY_UPDATES_PER_TICK.get() : 0;
+        return WATER_BODY_UPDATES_PER_TICK.get();
     }
 
     /** Returns how many compact local water network events may be sent in one dimension tick. */
     public static int localWaterNetworkEventsPerTick() {
-        return wildernessWaterEnabled() ? LOCAL_WATER_NETWORK_EVENTS_PER_TICK.get() : 0;
+        return LOCAL_WATER_NETWORK_EVENTS_PER_TICK.get();
     }
 
     /** Returns whether server-owned local SPH is allowed for gameplay-critical active water. */
     public static boolean serverSphLocalSimulationEnabled() {
-        return wildernessWaterEnabled()
-                && ENABLE_SERVER_SPH_LOCAL_SIMULATION.get()
+        return ENABLE_SERVER_SPH_LOCAL_SIMULATION.get()
                 && SERVER_SPH_MAX_ACTIVE_BODIES.get() > 0
                 && SERVER_SPH_PARTICLE_TICK_BUDGET.get() > 0;
     }
@@ -456,7 +457,7 @@ public final class WaterSimulationConfig {
 
     /** Returns whether localized weather may drive authoritative water response. */
     public static boolean weatherWaterCouplingEnabled() {
-        return wildernessWaterEnabled() && ENABLE_WEATHER_WATER_COUPLING.get();
+        return ENABLE_WEATHER_WATER_COUPLING.get();
     }
 
     /** Returns the regional sea-state cell width in blocks. */
@@ -531,7 +532,7 @@ public final class WaterSimulationConfig {
 
     /** Returns whether chunk-scale watershed conditions are active. */
     public static boolean watershedSimulationEnabled() {
-        return wildernessWaterEnabled() && ENABLE_WATERSHED_SIMULATION.get();
+        return ENABLE_WATERSHED_SIMULATION.get();
     }
 
     /** Returns normalized rainfall memory added by one simulation pass. */
@@ -593,7 +594,7 @@ public final class WaterSimulationConfig {
 
     /** Returns the per-dimension exact recession budget. */
     public static int maximumFloodRemovalsPerTick() {
-        return wildernessWaterEnabled() ? FLOOD_MAX_REMOVALS_PER_TICK.get() : 0;
+        return FLOOD_MAX_REMOVALS_PER_TICK.get();
     }
 
     /** Returns the player-centered loaded-chunk simulation radius. */

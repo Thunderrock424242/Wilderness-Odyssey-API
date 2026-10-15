@@ -132,9 +132,11 @@ public final class AtmosphereSavedData extends SavedData {
 
     private void applySettings(WeatherConfig.SchedulingSettings settings) {
         boolean changed = grid.ensureCellSize(settings.cellSize());
+        changed |= maxPersistedCells != settings.maxPersistedCells();
         maxPersistedCells = settings.maxPersistedCells();
-        int removed = grid.trimToLimit(maxPersistedCells, null);
-        if (changed || removed > 0) {
+        // Lookups also occur between capture and apply. Membership eviction is
+        // authority-owned at capture/commit, where active inputs are protected.
+        if (changed) {
             setDirty();
         }
     }

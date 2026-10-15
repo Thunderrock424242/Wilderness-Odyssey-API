@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.hydrology;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
@@ -23,6 +24,7 @@ public final class RegionalHydrologyManager {
 
     /** Admission only uses a chunk already supplied by the normal world lifecycle. */
     public static void onChunkLoad(ServerLevel level, LevelChunk chunk, WatershedChunkState metadata) {
+        if (!WildernessWaterRules.isEnabled(level)) return;
         RegionalHydrologySavedData data = RegionalHydrologySavedData.get(level);
         long key = chunk.getPos().toLong();
         RegionalHydrologyState state = data.state(key);
@@ -42,6 +44,7 @@ public final class RegionalHydrologyManager {
 
     /** Invalidates cached DEM only for an edited loaded terrain cell; retains exact inventory. */
     public static void terrainChanged(ServerLevel level, LevelChunk chunk, WatershedChunkState metadata) {
+        if (!WildernessWaterRules.isEnabled(level)) return;
         RegionalHydrologySavedData data = RegionalHydrologySavedData.get(level);
         RegionalHydrologyState state = data.state(chunk.getPos().toLong());
         if (state == null) return;
@@ -51,6 +54,10 @@ public final class RegionalHydrologyManager {
     }
 
     public static void tickLevel(ServerLevel level, WatershedSavedData metadata) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            clearLevel(level);
+            return;
+        }
         long started = System.nanoTime();
         if (!WaterSimulationConfig.watershedSimulationEnabled() && !WaterSimulationConfig.weatherHydrologyEnabled()) {
             clearLevel(level);
@@ -137,7 +144,8 @@ public final class RegionalHydrologyManager {
     }
 
     private static void refreshForcing(ServerLevel level, RegionalHydrologyState state) {
-        boolean enabled = WaterSimulationConfig.weatherWaterCouplingEnabled() && WeatherConfig.dimensionEnabled(level.dimension());
+        boolean enabled = WildernessWaterRules.isEnabled(level)
+                && WaterSimulationConfig.weatherWaterCouplingEnabled() && WeatherConfig.dimensionEnabled(level.dimension());
         ChunkPos chunk = new ChunkPos(state.key);
         BlockPos position = new BlockPos(chunk.getMiddleBlockX(),
                 (int) state.elevation + 1, chunk.getMiddleBlockZ());

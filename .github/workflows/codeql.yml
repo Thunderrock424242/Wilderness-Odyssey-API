@@ -1,3 +1,4 @@
+
 name: CodeQL Security Analysis
 
 on:
@@ -8,16 +9,19 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
   contents: read
-  packages: read
-  security-events: write
 
 jobs:
   codeql-java:
-    name: CodeQL Java
+    name: CodeQL Java (Mod + Aether)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      security-events: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -38,8 +42,11 @@ jobs:
           build-mode: manual
           dependency-caching: true
 
-      - name: Compile project for CodeQL
-        run: ./gradlew compileJava -PcodexBuildDir=.codeql-build --no-daemon --console=plain --max-workers=1 --rerun-tasks --no-build-cache
+      - name: Compile Minecraft mod and standalone Aether gateway
+        run: |
+          ./gradlew compileJava :aether-server:compileJava \
+            -PcodexBuildDir=.codeql-build \
+            --no-daemon --console=plain --max-workers=1 --rerun-tasks --no-build-cache
 
       - name: Analyze Java
         uses: github/codeql-action/analyze@v4
@@ -47,41 +54,54 @@ jobs:
           category: codeql-java
 
   qodana:
-    name: Qodana JVM
+    name: Qodana JVM Community
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      security-events: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Inspect with Qodana
+      - name: Scan with Qodana
         uses: JetBrains/qodana-action@v2026.2
         with:
           linter: jetbrains/qodana-jvm-community
           results-dir: ${{ runner.temp }}/qodana/results
           upload-result: true
+          post-pr-comment: false
+          use-annotations: false
+          push-fixes: none
 
-      - name: Upload Qodana SARIF
+      - name: Upload Qodana SARIF to code scanning
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
           category: qodana-jvm
 
   codeql-actions:
-    name: CodeQL Actions
+    name: CodeQL GitHub Actions
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Initialize CodeQL for workflows
+      - name: Initialize CodeQL for GitHub Actions
         uses: github/codeql-action/init@v4
         with:
           languages: actions
 
-      - name: Analyze workflows
+      - name: Analyze GitHub Actions workflows
         uses: github/codeql-action/analyze@v4
         with:
           category: codeql-actions

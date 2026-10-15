@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.network;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaStateField;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -16,7 +17,7 @@ public final class OceanSeaStateSynchronizer {
     public static void syncLevel(ServerLevel level) {
         for (var player : level.players()) {
             OceanSeaStatePayload payload;
-            if (WaterSimulationConfig.weatherWaterCouplingEnabled()
+            if (WildernessWaterRules.isEnabled(level) && WaterSimulationConfig.weatherWaterCouplingEnabled()
                     && WeatherConfig.dimensionEnabled(level.dimension())) {
                 payload = OceanSeaStatePayload.regional(
                         WaterSimulationConfig.seaStateCellSize(),

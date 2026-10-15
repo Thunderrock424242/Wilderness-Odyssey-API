@@ -43,10 +43,12 @@ public final class GroupFollowerGoal extends Goal {
     private long lastProgressAt;
     private double closestTargetDistanceSquared = Double.MAX_VALUE;
     private boolean usingNavigation;
+    private final GroupMemberInteractions interactions;
 
     /** Creates the low-priority follower controller for one profiled pathfinding animal. */
     public GroupFollowerGoal(PathfinderMob animal) {
         this.animal = animal;
+        interactions = new GroupMemberInteractions(animal);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
@@ -88,11 +90,14 @@ public final class GroupFollowerGoal extends Goal {
         double targetDistanceSquared = animal.position().distanceToSqr(target);
         double followDistance = resolvedPlan.get().followDistance(EcosystemConfig.FOLLOW_DISTANCE.get());
         double leaderDistanceSquared = animal.distanceToSqr(resolvedLeader.get());
+        boolean holdingInteraction = interactions.update(
+                candidateGroup, resolvedLeader.get(), resolvedProfile.get(), gameTime);
         boolean activeDecision = candidateGroup.state() != GroupBehavior.IDLE;
         if (!activeDecision && leaderDistanceSquared <= followDistance * followDistance) {
             return false;
         }
         if (activeDecision
+                && !holdingInteraction
                 && candidateGroup.state() != GroupBehavior.ALERT
                 && targetDistanceSquared <= 4.0) {
             return false;
@@ -100,6 +105,7 @@ public final class GroupFollowerGoal extends Goal {
         double catchUpDistance = followDistance + EcosystemConfig.GROUP_FORMATION_RADIUS.get() * 1.5;
         if (candidateGroup.state() != GroupBehavior.FLEE
                 && candidateGroup.state() != GroupBehavior.ALERT
+                && !holdingInteraction
                 && resolvedPlan.get().pausesAt(gameTime)
                 && leaderDistanceSquared <= catchUpDistance * catchUpDistance) {
             return false;
@@ -126,6 +132,9 @@ public final class GroupFollowerGoal extends Goal {
         long gameTime = animal.level().getGameTime();
         if (group.revision() != observedRevision) {
             return false;
+        }
+        if (interactions.update(group, leader, profile, gameTime)) {
+            return true;
         }
         if (group.state() == GroupBehavior.ALERT) {
             return true;
@@ -163,6 +172,12 @@ public final class GroupFollowerGoal extends Goal {
             return;
         }
         long gameTime = animal.level().getGameTime();
+        if (interactions.update(group, leader, profile, gameTime)) {
+            animal.getNavigation().stop();
+            usingNavigation = false;
+            animal.getLookControl().setLookAt(leader, 25.0F, 25.0F);
+            return;
+        }
         if (group.state() == GroupBehavior.ALERT) {
             animal.getNavigation().stop();
             animal.getLookControl().setLookAt(leader, 28.0F, 24.0F);
@@ -210,6 +225,7 @@ public final class GroupFollowerGoal extends Goal {
             animal.getNavigation().stop();
         }
         usingNavigation = false;
+        interactions.interrupt();
         group = null;
         leader = null;
         profile = null;
@@ -228,6 +244,9 @@ public final class GroupFollowerGoal extends Goal {
             long gameTime
     ) {
         Vec3 destination = group.destination() == null ? null : group.destination().getCenter();
+        if (group.state() == GroupBehavior.SEEK_WATER && destination != null) {
+            return destination;
+        }
         return GroupFormationPlanner.target(
                 leader.position(),
                 destination,

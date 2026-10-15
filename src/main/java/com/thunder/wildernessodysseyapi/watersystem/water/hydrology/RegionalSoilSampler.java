@@ -15,11 +15,17 @@ final class RegionalSoilSampler {
         int[] counts = new int[SoilHydrologyModel.SoilProfile.values().length];
         int vegetation = 0;
         for (int z = 2; z < 16; z += 4) for (int x = 2; x < 16; x += 4) {
-            int y = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
-            BlockState block = chunk.getBlockState(new BlockPos(chunk.getPos().getMinBlockX() + x,
-                    y, chunk.getPos().getMinBlockZ() + z));
+            int y = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            BlockPos surface = new BlockPos(chunk.getPos().getMinBlockX() + x,
+                    y, chunk.getPos().getMinBlockZ() + z);
+            BlockState block = chunk.getBlockState(surface.below());
             counts[classify(block).ordinal()]++;
-            if (block.is(Blocks.GRASS_BLOCK) || block.is(BlockTags.LEAVES)) vegetation++;
+            BlockState surfaceBlock = chunk.getBlockState(surface);
+            if (surfaceBlock.is(Blocks.GRASS_BLOCK)
+                    || chunk.getBlockState(new BlockPos(surface.getX(),
+                    chunk.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), surface.getZ())).is(BlockTags.LEAVES)) {
+                vegetation++;
+            }
         }
         int winner = 0;
         for (int i = 1; i < counts.length; i++) if (counts[i] > counts[winner]) winner = i;

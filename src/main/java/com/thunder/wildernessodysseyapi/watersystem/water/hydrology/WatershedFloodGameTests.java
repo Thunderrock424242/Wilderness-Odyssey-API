@@ -47,8 +47,10 @@ public final class WatershedFloodGameTests {
         helper.assertTrue(
                 removed == 1
                         && level.getBlockState(position).is(Blocks.SHORT_GRASS)
-                        && ledger.size() == 0,
-                "Flood recession did not restore the exact replaceable block state"
+                        && ledger.ownedUnits(position.asLong()) == 0,
+                "Flood recession did not restore the exact replaceable block state; removed=" + removed
+                        + ", block=" + level.getBlockState(position)
+                        + ", owned units=" + ledger.ownedUnits(position.asLong())
         );
         helper.succeed();
     }

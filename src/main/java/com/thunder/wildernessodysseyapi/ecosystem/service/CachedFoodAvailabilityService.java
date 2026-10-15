@@ -58,11 +58,13 @@ public final class CachedFoodAvailabilityService implements FoodAvailabilityServ
                 if (!level.hasChunkAt(horizontal)) {
                     continue;
                 }
-                int y = level.getHeight(Heightmap.Types.WORLD_SURFACE, horizontal.getX(), horizontal.getZ()) - 1;
+                // Leaves are presentation above forage, not the ground that a herbivore eats.
+                int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                        horizontal.getX(), horizontal.getZ()) - 1;
                 BlockPos surface = new BlockPos(horizontal.getX(), y, horizontal.getZ());
                 samples++;
                 if (level.getBlockState(surface).is(EcosystemTags.FORAGE_BLOCKS)
-                        || level.getBlockState(surface.below()).is(EcosystemTags.FORAGE_BLOCKS)) {
+                        || level.getBlockState(surface.above()).is(EcosystemTags.FORAGE_BLOCKS)) {
                     forage++;
                 }
             }

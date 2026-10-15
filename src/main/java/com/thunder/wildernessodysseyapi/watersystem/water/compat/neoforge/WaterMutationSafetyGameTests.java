@@ -17,6 +17,9 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -26,6 +29,81 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public final class WaterMutationSafetyGameTests {
     private WaterMutationSafetyGameTests() { }
+
+    /** Real bucket placement must reach the ordinary server ticker without a manual solver call. */
+    @GameTest(template = "water_flow", timeoutTicks = 100)
+    public static void vanillaBucketFlowsAlongOneBlockTrench(GameTestHelper helper) {
+        bucketFlowsAlongTrench(helper, (BucketItem) Items.WATER_BUCKET);
+    }
+
+    /** The custom bucket must follow the same automatic, conserved flow path. */
+    @GameTest(template = "water_flow", timeoutTicks = 100)
+    public static void wildernessBucketFlowsAlongOneBlockTrench(GameTestHelper helper) {
+        bucketFlowsAlongTrench(helper, WildernessFluidRegistry.WILDERNESS_WATER_BUCKET.get());
+    }
+
+    private static void bucketFlowsAlongTrench(GameTestHelper helper, BucketItem bucket) {
+        var level = helper.getLevel();
+        BlockPos source = helper.absolutePos(new BlockPos(3, 3, 4));
+        for (int x = -3; x <= 3; x++) {
+            for (int z = -1; z <= 1; z++) {
+                level.setBlock(source.offset(x, -1, z), Blocks.STONE.defaultBlockState(), 3);
+                level.setBlock(source.offset(x, 0, z), z != 0 || Math.abs(x) == 3
+                        ? Blocks.STONE.defaultBlockState() : Blocks.AIR.defaultBlockState(), 3);
+            }
+        }
+        helper.assertTrue(bucket.emptyContents(null, level, source, null, new ItemStack(bucket)),
+                "Bucket placement failed in an empty trench");
+        helper.assertTrue(CanonicalWater.get(level, source).volumeUnits() == WaterVolumeChunk.UNITS_PER_BLOCK,
+                "Bucket did not establish exactly one conserved block of water");
+
+        // Deliberately do not call tickCell: this covers event registration,
+        // active-queue admission, and physical projection through normal ticks.
+        helper.succeedWhen(() -> {
+            helper.assertTrue(CanonicalWater.get(level, source.west()).volumeUnits() > 0
+                            && CanonicalWater.get(level, source.east()).volumeUnits() > 0,
+                    "Bucket stayed in one cell: " + CanonicalWater.get(level, source)
+                            + "; " + WildernessFluidRegistry.diagnostics(level));
+            int total = 0;
+            for (int x = -2; x <= 2; x++) {
+                BlockPos cell = source.offset(x, 0, 0);
+                int units = CanonicalWater.get(level, cell).volumeUnits();
+                total += units;
+                if (units > 0) {
+                    helper.assertTrue(!level.getFluidState(cell).isEmpty(),
+                            "Flow reached a trench cell without a visible fluid projection: " + cell);
+                }
+            }
+            helper.assertTrue(total == WaterVolumeChunk.UNITS_PER_BLOCK,
+                    "Trench flow created or lost water: " + total);
+        });
+    }
+
+    /** Collecting live flow evidence must not wake, drain, or reproject the inspected water. */
+    @GameTest(template = "water_flow")
+    public static void flowInspectionLeavesCanonicalWaterUnchanged(GameTestHelper helper)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        var level = helper.getLevel();
+        BlockPos position = helper.absolutePos(new BlockPos(4, 4, 4));
+        CanonicalWater.set(level, position, WaterVolumeChunk.WaterCell.still(3072,
+                WaterVolumeChunk.FLAG_COMPATIBILITY_PROJECTED | WaterVolumeChunk.FLAG_SLEEPING), true, false);
+        var before = CanonicalWater.get(level, position);
+        var blockBefore = level.getBlockState(position);
+        var volume = level.getChunkAt(position).getData(ModAttachments.WATER_VOLUME);
+        long revisionBefore = volume.revision();
+        int queueBefore = CanonicalWater.diagnostics(level).queuedCells();
+        var commandSource = level.getServer().createCommandSourceStack().withLevel(level).withSuppressedOutput();
+
+        int result = level.getServer().getCommands().getDispatcher().execute(
+                "wowater inspect " + position.getX() + " " + position.getY() + " " + position.getZ(), commandSource);
+
+        helper.assertTrue(result == 1, "Flow inspection command did not execute successfully");
+        helper.assertTrue(before.equals(CanonicalWater.get(level, position)), "Inspection changed canonical water");
+        helper.assertTrue(blockBefore.equals(level.getBlockState(position)), "Inspection changed physical water");
+        helper.assertTrue(revisionBefore == volume.revision(), "Inspection created a water revision");
+        helper.assertTrue(queueBefore == CanonicalWater.diagnostics(level).queuedCells(), "Inspection changed flow work");
+        helper.succeed();
+    }
 
     @GameTest(template = "water_flow")
     public static void shapeContextRestoresAfterNestedFailure(GameTestHelper helper) {

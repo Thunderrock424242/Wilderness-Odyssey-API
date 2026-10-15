@@ -618,7 +618,8 @@ public final class WeatherAuthority implements WeatherQuery {
 
         // Vanilla weather commands are dimension-wide. Existing dormant cells
         // and every currently player-relevant cell receive the same override.
-        Set<Long> targetKeys = collectActiveKeys(level, scheduling);
+        Set<Long> activeKeys = collectActiveKeys(level, scheduling);
+        Set<Long> targetKeys = new HashSet<>(activeKeys);
         for (AtmosphereView view : data.grid().views()) {
             targetKeys.add(view.key().packed());
         }
@@ -632,8 +633,11 @@ public final class WeatherAuthority implements WeatherQuery {
                 gameTime,
                 true
         );
-        if (changed > 0) {
+        int removed = trimVanillaCommandHistory(runtime, data, scheduling, activeKeys);
+        if (changed > 0 || removed > 0) {
             data.markChanged();
+        }
+        if (changed > 0) {
             WeatherSnapshotManager.markLevelDirty(level.dimension());
         }
         return changed;
@@ -741,9 +745,12 @@ public final class WeatherAuthority implements WeatherQuery {
             ensureCell(level, data, key, scheduling);
             grid.markActive(key, gameTime);
         }
-        if (!activeKeys.isEmpty()) {
+        int removed = grid.trimToLimit(scheduling.maxPersistedCells(), activeKeys);
+        if (!activeKeys.isEmpty() || removed > 0) {
             // Activity watermarks are persistent authority state even if a
-            // later worker result is rejected as stale.
+            // later worker result is rejected as stale. Trim dormant history
+            // before forming the revision set; active footprints may exceed
+            // the persistence cap without invalidating their own calculation.
             data.markChanged();
         }
 
@@ -1065,12 +1072,26 @@ public final class WeatherAuthority implements WeatherQuery {
         for (long packedKey : activeKeys) {
             data.grid().markActive(AtmosphereCellKey.fromPacked(packedKey), gameTime);
         }
-        if (!activeKeys.isEmpty()) {
+        int removed = trimVanillaCommandHistory(runtime, data, scheduling, activeKeys);
+        if (!activeKeys.isEmpty() || removed > 0) {
             data.markChanged();
         }
         if (changed > 0) {
             WeatherSnapshotManager.markLevelDirty(level.dimension());
         }
+    }
+
+    private int trimVanillaCommandHistory(
+            LevelRuntime runtime,
+            AtmosphereSavedData data,
+            WeatherConfig.SchedulingSettings scheduling,
+            Set<Long> activeKeys
+    ) {
+        int removed = data.grid().trimToLimit(scheduling.maxPersistedCells(), activeKeys);
+        // Expiry only clears cells that still exist. A long command must not
+        // retain a second, unbounded history of regions a player has visited.
+        runtime.vanillaWeatherAppliedKeys.retainAll(data.grid().snapshotByPackedKey().keySet());
+        return removed;
     }
 
     private void expireVanillaCommandWeather(
@@ -1492,6 +1513,9 @@ public final class WeatherAuthority implements WeatherQuery {
                 long gameTime,
                 int durationTicks
         ) {
+            // Even an unchanged /weather clear takes authority from detached
+            // autonomous work whose cells may not receive a new revision.
+            invalidateSimulationGeneration();
             long safeDuration = Math.max(1L, durationTicks);
             vanillaWeatherState = state;
             vanillaWeatherUntilTick = gameTime > Long.MAX_VALUE - safeDuration

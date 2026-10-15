@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.ocean.shore;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.GerstnerWaveProfile;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSurfaceSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
@@ -59,6 +60,10 @@ public final class ShorelineWaterManager {
      * @param level loaded server dimension
      */
     public void tick(ServerLevel level) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            clearLevel(level);
+            return;
+        }
         Map<Long, Region> regions = regionsByLevel.computeIfAbsent(level, ignored -> new HashMap<>());
         long gameTime = level.getGameTime();
 

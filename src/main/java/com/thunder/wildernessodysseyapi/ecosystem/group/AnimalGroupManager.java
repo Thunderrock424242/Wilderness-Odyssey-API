@@ -54,7 +54,42 @@ public final class AnimalGroupManager {
             return Optional.empty();
         }
         AnimalGroup group = state.membership().get(animal.getUUID());
+        if (group != null) {
+            PathfinderMob leader = resolve(level, group.getLeader());
+            if (leader == null || leader.isNoAi()
+                    || leader instanceof TamableAnimal tamable && tamable.isTame()) {
+                recoverDecisionOwner(level, state, group, animal);
+                group = state.membership().get(animal.getUUID());
+            }
+        }
         return group != null && group.contains(animal.getUUID()) ? Optional.of(group) : Optional.empty();
+    }
+
+    // A suspended leader cannot run its own validation. Recovery visits only the
+    // group's bounded UUID membership; it neither discovers animals nor changes NoAI.
+    private void recoverDecisionOwner(
+            ServerLevel level,
+            LevelGroups state,
+            AnimalGroup group,
+            PathfinderMob observer
+    ) {
+        SpeciesBehaviorProfile profile = SpeciesBehaviorProfileManager.profileFor(observer).orElse(null);
+        List<PathfinderMob> eligibleMembers = new ArrayList<>();
+        for (UUID id : group.members()) {
+            PathfinderMob member = resolve(level, id);
+            if (profile == null || member == null || !eligible(member, profile)) {
+                group.removeMember(id);
+                state.membership().remove(id, group);
+            } else {
+                eligibleMembers.add(member);
+            }
+        }
+        if (eligibleMembers.isEmpty()) {
+            removeGroup(state, group);
+        } else {
+            group.setLeader(chooseLeader(eligibleMembers).getUUID());
+            group.invalidate();
+        }
     }
 
     /**
@@ -105,6 +140,7 @@ public final class AnimalGroupManager {
         Map<UUID, PathfinderMob> selected = new LinkedHashMap<>();
         selected.put(animal.getUUID(), animal);
         nearby.stream()
+                .filter(candidate -> !candidate.getUUID().equals(animal.getUUID()))
                 .filter(candidate -> candidate.getType() == animal.getType())
                 .filter(candidate -> eligible(candidate, profile))
                 .filter(candidate -> !levelGroups.membership().containsKey(candidate.getUUID()))

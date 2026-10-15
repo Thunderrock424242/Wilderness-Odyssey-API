@@ -298,6 +298,15 @@ Server-side ownership can be inspected with:
 - `/wowater repair [radius]` for sparse projection gaps only
 - `/wowater convert [radius]` for an explicit loaded-only vanilla-water upgrade
 
+`/wowater inspect x y z` also reports the current game tick, pending flow-cell
+count, the latest solver/projection counters, and whether the loaded callback
+footprint is available. It describes the block and canonical volume at the five
+possible downward/lateral outlets without importing or changing water. Explicit
+inspections are copied to the log under `[Water flow inspection]`; no automatic
+per-tick logging is added. For a stalled placed bucket, inspect the water cell
+twice several unpaused seconds apart to distinguish a stopped clock, missing
+flow work, unavailable terrain, blocked outlets, and a physical projection gap.
+
 Only the operator-only `convert` command imports vanilla water. Its radius is
 capped at 24 blocks and unloaded chunk columns are skipped.
 

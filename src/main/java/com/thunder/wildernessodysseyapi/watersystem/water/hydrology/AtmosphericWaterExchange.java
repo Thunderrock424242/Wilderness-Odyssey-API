@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.hydrology;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 
@@ -87,7 +88,8 @@ public final class AtmosphericWaterExchange {
     }
 
     private static boolean couplingEnabled(ServerLevel level) {
-        return WaterSimulationConfig.weatherWaterCouplingEnabled() && WeatherConfig.dimensionEnabled(level.dimension());
+        return WildernessWaterRules.isEnabled(level) && WaterSimulationConfig.weatherWaterCouplingEnabled()
+                && WeatherConfig.dimensionEnabled(level.dimension());
     }
 
     /** Read-only snow-water equivalent supplied by regional storage, not an independent snowpack. */

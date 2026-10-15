@@ -70,6 +70,22 @@ This uses the separate `run-gametest` directory. It starts a real test server,
 changes its disposable test world, and should exit with a test summary. A
 server-ready message alone is not a passing GameTest result.
 
+The focused water-safety profile includes real vanilla and Wilderness bucket
+placement in a one-block-wide, five-cell trench. These tests rely on ordinary
+server tick events rather than calling the solver directly, require water in
+both neighboring cells with physical fluid projections, and check that the
+trench retains exactly 4,096 units. The inspection-command regression verifies
+that an actual `/wowater inspect` execution leaves volume, block state,
+revision, and queued work unchanged. Run this profile with:
+
+```powershell
+.\gradlew.bat runGameTestServer -PcodexBuildDir=.codex-build -PwaterSafetyGameTests --no-parallel
+```
+
+These server checks do not prove client visibility or diagnose a particular
+live-world stall. A finite bucket may spread into several shallow cells; it
+does not supply enough volume to fill an entire multi-block trench to the top.
+
 For wider regression coverage and packaging, run these separately:
 
 ```powershell

@@ -20,8 +20,6 @@ import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulation
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
-import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
-import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -31,7 +29,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.tags.FluidTags;
 
 import java.util.EnumSet;
 import java.util.Optional;
@@ -56,6 +53,10 @@ public final class EcosystemBehaviorGoal extends Goal {
     private long activeGroupRevision = Long.MIN_VALUE;
     private int attackDelay;
     private long nextNavigationUpdateAt;
+    private UUID inheritedGroupId;
+    private long inheritedRevision = Long.MIN_VALUE;
+    private EnvironmentalContext.WaterTarget activeWaterTarget;
+    private long nextWaterSafetyCheckAt;
 
     public EcosystemBehaviorGoal(PathfinderMob animal) {
         this.animal = animal;
@@ -133,8 +134,16 @@ public final class EcosystemBehaviorGoal extends Goal {
             }
 
             if (decisionGroup.roleOf(animal.getUUID()).orElse(null) == GroupRole.FOLLOWER) {
+                advanceNeeds(level, activeProfile, speciesMultiplier, gameTime,
+                        decisionGroup.environment().weather(), decisionGroup.foodAvailability(),
+                        !level.canSeeSky(animal.blockPosition().above()),
+                        EcosystemServices.groups().resolveLeader(decisionGroup)
+                                .map(leader -> animal.distanceToSqr(leader)
+                                        <= activeProfile.herd().preferredDistance() * activeProfile.herd().preferredDistance())
+                                .orElse(false),
+                        decisionGroup.threatened());
                 inheritGroupDecision(decisionGroup, gameTime, simulationLod);
-                needs.scheduleEvaluation(gameTime + 20L + Math.floorMod(animal.getId(), 13));
+                needs.recordEvaluation(gameTime, 0L, gameTime + 20L + Math.floorMod(animal.getId(), 13));
                 return false;
             }
             if (decisionGroup.validationDue(gameTime)) {
@@ -337,6 +346,8 @@ public final class EcosystemBehaviorGoal extends Goal {
             animal.setTarget(null);
         }
         huntingTarget = null;
+        activeWaterTarget = null;
+        nextWaterSafetyCheckAt = 0L;
         if (activeGroup != null) {
             activeGroup.clearDecisionIfRevision(activeGroupRevision);
         }
@@ -467,31 +478,10 @@ public final class EcosystemBehaviorGoal extends Goal {
                 ? EcosystemServices.food().prey(animal, profile, Math.min(radiusCap, profile.predator().huntRadius()))
                 : new FoodAvailabilityService.PredatorFoodSample(java.util.List.of(), Optional.empty());
 
-        long elapsedTicks = needs.lastEvaluatedAt() == 0L
-                ? EcosystemConfig.BEHAVIOR_UPDATE_FREQUENCY.get()
-                : gameTime - needs.lastEvaluatedAt();
-        int scheduleOffset = WildlifeSchedule.deterministicOffset(
-                animal.getUUID(), profile.environment().scheduleJitterTicks());
-        boolean preferredActive = WildlifeSchedule.period(
-                profile.environment().activeTime(), level.getDayTime(), scheduleOffset)
-                == WildlifeSchedule.Period.ACTIVE;
-        EcosystemNeedModel.Values updated = EcosystemNeedModel.advance(
-                new EcosystemNeedModel.Values(
-                        needs.thirst(), needs.hunger(), needs.rest(), needs.social(), needs.safetyConcern()),
-                profile.needs(),
-                elapsedTicks,
-                weather.temperature(),
-                animal.getDeltaMovement().horizontalDistanceSqr() > 0.0025,
-                preferredActive,
-                !exposed,
-                foodAvailability,
+        advanceNeeds(level, profile, speciesMultiplier, gameTime, weather, foodAvailability, !exposed,
                 herd.isPresent() && herd.get().distanceSquared()
                         <= profile.herd().preferredDistance() * profile.herd().preferredDistance(),
-                threat.isPresent(),
-                EcosystemConfig.THIRST_RATE_MULTIPLIER.get(),
-                speciesMultiplier
-        );
-        needs.setNeeds(updated.thirst(), updated.hunger(), updated.rest(), updated.social(), updated.safetyConcern());
+                threat.isPresent());
 
         var watershed = regionalEnvironment.watershed();
         boolean weatherHazard = weather.precipitationIntensity() >= profile.shelter().precipitationThreshold()
@@ -518,7 +508,8 @@ public final class EcosystemBehaviorGoal extends Goal {
             shelter = weatherReaction.shelter();
         } else if (profile.shelter().enabled()
                 && EcosystemConfig.WEATHER_SHELTER_ENABLED.get()
-                && (weatherHazard || groupRequestsShelter)
+                && (weatherHazard || groupRequestsShelter
+                || DefaultEcosystemBehaviorController.coldRequiresShelter(profile, weather))
                 && exposed) {
             shelter = EcosystemServices.shelter().find(
                     animal,
@@ -534,6 +525,10 @@ public final class EcosystemBehaviorGoal extends Goal {
         ResourceLocation biome = level.getBiome(animal.blockPosition()).unwrapKey()
                 .map(key -> key.location())
                 .orElse(ResourceLocation.withDefaultNamespace("plains"));
+
+        if (decisionGroup != null) {
+            decisionGroup.observeEnvironment(regionalEnvironment, foodAvailability, threat.isPresent(), water.orElse(null));
+        }
 
         return new EnvironmentalContext(
                 level,
@@ -557,15 +552,46 @@ public final class EcosystemBehaviorGoal extends Goal {
         );
     }
 
+    private void advanceNeeds(
+            ServerLevel level,
+            SpeciesBehaviorProfile profile,
+            double speciesMultiplier,
+            long gameTime,
+            WeatherSample weather,
+            double foodAvailability,
+            boolean sheltered,
+            boolean herdNearby,
+            boolean threatened
+    ) {
+        long elapsedTicks = needs.lastEvaluatedAt() == 0L
+                ? EcosystemConfig.BEHAVIOR_UPDATE_FREQUENCY.get()
+                : gameTime - needs.lastEvaluatedAt();
+        int scheduleOffset = WildlifeSchedule.deterministicOffset(
+                animal.getUUID(), profile.environment().scheduleJitterTicks());
+        boolean preferredActive = WildlifeSchedule.period(
+                profile.environment().activeTime(), level.getDayTime(), scheduleOffset)
+                == WildlifeSchedule.Period.ACTIVE;
+        EcosystemNeedModel.Values updated = EcosystemNeedModel.advance(
+                new EcosystemNeedModel.Values(
+                        needs.thirst(), needs.hunger(), needs.rest(), needs.social(), needs.safetyConcern()),
+                profile.needs(), elapsedTicks, weather.temperature(),
+                animal.getDeltaMovement().horizontalDistanceSqr() > 0.0025,
+                preferredActive, sheltered, foodAvailability, herdNearby, threatened,
+                EcosystemConfig.THIRST_RATE_MULTIPLIER.get(), speciesMultiplier);
+        needs.setNeeds(updated.thirst(), updated.hunger(), updated.rest(), updated.social(), updated.safetyConcern());
+    }
+
     private void tickSeekingWater(long gameTime) {
         BlockPos target = needs.behaviorTarget();
         if (target != null && animal.distanceToSqr(target.getCenter()) <= 2.25) {
-            if (!isWaterPresent(needs.waterPosition())) {
+            activeWaterTarget = new EnvironmentalContext.WaterTarget(needs.waterPosition(), target, 0.0);
+            if (!EcosystemServices.isSafeWaterTarget(animal, activeProfile, activeWaterTarget)) {
                 needs.idle();
                 needs.scheduleEvaluation(gameTime + 100L);
                 return;
             }
             animal.getNavigation().stop();
+            nextWaterSafetyCheckAt = gameTime + 10L;
             if (needs.behavior() == EcosystemBehaviorState.DRINK) {
                 needs.markInteractionStarted(gameTime);
             } else {
@@ -595,6 +621,16 @@ public final class EcosystemBehaviorGoal extends Goal {
     }
 
     private void tickDrinking(long gameTime) {
+        if (gameTime >= nextWaterSafetyCheckAt) {
+            if (activeWaterTarget == null
+                    || !EcosystemServices.isSafeWaterTarget(animal, activeProfile, activeWaterTarget)
+                    || animal.distanceToSqr(activeWaterTarget.approachPosition().getCenter()) > 2.25) {
+                needs.idle();
+                needs.scheduleEvaluation(gameTime + 20L);
+                return;
+            }
+            nextWaterSafetyCheckAt = gameTime + 10L;
+        }
         BlockPos water = needs.waterPosition();
         if (water != null) {
             animal.getLookControl().setLookAt(
@@ -630,17 +666,23 @@ public final class EcosystemBehaviorGoal extends Goal {
         if (gameTime % 40L != Math.floorMod(animal.getId(), 40)) {
             return;
         }
-        WeatherSample weather = WeatherServices.query().sample(level, animal.blockPosition());
+        RegionalEnvironmentSnapshot environment = EnvironmentServices.query().sample(level, animal.blockPosition());
+        WeatherSample weather = environment.weather();
         WeatherReactionDecision reaction = EcosystemServices.stormReactions().assess(
                 animal,
                 activeProfile,
                 EcosystemConfig.MAXIMUM_SEARCH_RADIUS.get()
         );
         needs.rememberWeatherReaction(reaction);
-        boolean hazardous = weather.precipitationIntensity() >= activeProfile.shelter().precipitationThreshold()
+        boolean hazardous = EcosystemConfig.WEATHER_SHELTER_ENABLED.get()
+                && (weather.precipitationIntensity() >= activeProfile.shelter().precipitationThreshold()
                 || weather.thunderIntensity() >= activeProfile.shelter().thunderThreshold()
                 || weather.wind().magnitude() >= activeProfile.shelter().windThreshold()
-                || reaction.response().active();
+                || DefaultEcosystemBehaviorController.coldRequiresShelter(activeProfile, weather)
+                || environment.watershed().flooding()
+                || environment.watershed().floodRisk() >= 0.82f
+                || environment.influence().shelterPressure() >= 0.72)
+                || EcosystemConfig.PRE_STORM_REACTIONS_ENABLED.get() && reaction.response().active();
         if (hazardous) {
             needs.setShelterReleaseAt(Long.MAX_VALUE);
             return;
@@ -770,6 +812,11 @@ public final class EcosystemBehaviorGoal extends Goal {
             long gameTime,
             WildlifeSimulationLod simulationLod
     ) {
+        if (group.id().equals(inheritedGroupId) && group.revision() == inheritedRevision) {
+            return;
+        }
+        inheritedGroupId = group.id();
+        inheritedRevision = group.revision();
         EcosystemBehaviorState inherited = switch (group.state()) {
             case ALERT -> EcosystemBehaviorState.ALERT;
             case TRAVEL -> EcosystemBehaviorState.TRAVEL;
@@ -813,11 +860,4 @@ public final class EcosystemBehaviorGoal extends Goal {
         return entity instanceof LivingEntity living ? living : null;
     }
 
-    private boolean isWaterPresent(BlockPos position) {
-        if (position == null) {
-            return false;
-        }
-        return WaterServices.access().isWaterAt(animal.level(), position)
-                || animal.level().getFluidState(position).is(FluidTags.WATER);
-    }
 }

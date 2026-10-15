@@ -4,8 +4,11 @@ import com.thunder.wildernessodysseyapi.ecosystem.api.FoodAvailabilityService;
 import com.thunder.wildernessodysseyapi.ecosystem.api.ShelterLocator;
 import com.thunder.wildernessodysseyapi.ecosystem.api.ThreatAwarenessService;
 import com.thunder.wildernessodysseyapi.ecosystem.api.WaterSourceLocator;
+import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
+import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.group.AnimalGroupManager;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.PathfinderMob;
 
 /** Process-wide service registry for the server-authoritative ecosystem runtime. */
 public final class EcosystemServices {
@@ -27,6 +30,15 @@ public final class EcosystemServices {
 
     public static WaterSourceLocator water() {
         return WATER;
+    }
+
+    /** Validates an existing target against live loaded water and the requesting animal's abilities. */
+    public static boolean isSafeWaterTarget(
+            PathfinderMob animal,
+            SpeciesBehaviorProfile profile,
+            EnvironmentalContext.WaterTarget target
+    ) {
+        return WATER.isSafeTarget(animal, profile, target);
     }
 
     public static ShelterLocator shelter() {

@@ -98,7 +98,7 @@ public final class WildernessWeatherWaterInfluence implements WeatherWaterInflue
                 }
 
                 loaded++;
-                int surfaceY = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, blockX & 15, blockZ & 15) - 1;
+                int surfaceY = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, blockX & 15, blockZ & 15);
                 surfaceY = Math.max(level.getMinBuildHeight(), Math.min(level.getMaxBuildHeight() - 1, surfaceY));
                 BlockPos surface = new BlockPos(blockX, surfaceY, blockZ);
                 boolean wildernessWater = waterAccess.isWaterAt(level, surface);

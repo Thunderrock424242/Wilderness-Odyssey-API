@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.CompatibilityLevel;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibilityAdapter;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.LoadedWaterReadAccess;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -103,7 +104,8 @@ public final class EntityWaterCompat implements WaterCompatibilityAdapter {
         if (state.sampledAt(level, level.getGameTime())) {
             return state;
         }
-        if (!WaterSimulationConfig.entityWaterCompatEnabled()) {
+        if (!WildernessWaterRules.isEnabled(level)
+                || !WaterSimulationConfig.entityWaterCompatEnabled()) {
             state.clear(entity);
             return state;
         }

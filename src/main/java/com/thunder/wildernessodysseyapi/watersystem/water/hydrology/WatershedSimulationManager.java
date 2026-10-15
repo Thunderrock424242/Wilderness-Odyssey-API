@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.hydrology;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 
@@ -10,7 +11,8 @@ public final class WatershedSimulationManager {
 
     /** Initializes metadata and physical storage only for a normally loaded chunk. */
     public static void onChunkLoad(ServerLevel level, LevelChunk chunk) {
-        if (WaterSimulationConfig.watershedSimulationEnabled() || WaterSimulationConfig.weatherHydrologyEnabled()) {
+        if (WildernessWaterRules.isEnabled(level)
+                && (WaterSimulationConfig.watershedSimulationEnabled() || WaterSimulationConfig.weatherHydrologyEnabled())) {
             WatershedChunkState state = WatershedSavedData.get(level).getOrCreate(level, chunk);
             RegionalHydrologyManager.onChunkLoad(level, chunk, state);
         }
@@ -18,6 +20,10 @@ public final class WatershedSimulationManager {
 
     /** Advances bounded coarse state even without players; detailed mutations remain loaded-only. */
     public static void tickLevel(ServerLevel level) {
+        if (!WildernessWaterRules.isEnabled(level)) {
+            clearLevel(level);
+            return;
+        }
         RegionalHydrologyManager.tickLevel(level, WatershedSavedData.get(level));
     }
 

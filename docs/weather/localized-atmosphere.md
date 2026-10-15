@@ -362,8 +362,18 @@ time uses the available forcing snapshot rather than replaying historic calendar
 Stopped-server wall-clock time is not simulated.
 
 This is a bounded retained domain, not an infinite-world atmosphere.
-`maxPersistedCells` still limits retention; existing storm/interest priorities
-choose eviction when exploration reaches that cap. Evicted cells and deliberate
+`maxPersistedCells` limits saved cells and dormant runtime history. During capture,
+existing storm/interest priorities trim dormant cells while protecting the current
+active player footprint. At capture, runtime grid retention is bounded by the
+larger of the configured cap and that footprint; an overlapping player region
+is counted once. A delayed commit temporarily protects both captured and current
+interest until the next capture. Vanilla command maintenance also trims dormant
+history while protecting current interest, including when players travel during
+a long override. Command ownership invalidates pending autonomous calculations.
+Ordinary SavedData lookups cannot evict captured inputs between calculation and
+commit. Once active interest shrinks, the next capture trims history back to the
+cap. Saved output remains capped even while active runtime state exceeds it.
+Evicted cells and deliberate
 cell-width changes lose local continuity. Changing cell width retains the
 existing explicit grid-reset behavior. The configured width rounds down to a
 multiple of 16 blocks for chunk-aligned hydrologic accounting. Conservation
@@ -729,7 +739,7 @@ immutable scheduling/simulation records.
 | `inactiveCellGracePeriodTicks` | `2400` | `0..1728000`. |
 | `environmentResampleIntervalTicks` | `400` | `20..72000`. |
 | `snapshotSyncIntervalTicks` | `60` | `5..1200`. |
-| `maxPersistedCells` | `4096` | `64..65536` per dimension. |
+| `maxPersistedCells` | `4096` | `64..65536` saved cells/dormant history per dimension; runtime also protects the bounded active player footprint. |
 | `simulation.speed` | `1.0` | `0..8`; zero freezes evolution without deleting state. |
 | `simulation.humidityTransportRate` | `0.18` | `0..1`. |
 | `simulation.temperatureTransportRate` | `0.10` | `0..1`. |

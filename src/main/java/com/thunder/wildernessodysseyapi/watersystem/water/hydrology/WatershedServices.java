@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.hydrology;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWatershedSnapshotStore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -21,7 +22,8 @@ public final class WatershedServices {
 
     /** Returns loaded chunk-scale conditions for a world position. */
     public static WatershedConditions conditions(Level level, BlockPos position) {
-        if (level == null || position == null || !WaterSimulationConfig.watershedSimulationEnabled()) {
+        if (level == null || position == null || !WildernessWaterRules.isEnabled(level)
+                || !WaterSimulationConfig.watershedSimulationEnabled()) {
             return WatershedConditions.NONE;
         }
         if (level instanceof ServerLevel serverLevel) {
@@ -43,7 +45,8 @@ public final class WatershedServices {
 
     /** Returns local four-by-four drainage flow for an already-known chunk. */
     public static WatershedLocalFlow localFlow(Level level, BlockPos position) {
-        if (level == null || position == null || !WaterSimulationConfig.watershedSimulationEnabled()) {
+        if (level == null || position == null || !WildernessWaterRules.isEnabled(level)
+                || !WaterSimulationConfig.watershedSimulationEnabled()) {
             return WatershedLocalFlow.NONE;
         }
         WatershedChunkState state;

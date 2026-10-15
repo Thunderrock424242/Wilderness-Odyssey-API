@@ -529,7 +529,7 @@ public final class DistantWildlifeManager {
                 continue;
             }
             BlockPos spawnPos = spawnPosition(level, type, group, x, z, hash);
-            if (spawnPos == null) {
+            if (spawnPos == null || !habitatAllows(level, type, spawnPos)) {
                 continue;
             }
             Vec3 spawnCenter = Vec3.atBottomCenterOf(spawnPos);

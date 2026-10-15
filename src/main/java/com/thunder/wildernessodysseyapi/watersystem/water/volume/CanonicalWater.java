@@ -156,6 +156,15 @@ public final class CanonicalWater {
             return false;
         }
         BlockState state = level.getBlockState(pos);
+        FluidState fluid = state.getFluidState();
+        if (!fluid.isEmpty() && !WildernessWaterAuthority.isWildernessProjection(state, fluid)) {
+            // Unconverted water already owns its physical volume. A plain-water
+            // compatibility facade does not make it empty canonical capacity.
+            WaterVolumeChunk.WaterCell tracked = getTracked(level, pos);
+            if (!state.is(Blocks.WATER) || tracked == null || tracked.volumeUnits() <= 0) {
+                return false;
+            }
+        }
         return state.isAir() || isPlainWaterProjection(state) || state.canBeReplaced();
     }
 
@@ -722,7 +731,7 @@ public final class CanonicalWater {
             return tracked.withoutFlags(WaterVolumeChunk.FLAG_SLEEPING);
         }
 
-        if (!isPlainWaterProjection(replacedState)) {
+        if (!WildernessWaterAuthority.isWildernessProjection(replacedState, replacedState.getFluidState())) {
             return WaterVolumeChunk.WaterCell.EMPTY;
         }
         int volumeUnits = WildernessWaterAuthority.volumeUnitsFromFluid(replacedState.getFluidState());
@@ -872,7 +881,8 @@ public final class CanonicalWater {
         // A vanilla bubble column is a hosted projection of one full canonical
         // cell. Preserve it while the cell stays full, but remove or repaint it
         // as soon as canonical volume no longer supports a source block.
-        if (current.is(Blocks.BUBBLE_COLUMN)) {
+        boolean bubbleColumn = current.is(Blocks.BUBBLE_COLUMN);
+        if (bubbleColumn) {
             if (volumeUnits >= WildernessWaterAuthority.MIN_FULL_VOLUME_UNITS) {
                 WaterMutationSafety.deduplicated(level);
                 return true;
@@ -889,7 +899,12 @@ public final class CanonicalWater {
             WaterMutationSafety.deduplicated(level);
             return true;
         }
-        if (!current.isAir() && !isPlainWaterProjection(current) && !current.canBeReplaced()) {
+        if (!bubbleColumn && !current.getFluidState().isEmpty() && !isPlainWaterProjection(current)) {
+            // A deferred projection must not erase a foreign fluid or a hosted
+            // aquatic block that appeared while the write was unavailable.
+            return false;
+        }
+        if (!bubbleColumn && !current.isAir() && !isPlainWaterProjection(current) && !current.canBeReplaced()) {
             return true;
         }
 

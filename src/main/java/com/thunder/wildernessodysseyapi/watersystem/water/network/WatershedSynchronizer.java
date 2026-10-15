@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.network;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedChunkState;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSavedData;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedBasinSavedData;
@@ -21,7 +22,7 @@ public final class WatershedSynchronizer {
 
     /** Sends loaded-only chunk conditions or an explicit disabled-state clear. */
     public static void syncLevel(ServerLevel level) {
-        if (!WaterSimulationConfig.watershedSimulationEnabled()) {
+        if (!WildernessWaterRules.isEnabled(level) || !WaterSimulationConfig.watershedSimulationEnabled()) {
             for (var player : level.players()) {
                 PacketDistributor.sendToPlayer(player, WatershedRegionSyncPayload.disabled());
             }

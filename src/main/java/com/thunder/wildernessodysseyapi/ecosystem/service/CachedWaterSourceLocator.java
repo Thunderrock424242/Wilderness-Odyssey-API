@@ -50,7 +50,8 @@ public final class CachedWaterSourceLocator implements WaterSourceLocator {
         long key = cacheKey(origin, radius);
         Map<Long, Entry> cache = levels.computeIfAbsent(level, ignored -> new HashMap<>());
         Entry cached = cache.get(key);
-        if (cached != null && cached.expiresAt() > gameTime && valid(level, cached.target())) {
+        if (cached != null && cached.expiresAt() > gameTime
+                && valid(level, origin, radius, profile.drinking(), cached.target())) {
             return Optional.of(cached.target());
         }
 
@@ -157,11 +158,43 @@ public final class CachedWaterSourceLocator implements WaterSourceLocator {
         );
     }
 
-    private boolean valid(ServerLevel level, EnvironmentalContext.WaterTarget target) {
-        return level.hasChunkAt(target.waterPosition())
-                && isWater(level, target.waterPosition())
-                && (target.approachPosition().equals(target.waterPosition())
-                || isStandable(level, target.approachPosition()));
+    /** Revalidates current water, approach, and profile safety without performing discovery. */
+    public boolean isSafeTarget(
+            PathfinderMob animal,
+            SpeciesBehaviorProfile profile,
+            EnvironmentalContext.WaterTarget target
+    ) {
+        return animal.level() instanceof ServerLevel level && target != null
+                && valid(level, animal.blockPosition(), profile.drinking().searchRadius(), profile.drinking(), target);
+    }
+
+    private boolean valid(
+            ServerLevel level,
+            BlockPos origin,
+            int radius,
+            SpeciesBehaviorProfile.Drinking settings,
+            EnvironmentalContext.WaterTarget target
+    ) {
+        BlockPos source = target.waterPosition();
+        BlockPos approach = target.approachPosition();
+        if (!settings.enabled() || source == null || approach == null
+                || Math.abs((long) source.getX() - origin.getX()) > radius
+                || Math.abs((long) source.getZ() - origin.getZ()) > radius
+                || level.getChunkSource().getChunkNow(source.getX() >> 4, source.getZ() >> 4) == null
+                || level.getChunkSource().getChunkNow(approach.getX() >> 4, approach.getZ() >> 4) == null
+                || !isWater(level, source)) {
+            return false;
+        }
+        WatershedConditions conditions = water.getWatershedConditions(level, source);
+        float safeCurrent = settings.canSwim() ? 1.10f : 0.40f;
+        if (conditions.flooding() || conditions.floodRisk() >= 0.88f
+                || conditions.currentStrength() > safeCurrent) {
+            return false;
+        }
+        if (approach.equals(source)) {
+            return settings.canSwim() && waterDepth(level, source) <= settings.maximumSafeDepth();
+        }
+        return isStandable(level, approach) && !isWater(level, approach);
     }
 
     private boolean isWater(ServerLevel level, BlockPos position) {

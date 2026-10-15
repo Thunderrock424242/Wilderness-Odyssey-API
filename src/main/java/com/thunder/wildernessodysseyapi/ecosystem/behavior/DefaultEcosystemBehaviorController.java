@@ -11,6 +11,7 @@ import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.memory.EnvironmentalMemoryManager;
 import com.thunder.wildernessodysseyapi.ecosystem.service.EcosystemServices;
 import com.thunder.wildernessodysseyapi.ecosystem.state.AnimalNeedsState;
+import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.util.DefaultRandomPos;
@@ -182,6 +183,15 @@ public final class DefaultEcosystemBehaviorController implements EcosystemBehavi
                 )
         );
 
+        if (decision.state() == EcosystemBehaviorState.SEEK_SHELTER && context.shelter().isPresent()) {
+            EnvironmentalContext.ShelterTarget shelter = context.shelter().get();
+            if (destinationAccepted(context, shelter.position())) {
+                needs.setShelterPosition(shelter.position());
+                select(context, needs, EcosystemBehaviorState.SEEK_SHELTER, shelter.position(),
+                        decision.reason(), weatherResponse, groupState);
+                return true;
+            }
+        }
         if (decision.state() == EcosystemBehaviorState.DRINK && context.water().isPresent()) {
             EnvironmentalContext.WaterTarget water = context.water().get();
             if (destinationAccepted(context, water.approachPosition())) {
@@ -224,6 +234,12 @@ public final class DefaultEcosystemBehaviorController implements EcosystemBehavi
                 || context.watershed().flooding()
                 || context.watershed().floodRisk() >= 0.82f
                 || context.regionalEnvironment().influence().shelterPressure() >= 0.72;
+    }
+
+    /** Shared cold threshold for bounded shelter discovery, execution, and release. */
+    public static boolean coldRequiresShelter(SpeciesBehaviorProfile profile, WeatherSample weather) {
+        return profile.shelter().enabled()
+                && weather.temperature() < profile.environment().preferredMinimumTemperatureCelsius();
     }
 
     private static BlockPos fallbackAway(BlockPos origin, BlockPos threat, int distance) {

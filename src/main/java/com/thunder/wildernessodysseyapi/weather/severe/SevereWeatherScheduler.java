@@ -59,7 +59,7 @@ public final class SevereWeatherScheduler {
                     && level.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
             // Long-lived storms publish a sparse regional fact; individual
             // animals and plants decide their own reaction from that signal.
-            if (Math.floorMod(gameTime + system.id(), 1_200L) == 0L) {
+            if (disturbanceDue(gameTime, system.id())) {
                 WorldDisturbanceService.publish(
                         level,
                         new BlockPos(centerColumn.getX(), surfaceY, centerColumn.getZ()),
@@ -73,6 +73,12 @@ public final class SevereWeatherScheduler {
                 damageOnePlant(level, system, surfaceY, effectRadius, gameTime);
             }
         }
+    }
+
+    /** Returns a disturbance opportunity on the scheduler's actual ten-tick cadence. */
+    static boolean disturbanceDue(long gameTime, long systemId) {
+        return Math.floorMod(gameTime, 10L) == 0L
+                && Math.floorMod(gameTime / 10L + Math.floorMod(systemId, 120L), 120L) == 0L;
     }
 
     private static void pushEntities(

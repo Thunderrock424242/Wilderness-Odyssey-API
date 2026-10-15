@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.ocean;
 
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherServices;
@@ -33,7 +34,7 @@ public final class OceanSeaStateField {
 
     /** Advances player-relevant regional cells on the logical server thread. */
     public static void tickLevel(ServerLevel level) {
-        if (level == null || !WaterSimulationConfig.weatherWaterCouplingEnabled()) {
+        if (level == null || !WildernessWaterRules.isEnabled(level) || !WaterSimulationConfig.weatherWaterCouplingEnabled()) {
             return;
         }
         if (!WeatherConfig.dimensionEnabled(level.dimension())) {
@@ -71,7 +72,7 @@ public final class OceanSeaStateField {
             double worldZ,
             float partialTick
     ) {
-        if (level == null || !WaterSimulationConfig.weatherWaterCouplingEnabled()
+        if (level == null || !WildernessWaterRules.isEnabled(level) || !WaterSimulationConfig.weatherWaterCouplingEnabled()
                 || !WeatherConfig.dimensionEnabled(level.dimension())) {
             return level == null
                     ? OceanSeaState.CALM
@@ -84,7 +85,7 @@ public final class OceanSeaStateField {
 
     /** Returns the bounded square of cells synchronized to one player. */
     public static List<CellView> cellsAround(ServerLevel level, int blockX, int blockZ) {
-        if (level == null || !WaterSimulationConfig.weatherWaterCouplingEnabled()
+        if (level == null || !WildernessWaterRules.isEnabled(level) || !WaterSimulationConfig.weatherWaterCouplingEnabled()
                 || !WeatherConfig.dimensionEnabled(level.dimension())) {
             return List.of();
         }

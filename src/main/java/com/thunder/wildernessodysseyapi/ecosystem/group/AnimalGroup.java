@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.ecosystem.group;
 
+import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
+import com.thunder.wildernessodysseyapi.environment.api.RegionalEnvironmentSnapshot;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 
@@ -41,6 +43,39 @@ public final class AnimalGroup {
     private long nextValidationAt;
     private DecisionSource decisionSource = DecisionSource.LEADER;
     private int nextSlotIndex;
+    private RegionalEnvironmentSnapshot environment = RegionalEnvironmentSnapshot.EMPTY;
+    private double foodAvailability;
+    private boolean threatened;
+    private EnvironmentalContext.WaterTarget waterTarget;
+
+    /** Publishes immutable leader observations for cheap individual need and interaction updates. */
+    public void observeEnvironment(
+            RegionalEnvironmentSnapshot environment,
+            double foodAvailability,
+            boolean threatened,
+            EnvironmentalContext.WaterTarget waterTarget
+    ) {
+        this.environment = environment == null ? RegionalEnvironmentSnapshot.EMPTY : environment;
+        this.foodAvailability = Math.max(0.0, Math.min(1.0, foodAvailability));
+        this.threatened = threatened;
+        this.waterTarget = waterTarget;
+    }
+
+    public RegionalEnvironmentSnapshot environment() {
+        return environment;
+    }
+
+    public double foodAvailability() {
+        return foodAvailability;
+    }
+
+    public boolean threatened() {
+        return threatened || state == GroupBehavior.FLEE;
+    }
+
+    public EnvironmentalContext.WaterTarget waterTarget() {
+        return waterTarget;
+    }
 
     AnimalGroup(
             UUID groupId,
@@ -197,6 +232,8 @@ public final class AnimalGroup {
         }
         if (!leaderId.equals(this.leaderId)) {
             this.leaderId = leaderId;
+            nextLeaderDecisionAt = 0L;
+            nextValidationAt = 0L;
             revision++;
         }
     }
@@ -240,6 +277,10 @@ public final class AnimalGroup {
         destination = null;
         requestedState = null;
         requestedDestination = null;
+        environment = RegionalEnvironmentSnapshot.EMPTY;
+        foodAvailability = 0.0;
+        threatened = false;
+        waterTarget = null;
         revision++;
     }
 
@@ -252,6 +293,10 @@ public final class AnimalGroup {
     ) {
         this.state = state == null ? GroupBehavior.IDLE : state;
         this.destination = immutable(destination);
+        if (this.state != GroupBehavior.SEEK_WATER || waterTarget != null
+                && !waterTarget.approachPosition().equals(destination)) {
+            waterTarget = null;
+        }
         this.requestedState = null;
         this.requestedDestination = null;
         this.decisionSource = DecisionSource.LEADER;

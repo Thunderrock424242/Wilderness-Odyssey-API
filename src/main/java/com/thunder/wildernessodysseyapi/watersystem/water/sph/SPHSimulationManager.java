@@ -2,6 +2,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.sph;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
@@ -167,7 +168,8 @@ public class SPHSimulationManager {
         if (conservedVolume <= 0) {
             return false;
         }
-        if (!WaterSimulationConfig.serverSphLocalSimulationEnabled()) {
+        if (!WildernessWaterRules.isEnabled(level)
+                || !WaterSimulationConfig.serverSphLocalSimulationEnabled()) {
             return false;
         }
 

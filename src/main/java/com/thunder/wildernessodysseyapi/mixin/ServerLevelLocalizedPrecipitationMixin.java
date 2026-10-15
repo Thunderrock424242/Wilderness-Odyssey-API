@@ -5,9 +5,11 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.integration.LocalizedPrecipitationController;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.AtmosphericWaterExchange;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
@@ -67,7 +69,10 @@ public abstract class ServerLevelLocalizedPrecipitationMixin {
                 || !WeatherConfig.dimensionEnabled(level.dimension())) {
             return original.call(biome, levelReader, position);
         }
-        return LocalizedPrecipitationController.get().precipitationTypeAt(level, position)
+        // Modeled SWE already owns this precipitation. Keep the vanilla callback
+        // path, but do not also turn that inventory into collectible snow.
+        return !AtmosphericWaterExchange.query(level, new ChunkPos(position)).supported()
+                && LocalizedPrecipitationController.get().precipitationTypeAt(level, position)
                 .usesSnowInteractions()
                 && wildernessodysseyapi$canPlaceSnow(levelReader, position);
     }

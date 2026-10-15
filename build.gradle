@@ -92,7 +92,12 @@ neoForge {
             if (waterSafetyTests && !(waterSafetyProfile in ['baseline', 'sable', 'c2me', 'sable-c2me'])) {
                 throw new GradleException('waterSafetyProfile must be baseline, sable, c2me, or sable-c2me')
             }
-            def testDirectory = providers.gradleProperty('coordinatorGameTests').isPresent() ? 'run-coordinator-gametest'
+            def auditGameTestRun = providers.gradleProperty('auditGameTestRun').orNull
+            if (auditGameTestRun != null && !(auditGameTestRun ==~ /[a-z0-9-]{1,64}/)) {
+                throw new GradleException('auditGameTestRun must contain 1-64 lowercase letters, digits, or hyphens')
+            }
+            def testDirectory = auditGameTestRun != null ? "run-audit-${auditGameTestRun}"
+                    : providers.gradleProperty('coordinatorGameTests').isPresent() ? 'run-coordinator-gametest'
                     : waterSafetyTests ? "run-water-safety-${waterSafetyProfile}"
                     : providers.gradleProperty('questGameTests').isPresent() ? 'run-quest-gametest'
                     : providers.gradleProperty('riftGameTests').isPresent() ? 'run-rift-gametest' : 'run-gametest'
@@ -214,6 +219,12 @@ tasks.named('processResources') {
     }
     from('src/main/resources/data/minecraft/structures/empty.nbt') {
         into 'data/wildernessodysseyapi_environment_tests/structure'
+    }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_environment_tests/structure'
+    }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_weather_tests/structure'
     }
     from('src/main/resources/data/minecraft/structures/empty.nbt') {
         into 'data/wildernessodysseyapi_coordinator_tests/structure'

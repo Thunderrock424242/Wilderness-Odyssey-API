@@ -4,8 +4,11 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.WaterCompatibilityRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
+import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.LoadedWaterReadAccess;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.CanonicalWater;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.ExistingWorldWaterConverter;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterCompatibility;
@@ -17,6 +20,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 
@@ -155,7 +159,44 @@ public final class WaterDebugCommand {
                 + ", sleeping=" + snapshot.sleeping()), false);
         source.sendSuccess(() -> Component.literal("  canonicalSpeed=" + format(snapshot.canonicalSpeed())
                 + ", mobileSpeed=" + format(snapshot.mobileSpeed())), false);
+
+        boolean loadedFootprint = WaterMutationSafety.hasNeighborhood(pos.getX(), pos.getZ(),
+                WaterMutationSafety.CALLBACK_RADIUS + 1,
+                (x, z) -> level.getChunkSource().getChunkNow(x, z) != null);
+        String flow = "  flow tick=" + level.getGameTime()
+                + ", queuedCells=" + CanonicalWater.diagnostics(level).queuedCells()
+                + ", loadedFootprint=" + loadedFootprint + "; "
+                + WildernessFluidRegistry.diagnostics(level);
+        StringBuilder outlets = new StringBuilder("  outlets");
+        for (Direction direction : new Direction[] {
+                Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
+        }) {
+            outlets.append(" | ").append(direction.getName()).append('=')
+                    .append(describeFlowOutlet(level, pos.relative(direction)));
+        }
+        String outletReport = outlets.toString();
+        source.sendSuccess(() -> Component.literal(flow), false);
+        source.sendSuccess(() -> Component.literal(outletReport), false);
+        // Log only an explicit read-only inspection. This preserves live stall
+        // evidence for support without adding per-tick or per-placement noise.
+        com.thunder.wildernessodysseyapi.core.ModConstants.LOGGER.info(
+                "[Water flow inspection] dimension={}, position={}, volume={}, sleeping={}, imported={}\n{}\n{}",
+                level.dimension().location(), formatPos(pos), snapshot.canonicalVolumeUnits(),
+                snapshot.sleeping(), snapshot.imported(), flow, outletReport);
         return 1;
+    }
+
+    private static String describeFlowOutlet(ServerLevel level, BlockPos position) {
+        var chunk = LoadedWaterReadAccess.loadedChunk(level, position);
+        if (chunk == null) {
+            return "unavailable";
+        }
+        var state = chunk.getBlockState(position);
+        var tracked = CanonicalWater.getTracked(level, position);
+        boolean acceptsWater = state.isAir()
+                || WildernessWaterAuthority.isPlainWaterProjection(state) || state.canBeReplaced();
+        return state + ", accepts=" + acceptsWater + ", canonicalUnits="
+                + (tracked == null ? "untracked" : Integer.toString(tracked.volumeUnits()));
     }
 
     /** Reports the authoritative watershed cell containing a loaded position. */
