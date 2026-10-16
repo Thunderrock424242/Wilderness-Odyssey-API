@@ -55,6 +55,10 @@ def tickEngineCompilerWorkaround = providers.gradleProperty('tickEngineCompilerW
 def biolithCompilerWorkaround = providers.gradleProperty('biolithCompilerWorkaround')
         .map { it.toBoolean() }.orElse(true)
 
+// CI smoke runs own disposable game directories and an opt-in client readiness
+// probe. Normal IDE/developer launches retain their existing startup behavior.
+def ciSmokeTest = providers.gradleProperty('ciSmokeTest').map { it.toBoolean() }.orElse(false)
+
 neoForge {
     // Specify the version of NeoForge to use.
     version = "21.1.262"
@@ -142,6 +146,12 @@ neoForge {
 
         // applies to all the run configs above
         configureEach {
+            if (name in ['client', 'server'] && ciSmokeTest.get()) {
+                gameDirectory = layout.buildDirectory.dir("run-ci-${name}").get().asFile
+                if (name == 'client') {
+                    systemProperty 'wildernessodysseyapi.ciSmokeTest', 'true'
+                }
+            }
             if (name in ['client', 'server', 'gameTestServer'] && tickEngineCompilerWorkaround.get()) {
                 jvmArgument '-XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine::finishTick'
             }
@@ -178,6 +188,14 @@ neoForge {
     unitTest {
         testedMod = mods."${mod_id}"
         enable()
+    }
+}
+
+// JavaExec otherwise supplies an empty stdin; CI must be able to ask the
+// dedicated server to save and stop through Minecraft's normal console path.
+tasks.named('runServer', JavaExec).configure {
+    if (ciSmokeTest.get()) {
+        standardInput = System.in
     }
 }
 

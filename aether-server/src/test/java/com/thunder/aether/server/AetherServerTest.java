@@ -275,6 +275,10 @@ class AetherServerTest {
         ProcessBuilder process=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),
                 "-jar",jar.toString(),"--config",configuration.toString());
         process.redirectErrorStream(true);
+        // Process.destroy() can close its output pipe on Linux. Capture while
+        // running so shutdown cannot discard diagnostics or block a full pipe.
+        Path processLog=temporary.resolve("executable-server.log");
+        process.redirectOutput(processLog.toFile());
         process.environment().put("AETHER_INFERENCE_TOKEN", INFERENCE);
         process.environment().put("AETHER_MONITORING_TOKEN", MONITOR);
         Process running=process.start();
@@ -288,7 +292,7 @@ class AetherServerTest {
                 catch(Exception ignored){}
                 Thread.sleep(50);
             }
-            assertTrue(up,"Executable server did not become healthy");
+            assertTrue(up,() -> "Executable server did not become healthy; see " + processLog);
             // A client that never finishes its headers must not hold an HTTP worker forever.
             try (var stalled = new java.net.Socket("127.0.0.1", port)) {
                 stalled.setSoTimeout(4000);
@@ -306,7 +310,7 @@ class AetherServerTest {
             assertEquals(503,http.send(generate,HttpResponse.BodyHandlers.ofString()).statusCode());
         }finally{running.destroy();if(!running.waitFor(3,TimeUnit.SECONDS)){running.destroyForcibly();running.waitFor();}}
         String output;
-        try (var logs = running.getInputStream()) {
+        try (var logs = Files.newInputStream(processLog)) {
             output = new String(logs.readNBytes(65536), StandardCharsets.UTF_8);
         }
         assertFalse(output.contains("server-key-a"));

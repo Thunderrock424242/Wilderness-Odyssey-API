@@ -3,55 +3,74 @@ name: Build and Run Client
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: run-client-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   run-client:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        id: checkout
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Setup JDK 21
-        uses: actions/setup-java@v5
+        id: java
+        uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        id: gradle
+        uses: gradle/actions/setup-gradle@v6
 
-      - name: Install xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Install software display support
+        id: display
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgl1-mesa-dri libglx-mesa0 libopenal1
 
-      - name: Build
-        run: ./gradlew build --no-daemon
+      - name: Verify smoke monitor regressions
+        id: harness
+        run: node --test .github/scripts/ci-smoke.test.mjs
 
-      - name: Run client until main menu
-        run: |
-          touch latest.log
-          tail -F latest.log &
-          TAIL_PID=$!
-          xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' ./gradlew runClient --no-daemon > latest.log 2>&1 &
-          PID=$!
-          if timeout 20m bash -c 'until grep -q "Created: 512x512x0 minecraft:textures/atlas/particles.png-atlas" latest.log; do sleep 5; done'; then
-            sleep 1m
-            kill $PID || true
-            wait $PID || true
-          else
-            echo "Client failed to reach main menu" >&2
-            kill $PID || true
-            wait $PID || true
-            exit 1
-          fi
-          kill $TAIL_PID || true
-          wait $TAIL_PID || true
+      - name: Build and verify client startup and shutdown
+        id: smoke
+        run: node .github/scripts/ci-smoke.mjs client
 
-      - name: Upload client log
-        if: always()
-        uses: actions/upload-artifact@v6
+      - name: Write client report
+        if: always() && steps.checkout.outcome == 'success'
+        env:
+          CI_STEP_OUTCOMES: '{"java":"${{ steps.java.outcome }}","gradle":"${{ steps.gradle.outcome }}","display":"${{ steps.display.outcome }}","harness":"${{ steps.harness.outcome }}","smoke":"${{ steps.smoke.outcome }}"}'
+        run: node .github/scripts/ci-smoke.mjs report client
+
+      - name: Upload client diagnostics
+        if: always() && steps.checkout.outcome == 'success'
+        uses: actions/upload-artifact@v7
         with:
-          name: latest-log
-          path: latest.log
+          name: client-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            .codex-build/reports/ci-client/
+            .codex-build/run-ci-client/logs/
+            .codex-build/run-ci-client/crash-reports/
+            .codex-build/reports/tests/
+            .codex-build/test-results/
+            aether-server/.codex-build/reports/tests/
+            aether-server/.codex-build/test-results/
+            tools/structure-viewer/.codex-build/reports/tests/
+            tools/structure-viewer/.codex-build/test-results/
+            **/hs_err_pid*.log
