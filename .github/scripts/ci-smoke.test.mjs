@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { monitorProcess, renderReport } from './ci-smoke.mjs';
+import { monitorProcess, prepareClientOptions, renderReport } from './ci-smoke.mjs';
 
 function launch(t, kind, source, options = {}) {
     const directory = mkdtempSync(join(tmpdir(), 'wo-ci-smoke-'));
@@ -21,6 +21,39 @@ function launch(t, kind, source, options = {}) {
         ...options,
     });
 }
+
+test('prepares a fresh CI client profile with accessibility onboarding already completed', t => {
+    const directory = mkdtempSync(join(tmpdir(), 'wo-ci-options-'));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    prepareClientOptions(directory);
+    const options = readFileSync(join(directory, 'options.txt'), 'utf8');
+    assert.match(options, /^onboardAccessibility:false$/m);
+});
+
+test('CI onboarding preparation preserves unrelated options and is repeatable', t => {
+    const directory = mkdtempSync(join(tmpdir(), 'wo-ci-options-'));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    writeFileSync(join(directory, 'options.txt'), 'lang:en_us\nonboardAccessibility:true\nrenderDistance:8\n');
+    prepareClientOptions(directory);
+    prepareClientOptions(directory);
+    const options = readFileSync(join(directory, 'options.txt'), 'utf8');
+    assert.match(options, /^lang:en_us$/m);
+    assert.match(options, /^renderDistance:8$/m);
+    assert.match(options, /^onboardAccessibility:false$/m);
+    assert.equal(options.match(/^onboardAccessibility:/gm).length, 1);
+});
+
+test('captures the blocking screen without counting onboarding as readiness', async t => {
+    const result = await launch(t, 'client', `
+        console.log('[WO-CI] CLIENT_SCREEN class=net.minecraft.client.gui.screens.AccessibilityOnboardingScreen overlay=none');
+    `);
+    assert.equal(result.status, 'failed');
+    assert.equal(result.ready, false);
+    assert.match(result.lastScreen, /AccessibilityOnboardingScreen/);
+    const report = renderReport('client', { runtime: result });
+    assert.match(report, /AccessibilityOnboardingScreen/);
+    assert.match(report, /before readiness/);
+});
 
 test('a texture atlas and a successful early exit do not prove client readiness', async t => {
     const result = await launch(t, 'client', `

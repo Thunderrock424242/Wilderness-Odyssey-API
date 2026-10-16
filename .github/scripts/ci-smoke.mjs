@@ -7,6 +7,15 @@ import { fileURLToPath } from 'node:url';
 const clientReady = /\[WO-CI\] CLIENT_READY screen=(TitleScreen|AlphaNoticeScreen)\b/;
 const serverReady = /Done \([\d.,]+s\)! For help, type "help"/;
 
+/** A disposable CI profile must not wait for a human at Minecraft's first-launch setup screen. */
+export function prepareClientOptions(gameDirectory) {
+    const file = join(gameDirectory, 'options.txt');
+    const lines = (existsSync(file) ? readFileSync(file, 'utf8') : '').split(/\r?\n/)
+        .filter(line => !line.startsWith('onboardAccessibility:'));
+    while (lines.at(-1) === '') lines.pop();
+    writeFileSync(file, [...lines, 'onboardAccessibility:false', ''].join('\n'));
+}
+
 /** Owns one launch, its deadlines and its process group. A marker alone never passes a run. */
 export function monitorProcess({ kind, command, args, cwd, logFile, startupTimeoutMs,
     soakMs = 60000, shutdownTimeoutMs = 90000, onOutput = () => {}, onProgress = () => {},
@@ -74,6 +83,10 @@ export function monitorProcess({ kind, command, args, cwd, logFile, startupTimeo
         for (const stream of [child.stdout, child.stderr]) {
             stream.on('data', data => { appendFileSync(logFile, data); onOutput(data); });
             createInterface({ input: stream }).on('line', line => {
+                if (kind === 'client' && line.includes('[WO-CI] CLIENT_SCREEN ')) {
+                    result.lastScreen = line;
+                    onProgress({ ...result });
+                }
                 if (/FAILED|Exception|Caused by:|Execution failed for task/.test(line)) {
                     result.highlights.push(line.slice(0, 1000));
                     result.highlights = result.highlights.slice(-30);
@@ -140,6 +153,7 @@ export function renderReport(kind, result, setup = {}) {
         ...Object.entries(setup).map(([name, status]) => row(`Setup: ${name}`, status)),
         row('Build', status(build) ?? 'not run', build?.reason),
         row('Startup', startup, runtime?.evidence ?? runtime?.reason),
+        ...(runtime?.lastScreen ? [row('Last client screen', 'observed', runtime.lastScreen)] : []),
         row('Soak', soak, runtime?.ready ? `Target: ${kind === 'client' ? 60 : 180} seconds` : ''),
         row('Shutdown', shutdown, runtime?.stopRequested ? runtime.reason : ''), '',
         `Commit: ${text(result?.commit ?? process.env.GITHUB_SHA ?? 'unavailable')}.`,
@@ -219,6 +233,7 @@ async function main() {
         const game = join(root, '.codex-build', `run-ci-${kind}`);
         mkdirSync(game, { recursive: true });
         if (kind === 'server') writeFileSync(join(game, 'eula.txt'), 'eula=true\n');
+        else prepareClientOptions(game);
         const gradleArgs = [kind === 'client' ? 'runClient' : 'runServer', ...common, '-PciSmokeTest=true'];
         result.runtime = { status: 'running', ready: false, stopRequested: false };
         save();

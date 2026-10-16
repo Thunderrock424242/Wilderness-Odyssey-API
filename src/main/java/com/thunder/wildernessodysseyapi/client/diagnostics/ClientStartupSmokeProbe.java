@@ -22,6 +22,8 @@ public final class ClientStartupSmokeProbe {
     private static final long SOAK_NANOS = TimeUnit.SECONDS.toNanos(60);
     private static long firstRenderNanos;
     private static boolean stopRequested;
+    private static String lastScreenClass;
+    private static String lastOverlayClass;
 
     private ClientStartupSmokeProbe() {
     }
@@ -34,7 +36,17 @@ public final class ClientStartupSmokeProbe {
         }
         Minecraft minecraft = Minecraft.getInstance();
         Screen screen = event.getScreen();
-        if (screen != minecraft.screen || minecraft.level != null || minecraft.getOverlay() != null
+        if (screen != minecraft.screen) {
+            return;
+        }
+        String screenClass = screen.getClass().getName();
+        String overlayClass = minecraft.getOverlay() == null ? "none" : minecraft.getOverlay().getClass().getName();
+        if (!screenClass.equals(lastScreenClass) || !overlayClass.equals(lastOverlayClass)) {
+            lastScreenClass = screenClass;
+            lastOverlayClass = overlayClass;
+            ModConstants.LOGGER.info("[WO-CI] CLIENT_SCREEN class={} overlay={}", screenClass, overlayClass);
+        }
+        if (minecraft.level != null || minecraft.getOverlay() != null
                 || !(screen instanceof TitleScreen || screen instanceof AlphaNoticeScreen)) {
             firstRenderNanos = 0;
             return;

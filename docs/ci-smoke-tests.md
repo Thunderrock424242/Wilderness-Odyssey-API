@@ -22,6 +22,14 @@ the probe asks Minecraft to exit normally. Success requires readiness, the plann
 stop marker and exit code zero. Creating a texture atlas alone proves none of
 these conditions.
 
+The launcher sets `onboardAccessibility:false` in the disposable CI profile's
+`options.txt` before starting Minecraft. Minecraft 1.21.1 otherwise defaults to
+an interactive accessibility onboarding screen, which cannot reach the title
+screen without input on a fresh runner. Other options are preserved, and the
+normal developer profile is not read or modified. The probe logs each observed
+screen/overlay transition; reports retain the last observed screen without
+counting an onboarding or error screen as a successful startup.
+
 The dedicated server needs no display server. Its normal `Done (...)! For help,
 type "help"` message marks world readiness. After 180 seconds, the monitor writes
 `stop` to the server console and waits for a clean exit, allowing Minecraft to
