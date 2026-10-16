@@ -77,10 +77,26 @@ jobs:
           use-annotations: false
           push-fixes: none
 
+      - name: Set up Node.js for report tagging
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Test Qodana performance tagging
+        run: node --test .github/scripts/tag-qodana-performance.test.mjs
+
+      - name: Tag performance inspections for GitHub filtering
+        run: |
+          node .github/scripts/tag-qodana-performance.mjs \
+            "$RUNNER_TEMP/qodana/results/qodana.sarif.json" \
+            "$RUNNER_TEMP/qodana/results/qodana.github.sarif.json"
+          echo '[Performance alerts](https://github.com/Thunderrock424242/Wilderness-Odyssey-API/security/code-scanning?query=is%3Aopen%20branch%3Ain-dev%20tag%3Aperformance)' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Qodana SARIF to code scanning
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+          sarif_file: ${{ runner.temp }}/qodana/results/qodana.github.sarif.json
           category: qodana-jvm
 
   codeql-actions:
