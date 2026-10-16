@@ -4,6 +4,13 @@ Dependabot notifications focus on the Minecraft mod, the standalone Aether
 gateway, and the Aether voice service. Runtime dependencies remain covered,
 including transitive libraries supplied by Minecraft/NeoForge.
 
+Runtime scope is the first filter. Individual advisories also need review of
+their affected functionality and input conditions. The
+[Minecraft and Aether applicability review](dependency-security-review.md)
+records current unused-feature dismissals and the findings retained because
+Minecraft can use the affected paths. Keep unresolved findings visible and
+revisit dismissals when versions, mods, or configurations change.
+
 ## Runtime and development scopes
 
 `.github/workflows/dependency-submission.yml` uses the official Gradle
@@ -111,7 +118,8 @@ node .github/scripts/dependency-report.mjs .codex-build/reports/dependency-origi
 Publish the workflow to the default branch (`in-dev`) and run **Dependency
 Security Scope**. Inspect its retained dependency graph artifact and the
 effective dependency graph in GitHub before considering rollout complete.
-Keep runtime alerts open even when their automatic update fails.
+Keep applicable or unresolved runtime alerts open even when their automatic
+update fails. Dismiss only individually reviewed unused vulnerable paths.
 
 References:
 
