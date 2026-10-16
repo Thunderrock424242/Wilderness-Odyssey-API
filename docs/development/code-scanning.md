@@ -99,7 +99,10 @@ The resource inspection remains enabled, including checks on factory-returned
 resources. Its method exceptions in `qodana.yaml` retain the pinned inspection's
 standard entries and add specific accessors for borrowed Minecraft worlds,
 shared rendering backends, and the shared Minecraft I/O pool. The paired class
-and method lists must stay aligned. They do not exempt all `Level`,
+and method entries use the inspection's serialized `METHOD_MATCHER_CONFIG`
+string: alternating class and method names separated by commas. Qodana option
+values must be scalar strings; the dotted table-control IDs shown by
+Inspectopedia are not the saved matcher option. They do not exempt all `Level`,
 `RenderBackend`, or `ExecutorService` instances: constructors and other factories
 still need an owner that closes what they create. In particular, a render state
 scope returned by `captureRenderStateScope()` is still owned by its caller.
@@ -165,5 +168,6 @@ References:
 - [GitHub alert filtering](https://docs.github.com/en/code-security/how-tos/manage-security-alerts/manage-code-scanning-alerts/assess-alerts)
 - [Qodana bootstrap and project configuration](https://www.jetbrains.com/help/qodana/configuration-reference.html)
 - [Resource-inspection method exceptions](https://www.jetbrains.com/help/inspectopedia/resource.html)
+- [JetBrains MethodMatcher settings serialization](https://github.com/JetBrains/intellij-community/blob/89a815572860fda15700fb1828245df7b73d34e0/java/java-analysis-impl/src/com/siyeh/ig/psiutils/MethodMatcher.java)
 - [Qodana profile inheritance and options](https://www.jetbrains.com/help/qodana/inspection-profiles.html)
 - [CodeQL manual-build analysis scope](https://docs.github.com/en/code-security/reference/code-scanning/troubleshoot-analysis-errors/alerts-in-generated-code)
