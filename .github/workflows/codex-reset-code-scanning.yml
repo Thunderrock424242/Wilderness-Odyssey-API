@@ -1,0 +1,118 @@
+name: One-time code scanning history reset
+
+on:
+  push:
+    branches: [in-dev]
+    paths: [.github/workflows/codex-reset-code-scanning.yml]
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codex-reset-code-scanning-history
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    if: github.repository == 'Thunderrock424242/Wilderness-Odyssey-API' && github.event.head_commit.message == 'reset code scanning analysis history'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Delete all stored analyses and verify no alerts remain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CODEX_RUN_CODE_SCANNING_RESET: 'true'
+        run: |
+          node --input-type=module <<'CODEX_RESET'
+          import { appendFileSync } from 'node:fs';
+          import { setTimeout as sleep } from 'node:timers/promises';
+          
+          const repository = 'Thunderrock424242/Wilderness-Odyssey-API';
+          const apiBase = `https://api.github.com/repos/${repository}`;
+          
+          export async function clearAnalyses(request, pause = sleep, log = console.log) {
+              let deleted = 0;
+              const seen = new Set();
+              for (;;) {
+                  const analyses = await request('GET', '/code-scanning/analyses?per_page=100');
+                  if (!Array.isArray(analyses)) throw new Error('Expected an analysis list.');
+                  if (analyses.length === 0) break;
+                  const analysis = analyses.find(value => value.deletable === true);
+                  if (!analysis || !Number.isSafeInteger(analysis.id)) {
+                      throw new Error('GitHub returned analyses but no deletable analysis.');
+                  }
+                  log(`Clearing ${analysis.tool?.name} / ${analysis.category} / ${analysis.ref}`);
+                  let id = String(analysis.id);
+                  while (id !== null) {
+                      if (seen.has(id) || deleted >= 20000) throw new Error('Deletion did not advance safely.');
+                      seen.add(id);
+                      const response = await request('DELETE', `/code-scanning/analyses/${id}?confirm_delete=true`);
+                      deleted++;
+                      if (deleted % 25 === 0) log(`Deleted ${deleted} analyses so far.`);
+                      const next = response.confirm_delete_url;
+                      if (next == null) {
+                          id = null;
+                      } else {
+                          const nextUrl = new URL(next);
+                          const expectedPrefix = `${apiBase}/code-scanning/analyses/`;
+                          if (!nextUrl.href.startsWith(expectedPrefix)) throw new Error('Unexpected deletion destination.');
+                          id = nextUrl.pathname.slice(new URL(expectedPrefix).pathname.length);
+                          if (!/^\d+$/.test(id)) throw new Error('Unexpected next analysis ID.');
+                      }
+                      await pause(1100);
+                  }
+              }
+              const open = await request('GET', '/code-scanning/alerts?state=open&per_page=1');
+              const closed = await request('GET', '/code-scanning/alerts?state=closed&per_page=1');
+              if (!Array.isArray(open) || !Array.isArray(closed) || open.length || closed.length) {
+                  throw new Error('Analyses are empty, but alert records remain; reset is not verified complete.');
+              }
+              return { deleted, remainingAnalyses: 0, openAlerts: 0, closedAlerts: 0 };
+          }
+          
+          if (process.env.CODEX_RUN_CODE_SCANNING_RESET === 'true') {
+              if (process.env.GITHUB_REPOSITORY !== repository || process.env.GITHUB_REF !== 'refs/heads/in-dev') {
+                  throw new Error('This one-time reset is restricted to the requested repository and branch.');
+              }
+              if (!process.env.GITHUB_TOKEN) throw new Error('The repository workflow token is required.');
+              const deadline = Date.now() + 5 * 60 * 60 * 1000;
+              const request = async (method, path) => {
+                  if (!/^\/code-scanning\/(analyses(?:\/\d+)?|alerts)\?/.test(path)) throw new Error('Unexpected API path.');
+                  for (;;) {
+                      if (Date.now() >= deadline) throw new Error('Reset exceeded its five-hour limit.');
+                      const response = await fetch(`${apiBase}${path}`, {
+                          method,
+                          headers: {
+                              Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                              Accept: 'application/vnd.github+json',
+                              'X-GitHub-Api-Version': '2022-11-28',
+                              'User-Agent': 'Codex-code-scanning-reset',
+                          },
+                          signal: AbortSignal.timeout(60000),
+                      });
+                      const body = await response.json();
+                      if (response.ok) return body;
+                      if (response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0')) {
+                          const retryAfter = Number(response.headers.get('retry-after'));
+                          const resetTime = Number(response.headers.get('x-ratelimit-reset')) * 1000;
+                          const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.max(60000, resetTime - Date.now() + 5000);
+                          if (!Number.isFinite(waitMs) || waitMs > 3700000) throw new Error('Unexpected rate-limit wait.');
+                          console.log(`GitHub rate limit reached; retrying in ${Math.ceil(waitMs / 1000)} seconds.`);
+                          await sleep(waitMs);
+                          continue;
+                      }
+                      throw new Error(`GitHub API ${method} failed with HTTP ${response.status}: ${body.message}`);
+                  }
+              };
+              const result = await clearAnalyses(request);
+              console.log(JSON.stringify(result));
+              appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Deleted **${result.deleted}** code-scanning analyses. Verified **0 analyses, 0 open alerts, and 0 closed alerts**. Existing scan workflows remain enabled.\n`);
+          }
+          CODEX_RESET
