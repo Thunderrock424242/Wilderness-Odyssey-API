@@ -53,6 +53,28 @@ declaration. This is expected upstream behavior, and remains true with scopes.
 Do not move dependencies into settings.gradle or patch generated JARs to make
 that label appear correct.
 
+Each **Dependency Security Scope** run now adds an ownership report to its
+job summary and retains a `dependency-ownership-report` artifact for 14 days.
+It uses the same pinned official extractor's diagnostic format, which preserves
+the project/configuration origins and dependency edges omitted from native
+alert metadata. Native alert manifests and their locations remain unchanged.
+
+For every captured package version, the report includes:
+
+- Effective runtime/development scope and each resolving configuration.
+- Owning project entry points such as `build.gradle` or
+  `aether-server/build.gradle`.
+- A shortest captured path from a direct dependency to the reported package.
+- A commit-specific declaration link when a literal coordinate for the parent
+  is actually present in that project's build file. Other links are explicitly
+  labeled project entry points, without an invented declaration line.
+- A dependency-insight command and guidance for repository-owned versions,
+  Minecraft/NeoForge-managed libraries, or development tooling.
+
+The JSON report is available for exact searches by group, artifact and version.
+This diagnostic report does not change which packages are submitted to GitHub,
+and does not establish whether an advisory's vulnerable functionality is used.
+
 For example, alert #1 reported Commons Compress 1.18 through
 `net.neoforged:neoform-runtime:2.0.31`, while Minecraft's runtime resolves
 Commons Compress 1.26.0. The first is development tooling; the latter remains
@@ -82,6 +104,8 @@ or guarantee every Gradle/transitive security update can be automated.
 ```powershell
 node --test .github/scripts/check-dependency-scope.test.mjs
 node .github/scripts/check-dependency-scope.mjs .codex-build/reports/dependency-graph
+node --test .github/scripts/dependency-report.test.mjs
+node .github/scripts/dependency-report.mjs .codex-build/reports/dependency-origins
 ```
 
 Publish the workflow to the default branch (`in-dev`) and run **Dependency

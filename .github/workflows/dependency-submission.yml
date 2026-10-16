@@ -10,6 +10,8 @@ on:
       - 'gradle/**'
       - '.github/workflows/dependency-submission.yml'
       - '.github/scripts/check-dependency-scope*'
+      - '.github/scripts/dependency-report*'
+      - '.github/gradle/dependency-origins.init.gradle'
   workflow_dispatch:
 
 permissions:
@@ -51,7 +53,7 @@ jobs:
           package-manager-cache: false
 
       - name: Test dependency scope guard
-        run: node --test .github/scripts/check-dependency-scope.test.mjs
+        run: node --test .github/scripts/check-dependency-scope.test.mjs .github/scripts/dependency-report.test.mjs
 
       - name: Generate scoped dependency graph
         uses: gradle/actions/dependency-submission@v6
@@ -63,6 +65,28 @@ jobs:
 
       - name: Verify runtime coverage before submission
         run: node .github/scripts/check-dependency-scope.mjs .codex-build/reports/dependency-graph
+
+      - name: Capture dependency owners and resolution paths
+        env:
+          # Keep diagnostic JSON separate from the native GitHub snapshot.
+          GITHUB_DEPENDENCY_GRAPH_ENABLED: 'false'
+          DEPENDENCY_GRAPH_REPORT_DIR: .codex-build/reports/dependency-origins
+        run: >-
+          ./gradlew --init-script .github/gradle/dependency-origins.init.gradle
+          :ForceDependencyResolutionPlugin_resolveAllDependencies
+          -PcodexBuildDir=.codex-build --no-parallel --console=plain
+
+      - name: Explain dependency owners and fix routes
+        run: node .github/scripts/dependency-report.mjs .codex-build/reports/dependency-origins
+
+      - name: Retain dependency ownership report
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-ownership-report
+          path: .codex-build/reports/dependency-origins/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
 
   submit:
     needs: generate

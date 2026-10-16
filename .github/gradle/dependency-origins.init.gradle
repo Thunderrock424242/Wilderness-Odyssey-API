@@ -1,0 +1,13 @@
+// The official extractor's diagnostic format preserves project/configuration
+// origins that are intentionally absent from its GitHub settings.gradle manifest.
+// Pin the version alongside DEPENDENCY_GRAPH_PLUGIN_VERSION in the workflow.
+initscript {
+    repositories {
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'org.gradle:github-dependency-graph-gradle-plugin:1.5.0'
+    }
+}
+
+apply plugin: org.gradle.dependencygraph.simple.SimpleDependencyGraphPlugin
