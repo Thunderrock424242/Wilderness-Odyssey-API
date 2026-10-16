@@ -44,6 +44,8 @@ public abstract class CanonicalWaterBucketPickupMixin {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
+        // This handler executes after Mixin merges it into LiquidBlock.
+        //noinspection DataFlowIssue
         LiquidBlock liquidBlock = (LiquidBlock) (Object) this;
         CanonicalWaterBucketTransactions.PickupDecision decision =
                 CanonicalWaterBucketTransactions.pickup(

@@ -38,6 +38,8 @@ public abstract class ClientLevelChunkWaterMeshMixin {
         if (previousState == null || previousState == newState) {
             return;
         }
+        // This handler executes after Mixin merges it into LevelChunk.
+        //noinspection DataFlowIssue
         LevelChunk chunk = (LevelChunk) (Object) this;
         ClientWaterSnapshotStore.notifyBlockChange(chunk.getLevel(), position);
     }

@@ -32,6 +32,8 @@ public abstract class DayNightCycleMixin {
 
     @Inject(method = "getDayTimePerTick", at = @At("HEAD"), cancellable = true)
     private void overridePerTickSpeed(CallbackInfoReturnable<Float> cir) {
+        // This handler executes after Mixin merges it into ServerLevel.
+        //noinspection DataFlowIssue
         ServerLevel level = (ServerLevel)(Object)this;
         long timeOfDay = level.getDayTime() % TOTAL_CYCLE;
 

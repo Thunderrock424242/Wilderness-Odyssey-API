@@ -90,6 +90,8 @@ public abstract class ServerLevelLocalizedPrecipitationMixin {
             BlockPos position,
             Operation<Biome.Precipitation> original
     ) {
+        // This handler executes after Mixin merges it into ServerLevel.
+        //noinspection DataFlowIssue
         ServerLevel level = (ServerLevel) (Object) this;
         if (!WeatherConfig.dimensionEnabled(level.dimension())) {
             return original.call(biome, position);

@@ -3,7 +3,61 @@ version: "1.0"
 linter: qodana-jvm-community
 projectJDK: "21"
 profile:
-  name: qodana.starter
+  base:
+    name: qodana.starter
+  inspections:
+    - inspection: AutoCloseableResource
+      options:
+        # Keep factory-returned resources checked. Only the accessors listed
+        # below borrow an existing owner's resource without transferring it.
+        ignoreFromMethodCall: false
+        # Retain the pinned inspection's standard method exceptions first.
+        myMethodMatcher.myClassNames:
+          - java.util.Formatter
+          - java.io.Writer
+          - com.google.common.base.Preconditions
+          - org.hibernate.Session
+          - java.io.PrintWriter
+          - java.io.PrintStream
+          - java.lang.foreign.Arena
+          - java.lang.foreign.Arena
+          - net.minecraft.world.entity.Entity
+          - net.minecraft.server.level.ServerPlayer
+          - net.minecraft.server.MinecraftServer
+          - net.minecraft.Util
+          - com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends
+          - com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends.Selection
+          - com.thunder.wildernessodysseyapi.rendering.RenderFrameContext
+          - com.thunder.wildernessodysseyapi.simulation.api.SimulationContext
+          - com.thunder.wildernessodysseyapi.vegetation.api.ReactivePlantUpdateContext
+          - com.thunder.wildernessodysseyapi.worldupgrade.MigrationContext
+          - com.thunder.wildernessodysseyapi.saving.coordinator.SavingCoordinator
+          - com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WorldFluidMutationReconciler.StarterTerrainContext
+          - com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.WaterMutationSafety.LoadedShapeReader
+        # Entries correspond one-to-one with the class names above. Keep the
+        # project patterns exact so new resource factories remain visible.
+        myMethodMatcher.myMethodNamePatterns:
+          - format
+          - append
+          - checkNotNull
+          - close
+          - printf
+          - printf
+          - ofAuto
+          - global
+          - level
+          - serverLevel
+          - overworld
+          - ioPool
+          - current
+          - backend
+          - backend
+          - level
+          - level
+          - level
+          - level
+          - level
+          - level
 
 # The Gradle importer references these generated artifacts at their normal build
 # paths. Prepare them inside Qodana's disposable checkout before project opening.

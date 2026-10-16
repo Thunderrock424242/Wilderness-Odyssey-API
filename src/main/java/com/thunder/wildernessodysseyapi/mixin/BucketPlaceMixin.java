@@ -49,6 +49,8 @@ public abstract class BucketPlaceMixin {
             @Nullable ItemStack container,
             CallbackInfoReturnable<Boolean> callbackInfo
     ) {
+        // Mixin merges this handler into BucketItem; the target cast is intentional.
+        //noinspection DataFlowIssue
         if (level instanceof ServerLevel serverLevel
                 && CanonicalWaterBucketTransactions.wouldOverwriteOwnedWater(
                         serverLevel,
@@ -73,6 +75,8 @@ public abstract class BucketPlaceMixin {
     private void onBucketEmpty(@Nullable Player player, Level level, BlockPos pos,
                                @Nullable BlockHitResult result, @Nullable ItemStack container,
                                CallbackInfoReturnable<Boolean> callbackInfo) {
+        // This handler executes on the BucketItem target after Mixin transformation.
+        //noinspection DataFlowIssue
         Fluid content = ((BucketItem) (Object) this).content;
         if (!isCanonicalBucketWater(content)
                 || level.isClientSide

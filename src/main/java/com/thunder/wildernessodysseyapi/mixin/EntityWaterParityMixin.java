@@ -47,6 +47,8 @@ public abstract class EntityWaterParityMixin {
     /** Makes vanilla movement and swim-pose logic follow the animated surface. */
     @Inject(method = "isInWater", at = @At("RETURN"), cancellable = true)
     private void wildernessOdysseyApi$useAnimatedWaterContact(CallbackInfoReturnable<Boolean> callbackInfo) {
+        // This handler executes after Mixin merges it into Entity.
+        //noinspection DataFlowIssue
         EntityWaterState state = EntityWaterCompat.stateFor((Entity) (Object) this);
         if (state.authoritativeContactKnown()) {
             callbackInfo.setReturnValue(state.touchingWater());
@@ -62,6 +64,8 @@ public abstract class EntityWaterParityMixin {
         if (fluidTag != FluidTags.WATER) {
             return;
         }
+        // This handler executes after Mixin merges it into Entity.
+        //noinspection DataFlowIssue
         EntityWaterState state = EntityWaterCompat.stateFor((Entity) (Object) this);
         if (state.authoritativeContactKnown()) {
             callbackInfo.setReturnValue(state.eyesSubmerged());
@@ -79,6 +83,8 @@ public abstract class EntityWaterParityMixin {
     private void wildernessOdysseyApi$useAnimatedEyeFluidType(
             CallbackInfoReturnable<FluidType> callbackInfo
     ) {
+        // This handler executes after Mixin merges it into Entity.
+        //noinspection DataFlowIssue
         EntityWaterState state = EntityWaterCompat.stateFor((Entity) (Object) this);
         if (!state.authoritativeContactKnown()) {
             return;

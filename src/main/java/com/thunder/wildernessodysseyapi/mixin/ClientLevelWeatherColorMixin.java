@@ -23,6 +23,8 @@ public class ClientLevelWeatherColorMixin {
 
     @Inject(method = "getSkyColor", at = @At("RETURN"), cancellable = true)
     private void wildernessodysseyapi$tintSkyColor(Vec3 cameraPos, float partialTick, CallbackInfoReturnable<Vec3> cir) {
+        // This handler executes after Mixin merges it into ClientLevel.
+        //noinspection DataFlowIssue
         ClientLevel level = (ClientLevel) (Object) this;
         Vec3 result = cir.getReturnValue();
         boolean changed = false;
@@ -42,6 +44,8 @@ public class ClientLevelWeatherColorMixin {
 
     @Inject(method = "getCloudColor", at = @At("RETURN"), cancellable = true)
     private void wildernessodysseyapi$tintCloudColor(float partialTick, CallbackInfoReturnable<Vec3> cir) {
+        // This handler executes after Mixin merges it into ClientLevel.
+        //noinspection DataFlowIssue
         ClientLevel level = (ClientLevel) (Object) this;
         Vec3 result = cir.getReturnValue();
         boolean changed = false;

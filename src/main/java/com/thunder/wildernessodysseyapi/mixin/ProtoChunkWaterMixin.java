@@ -32,6 +32,8 @@ public abstract class ProtoChunkWaterMixin {
             boolean moved,
             CallbackInfoReturnable<BlockState> callback
     ) {
+        // This handler executes after Mixin merges it into ProtoChunk.
+        //noinspection DataFlowIssue
         ProtoChunk chunk = (ProtoChunk) (Object) this;
         GenerationWaterStateMapper.recordStoredState(chunk, pos, chunk.getBlockState(pos));
     }

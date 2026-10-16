@@ -6,7 +6,7 @@ Actions, plus Qodana JVM Community. Qodana's report is uploaded with the existin
 
 ## Minecraft analysis setup
 
-Qodana uses an explicitly selected `qodana.starter` profile and Java 21. The
+Qodana extends the `qodana.starter` profile and uses Java 21. The
 workflow passes a published Qodana Community 2026.2 image pinned by digest through
 the supported `args: --image ...` input. Updating the image is a deliberate change
 that should include checking the resulting report and its analysis diagnostics.
@@ -95,12 +95,32 @@ the owning code and its callers. Minecraft and mixin lifecycle assumptions can
 make generic Java suggestions inappropriate. Confirm false positives before
 applying a narrow suppression with a reason.
 
-The current source exceptions are limited to the two-cow fixture's
-`SlowListContainsAll` assertion and `DataFlowIssue` on three explicit mixin-target
-casts in `MinecraftWorldLoadDeadlineMixin` and `CoordinatorLevelChunkDirtyMixin`.
-Each is documented at the affected statement. Other nullability, resource,
-threading, security, and GameTest correctness checks remain enabled. Reevaluate
-an exception if its fixture grows or its mixin target changes.
+The resource inspection remains enabled, including checks on factory-returned
+resources. Its method exceptions in `qodana.yaml` retain the pinned inspection's
+standard entries and add specific accessors for borrowed Minecraft worlds,
+shared rendering backends, and the shared Minecraft I/O pool. The paired class
+and method lists must stay aligned. They do not exempt all `Level`,
+`RenderBackend`, or `ExecutorService` instances: constructors and other factories
+still need an owner that closes what they create. In particular, a render state
+scope returned by `captureRenderStateScope()` is still owned by its caller.
+
+Project world-context accessors are included only when they retain a reference
+to an existing server-owned world. Review ownership again before adding another
+method or changing one of those accessors to create a resource.
+
+Source exceptions cover the two-cow fixture's `SlowListContainsAll` assertion and
+specific `DataFlowIssue` casts whose types match their declared `@Mixin` targets.
+Each is documented at the affected statement. No entire mixin package or
+nullability category is excluded. Reevaluate an exception if its fixture grows
+or its mixin target changes. Threading, security, and GameTest correctness checks
+remain enabled; low-value findings are not evidence that those checks should be
+disabled broadly.
+
+Deleting a stale configuration only changes the alert configuration/status.
+A history reset instead deletes stored analyses through GitHub's code-scanning
+API, newest first, including the final analysis in each set. Even after all
+analyses have been removed, a new upload can reconnect a finding to its original
+alert number and first-detected date. A reset is not a way to force new dates.
 
 Performance alerts identify candidates for investigation. Check execution
 frequency, collection size, client/server side, and whether the code is a GameTest
@@ -133,10 +153,17 @@ unresolved-library and suspended-sanity diagnostics are gone before judging
 changes in alert counts. A compilation or script test alone does not prove that
 Qodana's container imported the prepared artifacts correctly.
 
+For resource-profile changes, also check that the borrowed-accessor warnings are
+reduced while findings for unlisted resource factories remain visible. Inspect
+configuration warnings for unknown option IDs; merely parsing YAML does not
+confirm that the linter applied the options.
+
 References:
 
 - [GitHub SARIF rule tags](https://docs.github.com/en/code-security/reference/code-scanning/sarif-files/sarif-support)
 - [Qodana report metadata](https://www.jetbrains.com/help/qodana/qodana-inspection-output.html)
 - [GitHub alert filtering](https://docs.github.com/en/code-security/how-tos/manage-security-alerts/manage-code-scanning-alerts/assess-alerts)
 - [Qodana bootstrap and project configuration](https://www.jetbrains.com/help/qodana/configuration-reference.html)
+- [Resource-inspection method exceptions](https://www.jetbrains.com/help/inspectopedia/resource.html)
+- [Qodana profile inheritance and options](https://www.jetbrains.com/help/qodana/inspection-profiles.html)
 - [CodeQL manual-build analysis scope](https://docs.github.com/en/code-security/reference/code-scanning/troubleshoot-analysis-errors/alerts-in-generated-code)

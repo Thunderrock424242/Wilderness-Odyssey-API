@@ -39,6 +39,8 @@ public abstract class WaterProjectionMutationMixin {
             int recursionLeft,
             CallbackInfoReturnable<Boolean> callbackInfo
     ) {
+        // Mixin merges this handler into Level before the target cast can execute.
+        //noinspection DataFlowIssue
         WorldFluidMutationReconciler.MutationDecision decision =
                 WorldFluidMutationReconciler.beforeSetBlock(
                         (Level) (Object) this,

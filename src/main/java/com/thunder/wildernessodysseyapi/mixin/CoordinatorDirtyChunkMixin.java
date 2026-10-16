@@ -18,12 +18,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class CoordinatorDirtyChunkMixin {
     @Inject(method = "setUnsaved(Z)V", at = @At("RETURN"), require = 0)
     private void wildernessodysseyapi$observeDirty(boolean dirty, CallbackInfo callback) {
+        // This handler executes after Mixin merges it into ChunkAccess.
+        //noinspection DataFlowIssue
         SavingCoordinator.dirtyStateChanged((ChunkAccess) (Object) this, dirty);
     }
 
     @Inject(method = {"setStartForStructure", "setAllStarts", "addReferenceForStructure", "setAllReferences"},
             at = @At("RETURN"), require = 0)
     private void wildernessodysseyapi$observeStructureDirty(CallbackInfo callback) {
+        // This handler executes after Mixin merges it into ChunkAccess.
+        //noinspection DataFlowIssue
         SavingCoordinator.dirtyStateChanged((ChunkAccess) (Object) this, true);
     }
 }
