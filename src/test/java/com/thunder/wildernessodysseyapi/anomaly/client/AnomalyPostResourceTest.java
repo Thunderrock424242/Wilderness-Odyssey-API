@@ -12,7 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AnomalyPostResourceTest {
-    private static final Path SHADERS = Path.of("src/main/resources/assets/wildernessodysseyapi/shaders");
+    private static final Path SHADERS = Path.of(System.getProperty(
+            "wildernessodysseyapi.projectDir", System.getProperty("user.dir")))
+            .resolve("src/main/resources/assets/wildernessodysseyapi/shaders");
 
     @Test
     void gradesThroughAnIndependentIntermediateTarget() throws IOException {

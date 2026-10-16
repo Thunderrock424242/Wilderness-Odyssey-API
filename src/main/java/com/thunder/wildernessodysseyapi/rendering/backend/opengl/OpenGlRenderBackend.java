@@ -10,6 +10,7 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GLCapabilities;
 
 import java.util.EnumSet;
@@ -28,6 +29,7 @@ import java.util.Set;
 public final class OpenGlRenderBackend implements RenderBackend {
 
     private final GPUCapabilities capabilities;
+    private final int[] viewportScratch = new int[4];
     private final Set<OpenGlGpuTimer> timers = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
     private boolean closed;
 
@@ -143,6 +145,35 @@ public final class OpenGlRenderBackend implements RenderBackend {
                 GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA),
                 shaderColor
         );
+    }
+
+    @Override
+    public RenderStateScope capturePostProcessingTargetScope() {
+        RenderSystem.assertOnRenderThread();
+        int readFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int drawFramebuffer = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+        int depthFunction = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewportScratch);
+        // Capture scalars so nested scopes retain their own viewport without
+        // allocating an additional array for every active post-processing pass.
+        int viewportX = viewportScratch[0];
+        int viewportY = viewportScratch[1];
+        int viewportWidth = viewportScratch[2];
+        int viewportHeight = viewportScratch[3];
+        return new RenderStateScope() {
+            private boolean restored;
+
+            @Override
+            public void close() {
+                RenderSystem.assertOnRenderThread();
+                if (restored) return;
+                restored = true;
+                GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFramebuffer);
+                GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, drawFramebuffer);
+                RenderSystem.viewport(viewportX, viewportY, viewportWidth, viewportHeight);
+                RenderSystem.depthFunc(depthFunction);
+            }
+        };
     }
 
     @Override

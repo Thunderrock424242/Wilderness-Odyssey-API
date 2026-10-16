@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.anomaly.client;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.thunder.wildernessodysseyapi.anomaly.config.AnomalyClientConfig;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
@@ -13,8 +12,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.material.FogType;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 
 import java.io.IOException;
 
@@ -25,7 +22,6 @@ import java.io.IOException;
 final class AnomalyPostEffectController {
     private static final ResourceLocation EFFECT = ResourceLocation.fromNamespaceAndPath(
             ModConstants.MOD_ID, "shaders/post/anomaly_atmosphere.json");
-    private static final int[] VIEWPORT = new int[4];
     private static PostChain chain;
     private static RenderTarget target;
     private static int width;
@@ -60,11 +56,8 @@ final class AnomalyPostEffectController {
             return;
         }
 
-        int previousRead = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
-        int previousDraw = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
-        int previousDepthFunction = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
-        GL11.glGetIntegerv(GL11.GL_VIEWPORT, VIEWPORT);
         RenderBackend backend = frame.backend();
+        RenderBackend.RenderStateScope targetState = backend.capturePostProcessingTargetScope();
         try (RenderBackend.RenderStateScope ignored = backend.captureRenderStateScope()) {
             ensureChain(minecraft);
             chain.setUniform("GradeAmount", grade);
@@ -81,10 +74,7 @@ final class AnomalyPostEffectController {
             closeChain();
             ModConstants.LOGGER.warn("Anomaly post effects disabled until resource reload; fog and particles remain available", failure);
         } finally {
-            GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousRead);
-            GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDraw);
-            RenderSystem.viewport(VIEWPORT[0], VIEWPORT[1], VIEWPORT[2], VIEWPORT[3]);
-            RenderSystem.depthFunc(previousDepthFunction);
+            targetState.close();
         }
     }
 

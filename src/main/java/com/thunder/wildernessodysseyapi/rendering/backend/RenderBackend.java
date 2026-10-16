@@ -66,6 +66,15 @@ public interface RenderBackend extends AutoCloseable {
         return snapshot::restore;
     }
 
+    /**
+     * Preserves render-target bindings, viewport and depth comparison while a
+     * post chain runs or releases failed resources. Close after failure cleanup,
+     * independently of the blend/depth-mask scope around the pass itself.
+     */
+    default RenderStateScope capturePostProcessingTargetScope() {
+        return RenderStateScope.UNAVAILABLE;
+    }
+
     /** Releases resources created and retained by this backend adapter. */
     @Override
     default void close() {

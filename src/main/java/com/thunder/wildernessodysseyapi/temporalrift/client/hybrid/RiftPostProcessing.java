@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.temporalrift.client.hybrid;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.rendering.GPUCapabilities;
@@ -22,8 +21,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 
 /** Independent scene pass. Does not replace GameRenderer's effect or take ownership from a shader pack. */
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
@@ -31,7 +28,6 @@ public final class RiftPostProcessing {
     private static PostChain chain;
     private static RenderTarget target;
     private static ClientLevel owner;
-    private static final int[] VIEWPORT = new int[4];
     private static boolean failed;
     private static int width;
     private static int height;
@@ -101,10 +97,7 @@ public final class RiftPostProcessing {
                 || frame.gpuCapabilities().api() != GPUCapabilities.GraphicsApi.OPENGL
                 || minecraft.screen != null || minecraft.gameRenderer.currentEffect() != null
                 || minecraft.gameRenderer.getMainCamera().getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE) return;
-        int previousRead = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
-        int previousDraw = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
-        int previousDepth = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
-        GL11.glGetIntegerv(GL11.GL_VIEWPORT, VIEWPORT);
+        var targetState = frame.backend().capturePostProcessingTargetScope();
         try (var ignored = frame.backend().captureRenderStateScope()) {
             if (width != minecraft.getMainRenderTarget().width || height != minecraft.getMainRenderTarget().height) resize();
             chain.setUniform("Intensity", amount * minecraft.options.screenEffectScale().get().floatValue());
@@ -120,10 +113,7 @@ public final class RiftPostProcessing {
             close();
             ModConstants.LOGGER.warn("Local rift post-processing failed; disabled until resource reload", exception);
         } finally {
-            GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousRead);
-            GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDraw);
-            RenderSystem.viewport(VIEWPORT[0], VIEWPORT[1], VIEWPORT[2], VIEWPORT[3]);
-            RenderSystem.depthFunc(previousDepth);
+            targetState.close();
         }
     }
 
