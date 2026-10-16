@@ -1,9 +1,16 @@
 # Minecraft startup smoke tests
 
-The **Build and Run Client** and **Build and Run Server** GitHub Actions workflows
-build the repository, then exercise one Minecraft development launch. They run
-on pushes and pull requests and also support **Run workflow** from the Actions
-page when GitHub exposes manual dispatch for the selected branch.
+The **Build and Run Client and Server** GitHub Actions workflow
+(`.github/workflows/run-client-server.yml`) builds the repository and exercises
+both Minecraft development launches. It runs on pushes and pull requests and
+also supports **Run workflow** from the Actions page when GitHub exposes manual
+dispatch for the selected branch.
+
+The workflow uses a two-entry matrix with separate `run-client` and `run-server`
+jobs. Each job has its own runner, checkout, build, report and diagnostics
+artifact. They may run concurrently on separate runners; `fail-fast: false`
+allows the other job to finish when one fails. Display support is installed only
+for the client. A newer run on the same ref cancels the superseded workflow run.
 
 The build and launch run sequentially through the checked-in Gradle wrapper,
 using JDK 21, `-PcodexBuildDir=.codex-build`, `--no-parallel`, plain console output
@@ -49,7 +56,7 @@ terminate the launched Linux process group, with forced cleanup if necessary.
 
 ## Reports
 
-Each workflow writes a job summary and a diagnostics artifact, including when
+Each job writes its own summary and diagnostics artifact, including when
 setup or the build fails before Minecraft starts. Reports distinguish **Build**,
 **Startup**, **Soak** (the observation period) and **Shutdown**, with the commit,
 timings, readiness evidence, exit code, signal, diagnostic excerpts and console
@@ -94,10 +101,11 @@ Check the Java probe and the Aether executable integration test sequentially:
 .\gradlew.bat :aether-server:test '-PcodexBuildDir=.codex-build' --no-parallel --console=plain
 ```
 
-After publishing the changes, inspect both Actions runs. Verify that a successful
-client run records its supported startup screen and a clean exit, and that the
-server records `Done`, a console stop and a clean exit. Download each artifact and
-check that the summary and logs agree with GitHub's outcome. A local Windows
+After publishing the changes, open the combined Actions run and inspect its
+`run-client` and `run-server` jobs. Verify that a successful client job records
+its supported startup screen and a clean exit, and that the server records
+`Done`, a console stop and a clean exit. Download each artifact and check that
+the summary and logs agree with GitHub's outcome. A local Windows
 compile/test pass does not establish Linux Xvfb startup, software graphics,
 process-group cleanup or console forwarding in a real Minecraft run.
 

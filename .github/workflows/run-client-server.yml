@@ -1,4 +1,4 @@
-name: Build and Run Client
+name: Build and Run Client and Server
 
 on:
   push:
@@ -9,15 +9,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: run-client-${{ github.ref }}
+  group: run-client-server-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  run-client:
+  smoke:
+    name: run-${{ matrix.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      LIBGL_ALWAYS_SOFTWARE: '1'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [client, server]
     steps:
       - name: Checkout repository
         id: checkout
@@ -39,34 +42,37 @@ jobs:
 
       - name: Install software display support
         id: display
+        if: matrix.target == 'client'
         run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgl1-mesa-dri libglx-mesa0 libopenal1
 
       - name: Verify smoke monitor regressions
         id: harness
         run: node --test .github/scripts/ci-smoke.test.mjs
 
-      - name: Build and verify client startup and shutdown
+      - name: Build and verify ${{ matrix.target }} startup and shutdown
         id: smoke
-        run: node .github/scripts/ci-smoke.mjs client
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: node .github/scripts/ci-smoke.mjs ${{ matrix.target }}
 
-      - name: Write client report
+      - name: Write ${{ matrix.target }} report
         if: always() && steps.checkout.outcome == 'success'
         env:
           CI_STEP_OUTCOMES: '{"java":"${{ steps.java.outcome }}","gradle":"${{ steps.gradle.outcome }}","display":"${{ steps.display.outcome }}","harness":"${{ steps.harness.outcome }}","smoke":"${{ steps.smoke.outcome }}"}'
-        run: node .github/scripts/ci-smoke.mjs report client
+        run: node .github/scripts/ci-smoke.mjs report ${{ matrix.target }}
 
-      - name: Upload client diagnostics
+      - name: Upload ${{ matrix.target }} diagnostics
         if: always() && steps.checkout.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
-          name: client-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ matrix.target }}-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
           path: |
-            .codex-build/reports/ci-client/
-            .codex-build/run-ci-client/logs/
-            .codex-build/run-ci-client/crash-reports/
+            .codex-build/reports/ci-${{ matrix.target }}/
+            .codex-build/run-ci-${{ matrix.target }}/logs/
+            .codex-build/run-ci-${{ matrix.target }}/crash-reports/
             .codex-build/reports/tests/
             .codex-build/test-results/
             aether-server/.codex-build/reports/tests/
