@@ -1,0 +1,80 @@
+name: Dependency Security Scope
+
+on:
+  push:
+    branches: [in-dev]
+    paths:
+      - '**/*.gradle'
+      - '**/*.gradle.kts'
+      - '**/gradle.properties'
+      - 'gradle/**'
+      - '.github/workflows/dependency-submission.yml'
+      - '.github/scripts/check-dependency-scope*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-security-scope-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # A shared library remains runtime-scoped if ANY runtime configuration uses it.
+      # Other projects (including Structure Viewer) and build/test tools are development.
+      DEPENDENCY_GRAPH_RUNTIME_INCLUDE_PROJECTS: '^(:|:aether-server)$'
+      DEPENDENCY_GRAPH_RUNTIME_INCLUDE_CONFIGURATIONS: '^(runtimeClasspath|clientLegacyClasspath|serverLegacyClasspath|jarJar|sodiumService)$'
+      # Keep the scope-capable extractor stable; do not rely on an action default.
+      DEPENDENCY_GRAPH_PLUGIN_VERSION: '1.5.0'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Node.js for scope verification
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Test dependency scope guard
+        run: node --test .github/scripts/check-dependency-scope.test.mjs
+
+      - name: Generate scoped dependency graph
+        uses: gradle/actions/dependency-submission@v6
+        with:
+          dependency-graph: generate-and-upload
+          dependency-graph-report-dir: .codex-build/reports/dependency-graph
+          additional-arguments: '-PcodexBuildDir=.codex-build --no-parallel --console=plain'
+          artifact-retention-days: 7
+
+      - name: Verify runtime coverage before submission
+        run: node .github/scripts/check-dependency-scope.mjs .codex-build/reports/dependency-graph
+
+  submit:
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      # Use a fresh job: the generation action marks local reports as processed.
+      - name: Submit verified dependency graph
+        uses: gradle/actions/dependency-submission@v6
+        with:
+          dependency-graph: download-and-submit
+          dependency-graph-report-dir: .codex-build/reports/dependency-graph

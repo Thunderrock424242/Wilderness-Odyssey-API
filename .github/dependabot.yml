@@ -1,0 +1,36 @@
+version: 2
+
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    # Security fixes only. The root Gradle build includes the Aether subproject.
+    open-pull-requests-limit: 0
+    # Only attempt automatic fixes for libraries whose versions we own.
+    # Minecraft/NeoForge's pinned libraries remain alertable; their fixes need
+    # a compatible platform update, rather than a new declaration in settings.gradle.
+    allow:
+      - dependency-name: 'com.google.code.gson:gson'
+      - dependency-name: 'org.yaml:snakeyaml'
+      - dependency-name: 'com.nimbusds:nimbus-jose-jwt'
+      - dependency-name: 'com.squareup.okhttp3:okhttp-jvm'
+      - dependency-name: 'com.squareup.okio:okio-jvm'
+      - dependency-name: 'org.jetbrains.kotlin:kotlin-stdlib'
+      - dependency-name: 'io.github.resilience4j:resilience4j-circuitbreaker'
+      - dependency-name: 'io.github.resilience4j:resilience4j-core'
+      - dependency-name: 'com.github.luben:zstd-jni'
+    groups:
+      owned-runtime-libraries:
+        applies-to: security-updates
+        patterns: ['*']
+
+  - package-ecosystem: pip
+    directory: /tools/aether_voice_service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      aether-voice:
+        applies-to: security-updates
+        patterns: ['*']
