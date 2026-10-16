@@ -506,6 +506,8 @@ public final class EcosystemRemediationGameTests {
                             "Fixture cows must be visible after entity registration; initially visible=" + initialVisible);
                     List<Cow> nearby = level.getEntitiesOfClass(Cow.class,
                             animals.getFirst().getBoundingBox().inflate(8.0), animals::contains);
+                    // This setup assertion checks two fixture cows; a set allocation is unnecessary.
+                    //noinspection SlowListContainsAll
                     helper.assertTrue(nearby.containsAll(animals),
                             "Fixture cows must be visible to real local entity discovery: visible=" + nearby.size());
                     EcosystemConfig.SIMULATION_ZONES_ENABLED.set(false);

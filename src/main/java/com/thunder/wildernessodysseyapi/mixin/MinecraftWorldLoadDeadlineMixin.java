@@ -29,6 +29,8 @@ public abstract class MinecraftWorldLoadDeadlineMixin {
     private void wildernessodysseyapi$guardWorldStartup(LevelStorageSource.LevelStorageAccess storage,
                                                         PackRepository packs, WorldStem stem, boolean newWorld,
                                                         Operation<Void> original) {
+        // Mixin merges this handler into Minecraft before it can execute.
+        //noinspection DataFlowIssue
         Minecraft minecraft = (Minecraft) (Object) this;
         if (WorldLoadFailureHandler.isWaitingForShutdown() || LoadingStallDetector.worldLoadTimedOut()) {
             // Ownership has not transferred to an integrated server yet.
@@ -69,6 +71,8 @@ public abstract class MinecraftWorldLoadDeadlineMixin {
 
     @Unique
     private void wildernessodysseyapi$abortStartup(boolean profilerPushed) {
+        // Mixin merges this handler into Minecraft before it can execute.
+        //noinspection DataFlowIssue
         Minecraft minecraft = (Minecraft) (Object) this;
         if (profilerPushed) {
             minecraft.getProfiler().pop();

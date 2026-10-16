@@ -1,3 +1,12 @@
 ---
 version: "1.0"
-linter: jetbrains/qodana-jvm-community
+linter: qodana-jvm-community
+projectJDK: "21"
+profile:
+  name: qodana.starter
+
+# The Gradle importer references these generated artifacts at their normal build
+# paths. Prepare them inside Qodana's disposable checkout before project opening.
+bootstrap: |
+  set -eu
+  ./gradlew :jar :aether-server:jar --no-daemon --no-parallel --max-workers=1 --console=plain

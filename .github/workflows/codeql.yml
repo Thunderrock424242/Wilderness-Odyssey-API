@@ -41,6 +41,7 @@ jobs:
           languages: java-kotlin
           build-mode: manual
           dependency-caching: true
+          config-file: ./codeql-config.yml
 
       - name: Compile Minecraft mod and standalone Aether gateway
         run: |
@@ -70,7 +71,12 @@ jobs:
       - name: Scan with Qodana
         uses: JetBrains/qodana-action@v2026.2
         with:
-          linter: jetbrains/qodana-jvm-community
+          # Pin the published 2026.2 image so inspection changes are deliberate.
+          args: --image,jetbrains/qodana-jvm-community:2026.2@sha256:a70ebaff842ac21bd1f0e53852e9d0dba950fe1a924c55666bdd50c21ac55a93
+          # Recheck the complete project after bootstrap; old cached resolutions
+          # and a previous commit's findings must not hide configuration changes.
+          use-caches: false
+          pr-mode: false
           results-dir: ${{ runner.temp }}/qodana/results
           upload-result: true
           post-pr-comment: false
@@ -83,8 +89,8 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
-      - name: Test Qodana performance tagging
-        run: node --test .github/scripts/tag-qodana-performance.test.mjs
+      - name: Test Qodana report scripts
+        run: node --test .github/scripts/*.test.mjs
 
       - name: Tag performance inspections for GitHub filtering
         run: |
@@ -98,6 +104,10 @@ jobs:
         with:
           sarif_file: ${{ runner.temp }}/qodana/results/qodana.github.sarif.json
           category: qodana-jvm
+
+      # Upload findings first so an unhealthy analysis remains available to inspect.
+      - name: Check Qodana analysis health
+        run: node .github/scripts/check-qodana-health.mjs "$RUNNER_TEMP/qodana/results/qodana.sarif.json"
 
   codeql-actions:
     name: CodeQL GitHub Actions

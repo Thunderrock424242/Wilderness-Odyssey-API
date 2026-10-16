@@ -57,7 +57,7 @@ def biolithCompilerWorkaround = providers.gradleProperty('biolithCompilerWorkaro
 
 neoForge {
     // Specify the version of NeoForge to use.
-    version = "21.1.256"
+    version = "21.1.262"
 
     parchment {
         mappingsVersion = project.parchment_mappings_version

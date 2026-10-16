@@ -21,6 +21,8 @@ public abstract class CoordinatorLevelChunkDirtyMixin {
             target = "Lnet/minecraft/world/level/chunk/LevelChunk;unsaved:Z", opcode = Opcodes.PUTFIELD,
             shift = At.Shift.AFTER), require = 0)
     private void wildernessodysseyapi$observeBlockDirty(CallbackInfoReturnable<BlockState> callback) {
+        // Mixin merges this handler into LevelChunk before it can execute.
+        //noinspection DataFlowIssue
         SavingCoordinator.dirtyStateChanged((LevelChunk) (Object) this, true);
     }
 }

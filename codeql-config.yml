@@ -1,18 +1,6 @@
-name: "Minecraft Mod CodeQL Config"
+name: "Wilderness Odyssey Java security analysis"
 
-queries:
-  - uses: security-and-quality
-
-query-filters:
-  - exclude:
-      id: java/unused-*
-
-paths:
-  - src/main/java
-  - src/generated/java
-  - buildSrc/src
-
-paths-ignore:
-  - '**/test/**'
-  - '**/example/**'
-  - '**/generated/**'
+# Keep the high-precision default security suite. Qodana owns the separate
+# code-quality report. Java manual-build scope is controlled by the workflow's
+# compile tasks, not paths/paths-ignore filters in this configuration.
+disable-default-queries: false
