@@ -1,0 +1,128 @@
+name: Publish JAR to GitHub Packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-github-packages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Validate and publish API JAR
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout selected revision
+        id: checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Prepare diagnostics
+        run: |
+          mkdir -p .codex-build/reports/packages
+          git rev-parse HEAD > .codex-build/reports/packages/commit.txt
+
+      - name: Set up JDK 21
+        id: java
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      - name: Set up Gradle
+        id: gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Refresh StructureGen content catalog
+        id: catalog
+        run: |
+          ./gradlew :runData -PcodexBuildDir=.codex-build --no-daemon --no-parallel --console=plain --stacktrace 2>&1 | tee .codex-build/reports/packages/catalog.log
+
+      - name: Run tests and build JARs
+        id: build
+        run: |
+          ./gradlew structureGenTest test build -PcodexBuildDir=.codex-build --no-daemon --no-parallel --console=plain --stacktrace 2>&1 | tee .codex-build/reports/packages/build.log
+
+      - name: Verify generated sources are unchanged
+        id: sources
+        run: git diff --exit-code
+
+      - name: Prepare Maven publication metadata
+        id: metadata
+        run: |
+          ./gradlew :generatePomFileForMavenJavaPublication :generateMetadataFileForMavenJavaPublication -PcodexBuildDir=.codex-build --no-daemon --no-parallel --console=plain --stacktrace 2>&1 | tee .codex-build/reports/packages/metadata.log
+          sha256sum .codex-build/libs/*.jar > .codex-build/reports/packages/sha256sums.txt
+
+      - name: Publish API JAR to GitHub Packages
+        id: publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./gradlew :publishMavenJavaPublicationToGitHubPackagesRepository -PcodexBuildDir=.codex-build --no-daemon --no-parallel --console=plain --stacktrace 2>&1 | tee .codex-build/reports/packages/publish.log
+
+      - name: Upload JARs and publication diagnostics
+        id: artifacts
+        if: always() && steps.checkout.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages-build-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .codex-build/libs/*.jar
+            .codex-build/publications/mavenJava/
+            .codex-build/reports/packages/
+            .codex-build/reports/tests/
+            .codex-build/test-results/
+            aether-server/.codex-build/reports/tests/
+            aether-server/.codex-build/test-results/
+            .codex-build/tools/structure-viewer/reports/tests/
+            .codex-build/tools/structure-viewer/test-results/
+
+      - name: Write publication report
+        if: always() && steps.checkout.outcome == 'success'
+        env:
+          JAVA_RESULT: ${{ steps.java.outcome }}
+          GRADLE_RESULT: ${{ steps.gradle.outcome }}
+          CATALOG_RESULT: ${{ steps.catalog.outcome }}
+          BUILD_RESULT: ${{ steps.build.outcome }}
+          SOURCES_RESULT: ${{ steps.sources.outcome }}
+          METADATA_RESULT: ${{ steps.metadata.outcome }}
+          PUBLISH_RESULT: ${{ steps.publish.outcome }}
+          ARTIFACTS_RESULT: ${{ steps.artifacts.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as report:
+              report.write('## GitHub Packages publication\n\n| Stage | Result |\n| --- | --- |\n')
+              for label, key in [('Java setup', 'JAVA'), ('Gradle setup', 'GRADLE'), ('Content catalog', 'CATALOG'),
+                                 ('Tests and build', 'BUILD'), ('Generated-source check', 'SOURCES'),
+                                 ('Publication metadata', 'METADATA'), ('GitHub Packages upload', 'PUBLISH'),
+                                 ('Diagnostics artifact', 'ARTIFACTS')]:
+                  report.write(f'| {label} | {os.environ.get(key + "_RESULT", "not run")} |\n')
+              report.write(f'\nCommit: `{os.environ["GITHUB_SHA"]}`\n')
+              pom = Path('.codex-build/publications/mavenJava/pom-default.xml')
+              if pom.is_file():
+                  root = ET.parse(pom).getroot()
+                  ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+                  coordinate = ':'.join(root.findtext('m:' + key, namespaces=ns) for key in ['groupId', 'artifactId', 'version'])
+                  report.write(f'\nMaven coordinates: `{coordinate}`\n')
+              url = os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY'] + '/packages'
+              report.write(f'\n[Repository packages]({url})\n')
+              if os.environ.get('PUBLISH_RESULT') != 'success':
+                  report.write('\nPublication was not confirmed. Check the failed stage and diagnostics artifact.\n')
+          PY
