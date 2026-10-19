@@ -140,7 +140,7 @@
     [
       "minecraft:glow_lichen",
       "minecraft:forest_flowers",
-      "minecraft:trees_taiga",
+      "wildernessodysseyapi:anomaly_conifers",
       "minecraft:flower_default",
       "minecraft:patch_grass_taiga",
       "minecraft:brown_mushroom_normal",

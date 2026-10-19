@@ -112,6 +112,10 @@ rise per four shoreline-distance blocks, with a configurable maximum cut
 high cliffs, or enters a cave. The whole cut and its foundation are checked
 before writing; chunks with structure starts or references are conservatively
 excluded. These changes also require new chunks.
+The sand band also covers supported tropical seabed within four water blocks
+of the surface and within the existing twenty-block shoreline reach. It checks
+the complete four-block natural foundation before resurfacing and leaves water
+blocks, seafloor height, deep ocean, and other shore profiles intact.
 The cut returns gradually to the original bank between fourteen and twenty
 blocks from water so its inland cutoff cannot create a sudden four-block wall.
 

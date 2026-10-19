@@ -5,10 +5,12 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalWaveProfi
 import com.thunder.wildernessodysseyapi.worldgen.coast.config.CoastalWorldgenConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
@@ -62,8 +64,14 @@ public final class CoastalTerrainFeature extends Feature<NoneFeatureConfiguratio
                     var type = area.shoreType(x, z);
                     var water = area.contact(x, z);
                     BlockPos top = area.surface(x, z);
-                    if (type == null || water == null || area.column(x, z).water()
-                            || !CoastalGenerationArea.natural(level.getBlockState(top))) continue;
+                    if (type == null || water == null) continue;
+                    if (area.column(x, z).water()) {
+                        if (type == CoastalWaveProfile.ShoreType.TROPICAL) {
+                            placed |= resurfaceTropicalSeabed(level, area, x, z);
+                        }
+                        continue;
+                    }
+                    if (!CoastalGenerationArea.natural(level.getBlockState(top))) continue;
                     double weight = area.biomeWeight(x, z);
                     double broad = CoastalTerrainProfile.noise(level.getSeed(), x, z, 29, 0xA0761D6478BD642FL);
                     double fine = CoastalTerrainProfile.noise(level.getSeed(), x, z, 9, 0xE7037ED1A0B428DBL);
@@ -81,6 +89,21 @@ public final class CoastalTerrainFeature extends Feature<NoneFeatureConfiguratio
         }
         if (details) placed |= CoastalDetailPlacer.place(level, area);
         return placed;
+    }
+
+    /** Continues beach sand below shallow water without changing its depth or fluid blocks. */
+    private static boolean resurfaceTropicalSeabed(WorldGenLevel level, CoastalGenerationArea area, int x, int z) {
+        int floorY = level.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z) - 1;
+        int waterDepth = area.column(x, z).y() - floorY;
+        BlockPos floor = new BlockPos(x, floorY, z);
+        if (waterDepth < 1 || waterDepth > 4
+                || !level.getFluidState(floor.above()).is(FluidTags.WATER)) {
+            return false;
+        }
+        // The shared preflight requires four solid natural cells. It rejects
+        // caves and construction before writing, and never fills the water above.
+        return resurface(level, area, floor, CoastalWaveProfile.ShoreType.TROPICAL,
+                CoastalTerrainProfile.Zone.OPEN_BEACH, 0.0, 0);
     }
 
     private static BlockPos gradeTropicalBank(WorldGenLevel level, CoastalGenerationArea area,

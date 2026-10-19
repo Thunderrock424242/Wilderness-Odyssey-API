@@ -1,8 +1,11 @@
 package com.thunder.wildernessodysseyapi.anomaly.client;
 
+import net.minecraft.client.renderer.FogRenderer.FogMode;
+import net.minecraft.world.level.material.FogType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AnomalyEffectPolicyTest {
@@ -51,6 +54,18 @@ class AnomalyEffectPolicyTest {
         assertEquals(88.0F, AnomalyEffectPolicy.fogFarPlane(100.0F, 1.0F), 0.001F);
         assertTrue(AnomalyEffectPolicy.fogFarPlane(12.0F, 1.0F) <= 12.0F);
         assertEquals(100.0F, AnomalyEffectPolicy.fogFarPlane(100.0F, 0.0F));
+    }
+
+    @Test
+    void anomalyHazeOnlyAdjustsTerrainAirFogAndLeavesTheSkyAndFluidsAlone() {
+        assertTrue(AnomalyEffectPolicy.canAdjustFog(FogMode.FOG_TERRAIN, FogType.NONE));
+        assertFalse(AnomalyEffectPolicy.canAdjustFog(FogMode.FOG_SKY, FogType.NONE));
+        for (FogType medium : FogType.values()) {
+            if (medium != FogType.NONE) {
+                assertFalse(AnomalyEffectPolicy.canAdjustFog(FogMode.FOG_TERRAIN, medium));
+                assertFalse(AnomalyEffectPolicy.canAdjustFog(FogMode.FOG_SKY, medium));
+            }
+        }
     }
 
     @Test

@@ -50,9 +50,12 @@ public final class AnomalyZoneClientEffects {
     /** A small far-plane reduction preserves existing short-distance weather/fluid visibility. */
     @SubscribeEvent
     public static void onRenderFog(ViewportEvent.RenderFog event) {
+        if (!AnomalyEffectPolicy.canAdjustFog(event.getMode(), event.getType())) {
+            return;
+        }
         Minecraft minecraft = Minecraft.getInstance();
         if (!AnomalyClientConfig.fogEnabled() || !AnomalyClientState.controls(minecraft.level)
-                || event.getType() != FogType.NONE || ShaderPackCompatibility.isExternalShaderPackActive()) {
+                || ShaderPackCompatibility.isExternalShaderPackActive()) {
             return;
         }
         float strength = AnomalyEffectPolicy.combinedStrength(AnomalyClientState.intensity(),

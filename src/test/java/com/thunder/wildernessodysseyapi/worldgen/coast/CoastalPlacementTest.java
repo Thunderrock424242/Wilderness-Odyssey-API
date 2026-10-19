@@ -130,6 +130,41 @@ class CoastalPlacementTest {
     }
 
     @Test
+    void tropicalSandContinuesAcrossTheShallowSeabedWithoutReplacingWater() throws ReflectiveOperationException {
+        config(CoastalWorldgenConfig.ENABLE_COASTAL_DETAILS, false);
+        ShoreFixture shore = new ShoreFixture(42);
+        shore.waterLine = 8;
+        shore.generate();
+
+        assertEquals(Blocks.SAND.defaultBlockState(), shore.writes.get(new BlockPos(6, 59, 8)));
+        assertEquals(Blocks.SANDSTONE.defaultBlockState(), shore.writes.get(new BlockPos(6, 58, 8)));
+        assertTrue(shore.writes.keySet().stream().noneMatch(pos -> pos.getX() < 8 && pos.getY() >= 60),
+                "The sand veneer must leave the water column intact");
+    }
+
+    @Test
+    void tropicalSeabedLeavesDeepWaterCavesAndOtherBiomesAlone() throws ReflectiveOperationException {
+        config(CoastalWorldgenConfig.ENABLE_COASTAL_DETAILS, false);
+        ShoreFixture deep = new ShoreFixture(42);
+        deep.waterLine = 8;
+        deep.seabedY = 54;
+        deep.generate();
+        assertTrue(deep.writes.keySet().stream().noneMatch(pos -> pos.getX() < 8));
+
+        ShoreFixture cave = new ShoreFixture(42);
+        cave.waterLine = 8;
+        cave.hole = new BlockPos(6, 57, 8);
+        cave.generate();
+        assertFalse(cave.writes.containsKey(new BlockPos(6, 59, 8)), "Do not cap a hollow seabed");
+
+        ShoreFixture rocky = new ShoreFixture(42);
+        rocky.waterLine = 8;
+        rocky.biome = ModBiomes.ROCKY_COAST_KEY;
+        rocky.generate();
+        assertTrue(rocky.writes.keySet().stream().noneMatch(pos -> pos.getX() < 8));
+    }
+
+    @Test
     void palmsRejectUnsupportedRootsWithoutLeavingPartialTrees() {
         ShoreFixture shore = new ShoreFixture(4);
         shore.hole = new BlockPos(8, 64, 8);
@@ -325,6 +360,7 @@ class CoastalPlacementTest {
         int heightReads;
         int biomeReads;
         int waterLine;
+        int seabedY = 59;
         boolean inlandForest;
         ResourceKey<Biome> biome = ModBiomes.TROPICAL_BEACH_KEY;
         final WorldGenLevel level;
@@ -349,7 +385,7 @@ class CoastalPlacementTest {
                         case "getHeight" -> {
                             heightReads++;
                             yield (int) args[1] < waterLine
-                                    ? args[0] == net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG ? 60 : 63 : 65;
+                                    ? args[0] == net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG ? seabedY + 1 : 63 : 65;
                         }
                         case "ensureCanWrite" -> inside((BlockPos) args[0]);
                         case "getChunk" -> {
@@ -379,7 +415,7 @@ class CoastalPlacementTest {
             if (pos.equals(hole)) return Blocks.AIR.defaultBlockState();
             BlockState written = writes.get(pos);
             if (written != null) return written;
-            if (pos.getX() < waterLine && pos.getY() >= 60 && pos.getY() <= 62) return Blocks.WATER.defaultBlockState();
+            if (pos.getX() < waterLine && pos.getY() > seabedY && pos.getY() <= 62) return Blocks.WATER.defaultBlockState();
             if (pos.getY() > (pos.getX() < waterLine ? 62 : 64)) return Blocks.AIR.defaultBlockState();
             return (pos.getY() == 64 ? Blocks.GRASS_BLOCK : Blocks.STONE).defaultBlockState();
         }

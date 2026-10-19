@@ -1,5 +1,8 @@
 package com.thunder.wildernessodysseyapi.anomaly.client;
 
+import net.minecraft.client.renderer.FogRenderer.FogMode;
+import net.minecraft.world.level.material.FogType;
+
 /** Pure visual budgets shared by atmosphere presentation and its offline tests. */
 public final class AnomalyEffectPolicy {
     private AnomalyEffectPolicy() {
@@ -40,7 +43,12 @@ public final class AnomalyEffectPolicy {
         return Math.max(clampUnit(rift), clampUnit((clampUnit(biome) - 0.35F) / 0.65F));
     }
 
-    /** Limits the extra anomaly haze to twelve percent of the existing far plane. */
+    /** Sky geometry keeps its native horizon fog; fluids retain their own visibility rules. */
+    public static boolean canAdjustFog(FogMode mode, FogType medium) {
+        return mode == FogMode.FOG_TERRAIN && medium == FogType.NONE;
+    }
+
+    /** Limits the extra anomaly terrain haze to twelve percent of the existing far plane. */
     public static float fogFarPlane(float sourceFar, float strength) {
         if (!Float.isFinite(sourceFar) || sourceFar <= 0.0F) {
             return sourceFar;

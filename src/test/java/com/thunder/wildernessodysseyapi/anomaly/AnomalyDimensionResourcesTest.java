@@ -48,7 +48,7 @@ class AnomalyDimensionResourcesTest {
         JsonArray features = biome.getAsJsonArray("features");
         assertEquals(11, features.size());
         assertTrue(contains(features.get(6).getAsJsonArray(), "minecraft:ore_diamond"));
-        assertTrue(contains(features.get(9).getAsJsonArray(), "minecraft:trees_taiga"));
+        assertTrue(contains(features.get(9).getAsJsonArray(), "wildernessodysseyapi:anomaly_conifers"));
         assertTrue(contains(features.get(10).getAsJsonArray(), "minecraft:freeze_top_layer"));
     }
 
@@ -77,6 +77,7 @@ class AnomalyDimensionResourcesTest {
                     path + " must not introduce conflicting shared feature order");
             assertTrue(contains(features.get(8).getAsJsonArray(), "minecraft:spring_water"), path);
             assertTrue(contains(features.get(9).getAsJsonArray(), "minecraft:trees_taiga")
+                    || contains(features.get(9).getAsJsonArray(), "wildernessodysseyapi:anomaly_conifers")
                     || contains(features.get(9).getAsJsonArray(), "wildernessodysseyapi:anomaly_conifers_sparse"), path);
             assertTrue(contains(features.get(10).getAsJsonArray(), "wildernessodysseyapi:anomaly_terrain"), path);
         }
@@ -141,6 +142,20 @@ class AnomalyDimensionResourcesTest {
         assertTrue(treeWeight > 0 && treeWeight / (double) allWeight <= 0.25);
     }
 
+    @Test
+    void forestUsesFullSpruceCrownsWithSpatiallyVaryingOpenings() throws IOException {
+        JsonObject placement = readJson("src/main/resources/data/wildernessodysseyapi/worldgen/placed_feature/anomaly_conifers.json");
+        assertEquals("minecraft:spruce", placement.get("feature").getAsString());
+        JsonObject count = placement.getAsJsonArray("placement").get(0).getAsJsonObject();
+        assertEquals("minecraft:noise_threshold_count", count.get("type").getAsString());
+        int clearingCount = count.get("below_noise").getAsInt();
+        int forestCount = count.get("above_noise").getAsInt();
+        assertTrue(clearingCount > 0 && clearingCount < forestCount);
+        assertTrue(forestCount <= 6, "Leave room for the ground and anomaly details to be visible");
+        assertTrue(placement.getAsJsonArray("placement").asList().stream().anyMatch(entry ->
+                "minecraft:biome".equals(entry.getAsJsonObject().get("type").getAsString())));
+    }
+
     private static String sample(Climate.ParameterList<String> sampler, float erosion, float weirdness) {
         return sampler.findValue(Climate.target(0.0F, 0.0F, 0.0F, erosion, 0.0F, weirdness));
     }
@@ -150,6 +165,7 @@ class AnomalyDimensionResourcesTest {
         for (var stage : features) {
             stages.add(stage.getAsJsonArray().asList().stream().map(element -> element.getAsString())
                     .filter(id -> !id.equals("minecraft:trees_taiga")
+                            && !id.equals("wildernessodysseyapi:anomaly_conifers")
                             && !id.equals("wildernessodysseyapi:anomaly_conifers_sparse"))
                     .toList());
         }

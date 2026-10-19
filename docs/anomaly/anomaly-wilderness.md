@@ -14,6 +14,8 @@ The anomaly uses a recognizable spruce wilderness with sparse physical faults an
 
 Minecraft's existing Overworld noise settings still own terrain shape, caves, ravines and natural springs. The anomaly dimension uses a five-biome climate table. Overworld incursions extend the existing Lithostitched anomaly region and region-scoped replacements. Forest remains the broad default. Vegetation differs between dense forest/hills and sparse plains/fringe/core, while shared feature ordering stays consistent. Adjacent loaded biome samples and client interpolation soften atmosphere transitions.
 
+The forest's `anomaly_conifers` placement uses vanilla full-crowned spruce with two tree attempts in open patches and six in denser patches. Spatial noise supplies the openings; it no longer uses the vanilla taiga placement's roughly ten attempts and pine/spruce mix. Existing trees are retained, so compare the forest composition in newly generated chunks.
+
 Surface distortion uses natural dry block allowlists. It does not clear structures, place fluid sources, or simulate moving terrain. Whole chunks with structure starts or references are skipped conservatively. Local details include rocks, crystal growths, suspended stone, shallow faults and a rare noninteractive core formation. A decorative formation does not open a travel portal or invent rift gameplay state.
 
 ## Floating island structures
@@ -33,6 +35,8 @@ The initial opaque 16px art uses natural dark materials with thin cyan/blue stab
 `AnomalyBlockMaterial` and `DistortedTerrainBlock.material()` expose stable/spatial/critical visual intent for a future optional material renderer. Animated emissive cracks, UV jitter and chromatic texture offsets are not implemented; client particles provide the current glitch effect without a material-rendering hack.
 
 ## Client atmosphere and post effects
+
+Anomaly haze shortens only the air terrain-fog distance. The sky pass retains its native fog distances, and fluid visibility remains with the fluid renderer. Air-fog color blending still supplies the restrained anomaly tint. A black horizon still requires a client comparison: disable the anomaly post pass with `/woanomalyvisual post false`, compare the same view, then use `/woanomalyvisual reset` to restore the configured presentation. Policy/resource tests do not establish that a reported GPU artifact is resolved.
 
 The server sends local conclusions, not its seed or undiscovered coordinates. Every second it samples nine already-loaded biome columns, layers the existing managed rift state, and sends only changes plus a ten-second refresh. Temporary operator previews expire after sixty seconds and clear on travel, logout, respawn and shutdown. Hybrid-ring presentation reuses the rift owner's dimension-safe, bounded packet state and distance falloff on the client; the anomaly does not run a second block-entity search.
 
