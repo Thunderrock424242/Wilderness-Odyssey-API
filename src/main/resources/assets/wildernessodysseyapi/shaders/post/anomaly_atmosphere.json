@@ -7,7 +7,7 @@
       "outtarget": "anomaly_swap"
     },
     {
-      "name": "minecraft:blit",
+      "name": "wildernessodysseyapi:anomaly_copy",
       "intarget": "anomaly_swap",
       "outtarget": "minecraft:main"
     }
