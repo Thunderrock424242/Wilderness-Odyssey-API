@@ -11,6 +11,11 @@ The framework does not implement Vulkan, DLSS, FSR, XeSS, a custom render graph,
 or vendor-specific native code. It records only capabilities that the active
 backend proves and leaves unavailable temporal inputs empty.
 
+The optional [WAGE experiment](performance/wage.md) extends this same frame
+owner with workload timing, bounded cloud-density optimization and diagnostic
+frame percentiles. It is disabled by default and does not replace the existing
+adaptive quality controller, terrain renderer or server performance coordinator.
+
 The ownership flow is:
 
 ```text

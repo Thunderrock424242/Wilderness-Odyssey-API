@@ -24,6 +24,7 @@ public final class ClientStartupSmokeProbe {
     private static boolean stopRequested;
     private static String lastScreenClass;
     private static String lastOverlayClass;
+    private static boolean windowHidden;
 
     private ClientStartupSmokeProbe() {
     }
@@ -35,6 +36,10 @@ public final class ClientStartupSmokeProbe {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
+        if (!windowHidden && Boolean.getBoolean("wildernessodysseyapi.ciSmokeTest.hideWindow")) {
+            org.lwjgl.glfw.GLFW.glfwHideWindow(minecraft.getWindow().getWindow());
+            windowHidden = true;
+        }
         Screen screen = event.getScreen();
         if (screen != minecraft.screen) {
             return;
