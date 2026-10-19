@@ -3,10 +3,11 @@ package com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river;
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.GenerationWaterStateMapper;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.bank.RiverBankProfiles;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.bank.RiverBankDecorator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.WorldGenRegion;
-import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
@@ -24,9 +25,10 @@ import net.minecraft.world.level.material.FlowingFluid;
 import java.util.function.Predicate;
 
 /**
- * Generation-only entry point. The first FEATURES invocation preflights and writes
- * a whole fixed 2x2-chunk tile inside Minecraft's declared one-chunk write radius.
- * It never requests additional terrain or edits a completed chunk.
+ * Generation-only entry point. Connected predictions share world-aligned geometry
+ * while each FEATURES invocation writes its own chunk. The conservative local
+ * fallback admits a complete 2x2 tile within the declared one-chunk write radius.
+ * Neither path requests extra dependencies or edits completed terrain.
  */
 public final class RiverNetworkFeature extends Feature<NoneFeatureConfiguration> {
     // Fixed stripes serialize same-tile invocations without a growing world cache.
@@ -46,13 +48,51 @@ public final class RiverNetworkFeature extends Feature<NoneFeatureConfiguration>
         int deltaX = chunkX - region.getCenter().x;
         int deltaZ = chunkZ - region.getCenter().z;
         if (deltaX < -1 || deltaX > 0 || deltaZ < -1 || deltaZ > 0) return false;
+        if (RiverWorldgenConfig.connectedNetworks()) {
+            var planned = RiverGenerationPlanning.plan(region.getLevel(), (NoiseBasedChunkGenerator) context.chunkGenerator(),
+                    region.getLevel().getChunkSource().randomState(), chunkX << 4, chunkZ << 4,
+                    settings, RiverWorldgenConfig.planningSettings(), RiverWorldgenConfig.maximumDrop());
+            boolean connectedTile = planned.shape().columns().stream().anyMatch(column ->
+                    column.x() >= (chunkX << 4) && column.x() < ((chunkX + 2) << 4)
+                            && column.z() >= (chunkZ << 4) && column.z() < ((chunkZ + 2) << 4));
+            if (connectedTile) {
+                var own = region.getChunk(region.getCenter().x, region.getCenter().z, ChunkStatus.CARVERS);
+                var evidence = own.getExistingData(ModAttachments.RIVER_GENERATION).orElse(null);
+                int remainingWrites = settings.maximumWrites();
+                if (evidence != null && evidence.hasTerrain(settings.fingerprint())) {
+                    for (var column : planned.shape().columns()) {
+                        if ((column.x() >> 4) == own.getPos().x && (column.z() >> 4) == own.getPos().z
+                                && !evidence.water(column.x() & 15, column.z() & 15))
+                            remainingWrites -= Math.max(evidence.height(column.x() & 15, column.z() & 15), column.topY()) - column.floorY() + 2;
+                    }
+                }
+                boolean placed = RiverConnectedGeneration.placeSlice(region.getSeed(), own, planned.shape(), settings,
+                        (x, z) -> Math.abs(x - region.getCenter().x) <= 1 && Math.abs(z - region.getCenter().z) <= 1
+                                ? region.getChunk(x, z, ChunkStatus.CARVERS) : null, region::ensureCanWrite,
+                        rejection -> RiverGenerationPlanning.recordRejection(region.getLevel(), rejection));
+                if (placed) {
+                    var bankColumns = planned.shape().columns().stream().filter(column ->
+                            column.x() >= (chunkX << 4) && column.x() < ((chunkX + 2) << 4)
+                                    && column.z() >= (chunkZ << 4) && column.z() < ((chunkZ + 2) << 4))
+                            .map(column -> new RiverChannelColumn(column.x() - (chunkX << 4), column.z() - (chunkZ << 4),
+                                    column.waterY(), column.floorY(), column.topY(), column.directionX(), column.directionZ(), column.speed(), column.kind()))
+                            .toList();
+                    RiverBankDecorator.decorate(region, own, bankColumns, (own.getPos().x - chunkX) * 16,
+                            (own.getPos().z - chunkZ) * 16, region.getSeed(), region::ensureCanWrite, remainingWrites);
+                } else if (evidence != null && evidence.hasTerrain(settings.fingerprint())) {
+                    evidence.complete(0, 0, 0, java.util.List.of());
+                    own.setUnsaved(true);
+                }
+                return placed;
+            }
+        }
         // All four are guaranteed CARVERS dependencies of this FEATURES call.
         // WorldGenRegion throws for undeclared dependencies, even require=false.
         ChunkAccess[] chunks = new ChunkAccess[4];
         for (int z = 0; z < 2; z++) for (int x = 0; x < 2; x++) {
             chunks[x + z * 2] = region.getChunk(chunkX + x, chunkZ + z, ChunkStatus.CARVERS);
         }
-        return placeTile(region.getSeed(), chunkX << 4, chunkZ << 4, chunks, settings, region::ensureCanWrite);
+        return placeTile(region.getSeed(), chunkX << 4, chunkZ << 4, chunks, settings, region::ensureCanWrite, region);
     }
 
     /** The existing glacial carver is superseded only where this generation contract applies. */
@@ -67,6 +107,11 @@ public final class RiverNetworkFeature extends Feature<NoneFeatureConfiguration>
      */
     public static boolean placeTile(long seed, int minimumX, int minimumZ, ChunkAccess[] chunks,
                                     RiverGenerationSettings settings, Predicate<BlockPos> canWrite) {
+        return placeTile(seed, minimumX, minimumZ, chunks, settings, canWrite, null);
+    }
+
+    private static boolean placeTile(long seed, int minimumX, int minimumZ, ChunkAccess[] chunks,
+                                     RiverGenerationSettings settings, Predicate<BlockPos> canWrite, WorldGenLevel level) {
         if (chunks.length != 4 || !settings.enabled() || Math.floorMod(minimumX, 32) != 0
                 || Math.floorMod(minimumZ, 32) != 0) return false;
         int stripe = (((minimumX >> 5) * 31) + (minimumZ >> 5)) & (LOCKS.length - 1);
@@ -113,7 +158,12 @@ public final class RiverNetworkFeature extends Feature<NoneFeatureConfiguration>
                     store(chunk, pos, state, column);
                 }
             }
+            int remainingWrites = settings.maximumWrites() - plan.requiredWrites();
             for (int i = 0; i < 4; i++) {
+                if (level != null && !plan.columns().isEmpty()) {
+                    remainingWrites -= RiverBankDecorator.decorate(level, chunks[i], plan.columns(),
+                            (i % 2) * 16, (i / 2) * 16, seed, canWrite, remainingWrites);
+                }
                 captures[i].complete(plan.basinId(), (i % 2) * 16, (i / 2) * 16, plan.columns());
                 chunks[i].setUnsaved(true);
             }
@@ -168,21 +218,10 @@ public final class RiverNetworkFeature extends Feature<NoneFeatureConfiguration>
     }
 
     private static BlockState bed(ChunkAccess chunk, BlockPos pos, RiverChannelColumn.Kind kind) {
-        var biome = chunk.getNoiseBiome(QuartPos.fromBlock(pos.getX()), QuartPos.fromBlock(pos.getY()), QuartPos.fromBlock(pos.getZ()));
-        long variation = pos.asLong() ^ (pos.asLong() >>> 23);
-        if (biome.is(BiomeTags.IS_BADLANDS)) return Blocks.RED_SAND.defaultBlockState();
-        if (biome.value().getBaseTemperature() > 1.0f && biome.value().getModifiedClimateSettings().downfall() < 0.3f) {
-            return (variation % 5 == 0 ? Blocks.CLAY : Blocks.SAND).defaultBlockState();
-        }
-        if (biome.is(BiomeTags.IS_JUNGLE) || biome.is(net.minecraft.world.level.biome.Biomes.SWAMP)
-                || biome.is(net.minecraft.world.level.biome.Biomes.MANGROVE_SWAMP)) {
-            return (variation % 4 == 0 ? Blocks.CLAY : Blocks.MUD).defaultBlockState();
-        }
-        return (kind == RiverChannelColumn.Kind.WATERFALL || biome.is(BiomeTags.IS_MOUNTAIN)
-                ? Blocks.STONE : variation % 7 == 0 ? Blocks.CLAY : Blocks.GRAVEL).defaultBlockState();
+        return RiverBankProfiles.bed(chunk, pos, kind);
     }
 
-    private static void store(ChunkAccess chunk, BlockPos pos, BlockState state, RiverChannelColumn column) {
+    static void store(ChunkAccess chunk, BlockPos pos, BlockState state, RiverChannelColumn column) {
         chunk.setBlockState(pos, state, false);
         GenerationWaterStateMapper.recordStoredState(chunk, pos, state);
         if (GenerationWaterStateMapper.isWildernessWater(state)) {

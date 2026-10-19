@@ -9,6 +9,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RiverGenerationChunkTest {
     @Test
+    void tallerSupportedCurtainsRoundTripAndLegacyMetadataStillLoads() {
+        var data = new RiverGenerationChunk();
+        data.complete(91, 0, 0, List.of(new RiverChannelColumn(3, 4, 140, 137, 156,
+                1, 0, 1.2f, RiverChannelColumn.Kind.WATERFALL)));
+        var restored = new RiverGenerationChunk();
+        restored.deserializeNBT(null, data.serializeNBT(null));
+        assertEquals(156, restored.reachAt(3, 4).topY());
+        var legacy = new RiverGenerationChunk();
+        legacy.complete(91, 0, 0, List.of(new RiverChannelColumn(3, 4, 140, 139, 140,
+                1, 0, 1.2f, RiverChannelColumn.Kind.STREAM)));
+        var legacyTag = legacy.serializeNBT(null);
+        legacyTag.putInt("format", 1);
+        restored.deserializeNBT(null, legacyTag);
+        assertEquals(RiverChannelColumn.Kind.STREAM, restored.reachAt(3, 4).kind());
+    }
+
+    @Test
     void preDecorationTerrainSurvivesSaveAndDoesNotAliasItsInputs() {
         int[] terrain = new int[512];
         for (int i = 0; i < 256; i++) {

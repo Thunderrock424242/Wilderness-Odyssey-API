@@ -123,20 +123,21 @@ public final class CachedWaterSourceLocator implements WaterSourceLocator {
             }
             double depth = waterDepth(level, waterPosition);
             WatershedConditions conditions = water.getWatershedConditions(level, waterPosition);
+            float current = currentStrength(level, waterPosition, conditions);
             float safeCurrent = settings.canSwim() ? 1.10f : 0.40f;
             if (conditions.flooding()
                     || conditions.floodRisk() >= 0.88f
-                    || conditions.currentStrength() > safeCurrent) {
+                    || current > safeCurrent) {
                 continue;
             }
             for (Direction direction : Direction.Plane.HORIZONTAL) {
                 BlockPos approach = waterPosition.relative(direction);
                 if (isStandable(level, approach) && !isWater(level, approach)) {
-                    return target(waterPosition, approach, depth, conditions);
+                    return target(waterPosition, approach, depth, conditions, current);
                 }
             }
             if (settings.canSwim() && depth <= settings.maximumSafeDepth()) {
-                return target(waterPosition, waterPosition, depth, conditions);
+                return target(waterPosition, waterPosition, depth, conditions, current);
             }
         }
         return null;
@@ -146,14 +147,15 @@ public final class CachedWaterSourceLocator implements WaterSourceLocator {
             BlockPos waterPosition,
             BlockPos approachPosition,
             double depth,
-            WatershedConditions conditions
+            WatershedConditions conditions,
+            float current
     ) {
         return new EnvironmentalContext.WaterTarget(
                 waterPosition,
                 approachPosition,
                 depth,
                 conditions.floodRisk(),
-                conditions.currentStrength(),
+                current,
                 conditions.clarity()
         );
     }
@@ -188,13 +190,25 @@ public final class CachedWaterSourceLocator implements WaterSourceLocator {
         WatershedConditions conditions = water.getWatershedConditions(level, source);
         float safeCurrent = settings.canSwim() ? 1.10f : 0.40f;
         if (conditions.flooding() || conditions.floodRisk() >= 0.88f
-                || conditions.currentStrength() > safeCurrent) {
+                || currentStrength(level, source, conditions) > safeCurrent) {
             return false;
         }
         if (approach.equals(source)) {
             return settings.canSwim() && waterDepth(level, source) <= settings.maximumSafeDepth();
         }
         return isStandable(level, approach) && !isWater(level, approach);
+    }
+
+    private float currentStrength(ServerLevel level, BlockPos position, WatershedConditions conditions) {
+        return water.isWaterAt(level, position)
+                ? currentStrengthInTicks(water.getCurrent(level, Vec3.atCenterOf(position)))
+                : conditions.currentStrength();
+    }
+
+    /** Preserve the existing blocks/tick thresholds while respecting the composed SI current API. */
+    static float currentStrengthInTicks(Vec3 physicalCurrent) {
+        double speed = physicalCurrent == null ? Double.NaN : Math.hypot(physicalCurrent.x, physicalCurrent.z);
+        return Double.isFinite(speed) ? (float) (speed / 20.0) : Float.POSITIVE_INFINITY;
     }
 
     private boolean isWater(ServerLevel level, BlockPos position) {

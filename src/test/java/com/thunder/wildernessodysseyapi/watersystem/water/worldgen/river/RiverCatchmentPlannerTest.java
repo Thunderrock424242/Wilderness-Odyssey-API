@@ -13,6 +13,32 @@ class RiverCatchmentPlannerTest {
             true, 1.0, 2, 1, 2, 3, 256, 12288, true, true, true);
 
     @Test
+    void elevatedLakeSpillsThroughItsLowestCertifiedSaddleToNativeWater() {
+        var terrain = spillBasin(false);
+        var plan = RiverCatchmentPlanner.plan(42, 0, 0, terrain, SETTINGS);
+        assertTrue(plan.columns().stream().anyMatch(column -> column.x() == 8 && column.z() == 16
+                && column.kind() == RiverChannelColumn.Kind.LAKE && column.waterY() == 141));
+        int previous = 141;
+        for (int x = 14; x < 24; x++) {
+            final int cellX = x;
+            var outlet = plan.columns().stream().filter(column -> column.x() == cellX && column.z() == 16).findFirst().orElseThrow();
+            assertNotEquals(RiverChannelColumn.Kind.LAKE, outlet.kind());
+            assertTrue(outlet.waterY() <= previous, "Lake outlet flowed uphill");
+            assertTrue(outlet.waterY() >= 137);
+            previous = outlet.waterY();
+        }
+        assertEquals(137, previous);
+        assertTrue(plan.columns().stream().noneMatch(column -> terrain.water(column.x(), column.z())));
+    }
+
+    @Test
+    void aLowerUnknownSpillCannotBeReplacedWithAHigherKnownOutlet() {
+        var plan = RiverCatchmentPlanner.plan(42, 0, 0, spillBasin(true), SETTINGS);
+        assertTrue(plan.columns().stream().noneMatch(column -> column.x() == 14 && column.z() == 16
+                && column.kind() == RiverChannelColumn.Kind.STREAM));
+    }
+
+    @Test
     void fillsASealedMountainBasinAboveSeaLevel() {
         var plan = RiverCatchmentPlanner.plan(42, 0, 0, bowl(140), SETTINGS);
         assertFalse(plan.columns().isEmpty());
@@ -97,6 +123,16 @@ class RiverCatchmentPlannerTest {
             for (var result : executor.invokeAll(List.of(call, call, call, call))) assertEquals(expected, result.get());
         }
         assertThrows(UnsupportedOperationException.class, () -> expected.columns().clear());
+    }
+
+    private static RiverTileTerrain spillBasin(boolean openFrontier) {
+        return RiverTileTerrain.create((x, z) -> {
+            if (x >= 24 && z >= 14 && z <= 18) return 137;
+            if (z == 16 && x >= 14) return Math.max(137, 142 - Math.max(0, x - 15));
+            if (openFrontier && z == 16 && x <= 4) return 141;
+            if (x >= 5 && x <= 13 && z >= 11 && z <= 21) return 140;
+            return 145;
+        }, (x, z) -> x >= 24 && z >= 14 && z <= 18, (x, z) -> 0xFFFF);
     }
 
     private static RiverTileTerrain bowl(int floor) {

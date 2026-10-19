@@ -4,6 +4,8 @@ import com.thunder.wildernessodysseyapi.weather.api.AtmosphereCellKey;
 import com.thunder.wildernessodysseyapi.weather.simulation.AtmosphereClimateCache;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterAccess;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
+import com.thunder.wildernessodysseyapi.core.ModAttachments;
+import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
@@ -116,9 +118,13 @@ public final class WildernessWeatherWaterInfluence implements WeatherWaterInflue
                         QuartPos.fromBlock(surfaceY),
                         QuartPos.fromBlock(blockZ)
                 );
-                if (biome.is(BiomeTags.IS_OCEAN)) {
+                var generated = chunk.getExistingData(ModAttachments.GENERATED_WATER).orElse(null);
+                var span = generated == null ? null : generated.spanAt(surface);
+                var kind = surfaceKind(span == null ? null : span.cell().bodyType(),
+                        biome.is(BiomeTags.IS_OCEAN), biome.is(BiomeTags.IS_RIVER));
+                if (kind == GeneratedWaterChunk.BodyType.OCEAN) {
                     ocean++;
-                } else if (biome.is(BiomeTags.IS_RIVER)) {
+                } else if (kind == GeneratedWaterChunk.BodyType.RIVER) {
                     river++;
                 } else {
                     inland++;
@@ -138,6 +144,14 @@ public final class WildernessWeatherWaterInfluence implements WeatherWaterInflue
                 taggedOnly * inverseLoaded,
                 loaded / (float) TOTAL_PROBES
         );
+    }
+
+    /** Generated body ownership takes precedence over the biome crossed by a new channel. */
+    static GeneratedWaterChunk.BodyType surfaceKind(GeneratedWaterChunk.BodyType generated, boolean ocean, boolean river) {
+        if (generated == GeneratedWaterChunk.BodyType.RIVER || generated == GeneratedWaterChunk.BodyType.SPRING)
+            return GeneratedWaterChunk.BodyType.RIVER;
+        if (generated == GeneratedWaterChunk.BodyType.OCEAN || generated == GeneratedWaterChunk.BodyType.LAKE) return generated;
+        return ocean ? GeneratedWaterChunk.BodyType.OCEAN : river ? GeneratedWaterChunk.BodyType.RIVER : GeneratedWaterChunk.BodyType.LAKE;
     }
 
     private static int boundedBlock(long coordinate) {

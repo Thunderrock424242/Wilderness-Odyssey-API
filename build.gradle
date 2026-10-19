@@ -256,6 +256,9 @@ tasks.named('processResources') {
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_river_tests/structure'
     }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_river_acceptance_tests/structure'
+    }
     doLast {
         // The historical test asset is raw NBT, while data-pack structure
         // resources are gzip-compressed. Normalize the copied template in the

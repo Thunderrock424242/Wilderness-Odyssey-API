@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverChannelColumn;
+
 /** Pure intensity model for the bounded local river soundscape. */
 public final class RiverSoundscapeModel {
 
@@ -20,6 +22,16 @@ public final class RiverSoundscapeModel {
                 + (flooding ? 0.16f : 0.0f)
                 + unit(rainIntensity) * 0.08f;
         return unit(flow);
+    }
+
+    /** Reach presentation uses the composed physical velocity in metres/second. */
+    public static float intensity(float discharge, float currentMetresPerSecond, boolean confluence,
+                                  boolean flooding, float rainIntensity, RiverChannelColumn.Kind kind, int drop) {
+        if (kind == RiverChannelColumn.Kind.LAKE || currentMetresPerSecond <= 0 && discharge <= 0) return 0;
+        float base = intensity(discharge, currentMetresPerSecond, confluence, flooding, rainIntensity);
+        float falling = kind == RiverChannelColumn.Kind.WATERFALL
+                ? unit(currentMetresPerSecond / 1.4f) * unit(drop / 8f) * 0.38f : 0;
+        return unit(base + falling);
     }
 
     /** Returns a quiet-to-lively one-shot interval in client ticks. */

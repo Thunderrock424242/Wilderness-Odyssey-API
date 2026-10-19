@@ -1,0 +1,26 @@
+{
+  "priority": 20,
+  "biome_tags": [
+    "minecraft:is_beach"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:sand",
+      "weight": 5
+    },
+    {
+      "block": "minecraft:gravel",
+      "weight": 2
+    },
+    {
+      "block": "minecraft:clay",
+      "weight": 1
+    }
+  ],
+  "plants": [
+    {
+      "block": "minecraft:short_grass",
+      "weight": 1
+    }
+  ]
+}

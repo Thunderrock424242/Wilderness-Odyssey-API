@@ -1,8 +1,9 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river;
 
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
-import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -45,13 +46,13 @@ public final class RiverReachServices {
         return new Current(reach.directionX() / length * speed, reach.directionZ() / length * speed);
     }
 
-    /** Geometry and modeled-current observation; stage is the generated surface block Y. */
+    /** Geometry and composed physical current in m/s; stage is the generated surface block Y. */
     public static Observation observe(Level level, BlockPos position) {
         var sample = sample(level, position);
-        if (sample == null) return null;
-        var flow = WatershedServices.localFlow(level, position);
+        if (sample == null || !WaterServices.access().isWaterAt(level, position)) return null;
+        var flow = WaterServices.access().getCurrent(level, Vec3.atCenterOf(position));
         return new Observation(sample.basinId(), sample.reach().waterY(), sample.reach().floorY(),
-                sample.reach().kind(), flow.currentX() * 20, flow.currentZ() * 20);
+                sample.reach().kind(), (float) flow.x, (float) flow.z);
     }
 
     public record Sample(long basinId, RiverGenerationChunk.Reach reach) { }

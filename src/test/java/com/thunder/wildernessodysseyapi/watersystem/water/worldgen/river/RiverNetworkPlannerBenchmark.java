@@ -25,6 +25,8 @@ public final class RiverNetworkPlannerBenchmark {
         catchment("receiver-tributary", 1);
         catchment("steep-drop", 2);
         catchment("rugged-rejected", 3);
+        source("connected-standard", false, 8);
+        source("connected-heavy", true, 12);
         System.out.println("Consumed topology checksum=" + consumed);
     }
 
@@ -87,5 +89,30 @@ public final class RiverNetworkPlannerBenchmark {
         }
         report(name, "complete-catchment-plan", times);
         System.out.printf(Locale.ROOT, "{\"scenario\":\"%s\",\"columns\":%d,\"writes\":%d}%n", name, columns, writes);
+    }
+
+    private static void source(String name, boolean rugged, int steps) {
+        var generation = new RiverGenerationSettings(true, 1, 2, 1, 2, 4, 256, 12288, true, true, true);
+        var settings = new RiverConnectedPlanner.Settings(steps, 1, 2, 2, 4096);
+        RiverConnectedPlanner.TerrainSampler terrain = (x, z) -> {
+            boolean water = x >= 88;
+            int height = water ? 94 : 100 - Math.floorDiv(x, 16);
+            if (rugged && !water) height += (int) (Math.sin(x * 0.21) * 8 + Math.cos(z * 0.13) * 5);
+            return new RiverConnectedPlanner.Terrain(height, water, 0.8f);
+        };
+        long[] times = new long[MEASUREMENTS];
+        RiverSourcePlanning.Plan last = null;
+        for (int i = -WARMUP; i < MEASUREMENTS; i++) {
+            long start = System.nanoTime();
+            last = RiverSourcePlanning.plan(42, 0, 0, generation, settings, 4, terrain);
+            long elapsed = System.nanoTime() - start;
+            consumed += last.shape().columns().size() + last.rasterVisits();
+            if (i >= 0) times[i] = elapsed;
+        }
+        report(name, "complete-source-plan", times);
+        System.out.printf(Locale.ROOT,
+                "{\"scenario\":\"%s\",\"columns\":%d,\"samples\":%d,\"raster_visits\":%d,\"rejected_routes\":%d,\"exhausted\":%s}%n",
+                name, last.shape().columns().size(), last.topology().terrainSamples(), last.rasterVisits(),
+                last.rejectedRoutes(), last.topology().budgetExceeded());
     }
 }

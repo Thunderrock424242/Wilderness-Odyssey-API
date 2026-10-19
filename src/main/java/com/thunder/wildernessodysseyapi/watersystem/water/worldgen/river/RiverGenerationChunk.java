@@ -15,7 +15,7 @@ import java.util.List;
  * Only completed reach data is synchronized; this is never a water inventory.
  */
 public final class RiverGenerationChunk implements INBTSerializable<CompoundTag> {
-    private static final int FORMAT = 1;
+    private static final int FORMAT = 2;
     private static final int STRIDE = 5;
     public static final StreamCodec<RegistryFriendlyByteBuf, RiverGenerationChunk> STREAM_CODEC =
             StreamCodec.of(RiverGenerationChunk::encode, RiverGenerationChunk::decode);
@@ -94,7 +94,8 @@ public final class RiverGenerationChunk implements INBTSerializable<CompoundTag>
 
     @Override
     public void deserializeNBT(HolderLookup.Provider registries, CompoundTag tag) {
-        if (tag.getInt("format") != FORMAT) throw new IllegalArgumentException("Unsupported river metadata version");
+        if (tag.getInt("format") != 1 && tag.getInt("format") != FORMAT)
+            throw new IllegalArgumentException("Unsupported river metadata version");
         int[] capture = tag.contains("terrain") ? tag.getIntArray("terrain") : null;
         if (capture != null && capture.length != 512) throw new IllegalArgumentException("Truncated river terrain capture");
         int[] next = tag.getIntArray("reaches");
@@ -134,7 +135,7 @@ public final class RiverGenerationChunk implements INBTSerializable<CompoundTag>
             int waterY = (short) values[i + 1];
             int floorY = (short) (values[i + 1] >>> 16);
             if (used[key] || kind >= RiverChannelColumn.Kind.values().length || floorY >= waterY
-                    || values[i + 2] < waterY || values[i + 2] > waterY + 4
+                    || values[i + 2] < waterY || values[i + 2] > waterY + 16
                     || values[i + 4] < 0 || values[i + 4] > 8000) {
                 throw new IllegalArgumentException("Invalid river reach column");
             }

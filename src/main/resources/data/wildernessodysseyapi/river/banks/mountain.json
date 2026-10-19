@@ -1,0 +1,34 @@
+{
+  "priority": 30,
+  "biome_tags": [
+    "minecraft:is_mountain"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:stone",
+      "weight": 4
+    },
+    {
+      "block": "minecraft:andesite",
+      "weight": 2
+    },
+    {
+      "block": "minecraft:gravel",
+      "weight": 2
+    },
+    {
+      "block": "minecraft:tuff",
+      "weight": 1
+    }
+  ],
+  "plants": [
+    {
+      "block": "minecraft:short_grass",
+      "weight": 2
+    },
+    {
+      "block": "minecraft:fern",
+      "weight": 1
+    }
+  ]
+}

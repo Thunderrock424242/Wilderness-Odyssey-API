@@ -23,6 +23,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.entity.BoatTiltStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.integration.WaterPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.bank.RiverBankProfileReloadListener;
 import com.thunder.wildernessodysseyapi.weather.integration.WeatherPerformanceIntegration;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.EventPriority;
@@ -134,6 +135,7 @@ public final class ServerLifecycleEvents {
         WaterBodyClassifier.clearCache();
         BoatTiltStore.clear();
         if (event.getLevel() instanceof ServerLevel level) {
+            com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverGenerationPlanning.clear(level);
             SimulationEngine.get().unload(level);
         }
         // ServerTickHandler and ClientTickHandler release only the unloading
@@ -145,6 +147,7 @@ public final class ServerLifecycleEvents {
     public static void onAddReloadListeners(AddReloadListenerEvent event) {
         event.addListener(new FaqReloadListener());
         event.addListener(new SpeciesBehaviorProfileReloadListener());
+        event.addListener(new RiverBankProfileReloadListener());
         event.addListener(com.thunder.wildernessodysseyapi.quest.runtime.QuestServerEvents.reloadListener(event.getRegistryAccess()));
     }
 }

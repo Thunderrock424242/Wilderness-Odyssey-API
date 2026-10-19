@@ -1,0 +1,26 @@
+{
+  "priority": 20,
+  "biomes": [
+    "minecraft:desert"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:sand",
+      "weight": 5
+    },
+    {
+      "block": "minecraft:sandstone",
+      "weight": 2
+    },
+    {
+      "block": "minecraft:clay",
+      "weight": 1
+    }
+  ],
+  "plants": [
+    {
+      "block": "minecraft:dead_bush",
+      "weight": 1
+    }
+  ]
+}

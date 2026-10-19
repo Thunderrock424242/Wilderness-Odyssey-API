@@ -32,6 +32,10 @@ public final class WaterRenderingConfig {
     public static ModConfigSpec.BooleanValue ENABLE_SPH_WATER_RENDERING;
     public static ModConfigSpec.BooleanValue ENABLE_RIPPLES;
     public static ModConfigSpec.BooleanValue ENABLE_AMBIENT_WATER_PARTICLES;
+    public static ModConfigSpec.BooleanValue ENABLE_RIVER_FOAM;
+    public static ModConfigSpec.BooleanValue ENABLE_RIVER_SPRAY;
+    public static ModConfigSpec.BooleanValue ENABLE_RIVER_DEBRIS;
+    public static ModConfigSpec.BooleanValue ENABLE_RIVER_AUDIO;
     public static ModConfigSpec.BooleanValue ENABLE_PERSISTENT_WAKE_FOAM;
     public static ModConfigSpec.BooleanValue ENABLE_COASTAL_WAVES;
     public static ModConfigSpec.BooleanValue ENABLE_COASTAL_RUN_UP;
@@ -141,6 +145,14 @@ public final class WaterRenderingConfig {
         ENABLE_AMBIENT_WATER_PARTICLES = builder
                 .comment("Add a quality-capped layer of suspended underwater motes, current bubbles, and wind/current-driven surface spray using vanilla particles.")
                 .define("enableAmbientWaterParticles", true);
+        ENABLE_RIVER_FOAM = builder.comment("Bounded local river and confluence foam; cosmetic only.")
+                .define("enableRiverFoam", true);
+        ENABLE_RIVER_SPRAY = builder.comment("Bounded waterfall/rapids spray and receiving-water mist.")
+                .define("enableRiverSpray", true);
+        ENABLE_RIVER_DEBRIS = builder.comment("Locally drifting leaf and twig flecks; no server entities.")
+                .define("enableRiverDebris", true);
+        ENABLE_RIVER_AUDIO = builder.comment("Sparse positional river and waterfall accents.")
+                .define("enableRiverAudio", true);
         ENABLE_PERSISTENT_WAKE_FOAM = builder
                 .comment("Let impact and wake foam outlive their short surface displacement while remaining bounded by the eight nearest GPU impulses.")
                 .define("enablePersistentWakeFoam", true);
@@ -650,6 +662,27 @@ public final class WaterRenderingConfig {
             case HIGH -> optimizedProfile ? 1 : 2;
             case CINEMATIC -> optimizedProfile ? 2 : 3;
         };
+    }
+
+    public static boolean riverFoamEnabled() { return ENABLE_RIVER_FOAM.get(); }
+    public static boolean riverSprayEnabled() { return ENABLE_RIVER_SPRAY.get(); }
+    public static boolean riverDebrisEnabled() { return ENABLE_RIVER_DEBRIS.get(); }
+    public static boolean riverAudioEnabled() { return ENABLE_RIVER_AUDIO.get(); }
+
+    /** Shared per-tick allowance for the entire persistent environmental pool. */
+    public static int environmentalParticleBudget() {
+        return environmentalParticleBudget(waterQuality(), usesOptimizedProfile(), ENABLE_AMBIENT_WATER_PARTICLES.get());
+    }
+
+    static int environmentalParticleBudget(WaterQuality quality, boolean optimizedProfile, boolean enabled) {
+        if (!enabled) return 0;
+        int budget = switch (quality) { case LOW -> 0; case MEDIUM -> 2; case HIGH -> 4; case CINEMATIC -> 6; };
+        return optimizedProfile ? Math.min(4, budget) : budget;
+    }
+
+    public static int riverEffectDistanceBlocks() { return riverEffectDistanceBlocks(waterQuality()); }
+    static int riverEffectDistanceBlocks(WaterQuality quality) {
+        return switch (quality) { case LOW -> 0; case MEDIUM -> 12; case HIGH -> 18; case CINEMATIC -> 24; };
     }
 
     /** Returns the quality-scaled strength of tick-aged wake and impact foam. */

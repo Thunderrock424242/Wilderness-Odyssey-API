@@ -25,7 +25,8 @@ public final class RiverSoundscape {
     /** Samples a small fixed neighborhood and plays at most one local accent. */
     public static void tick(Minecraft minecraft) {
         ClientLevel level = minecraft.level;
-        if (level == null || minecraft.player == null || level.getGameTime() < nextSoundTick) {
+        if (level == null || minecraft.player == null || !WaterRenderingConfig.riverAudioEnabled()
+                || level.getGameTime() < nextSoundTick) {
             return;
         }
         Candidate best = null;
@@ -52,12 +53,16 @@ public final class RiverSoundscape {
                 }
                 float rain = (float) ClientWeatherCoordinator.sampleAt(
                         level, position).precipitationIntensity();
+                var reach = snapshot.rivers().reachAt(blockX & 15, blockZ & 15);
+                float physicalSpeed = (float) Math.hypot(column.currentX(flow.currentX()), column.currentZ(flow.currentZ()));
                 float intensity = RiverSoundscapeModel.intensity(
                         conditions.riverDischarge(),
-                        flow.currentStrength(),
+                        physicalSpeed,
                         flow.confluence(),
                         conditions.flooding(),
-                        rain
+                        rain,
+                        reach == null ? null : reach.kind(),
+                        reach == null ? 0 : reach.topY() - reach.waterY()
                 );
                 float sharedWaterActivity = ClientEnvironmentState.current(level)
                         .map(environment -> 0.72F

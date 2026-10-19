@@ -6,6 +6,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Arrays;
+import java.util.PriorityQueue;
 
 /**
  * Plans one complete bounded catchment against captured CARVERS terrain. Every
@@ -28,6 +30,40 @@ public final class RiverCatchmentPlanner {
                 (x, z) -> new RiverTerrainSnapshot.Terrain(
                         terrain.height(x - minimumX, z - minimumZ), terrain.water(x - minimumX, z - minimumZ)));
         var network = RiverNetworkPlanner.plan(snapshot);
+        if (settings.lakes()) {
+            var basins = network.nodes().stream().filter(node -> node.terminal() == RiverNetworkPlanner.Terminal.CLOSED_BASIN)
+                    .sorted(Comparator.comparingInt(RiverNetworkPlanner.Node::elevation)
+                            .thenComparingLong(RiverNetworkPlanner.Node::cellKey)).limit(16).toList();
+            for (var basin : basins) {
+                int x = layout.worldX(basin.cellX()) - minimumX;
+                int z = layout.worldZ(basin.cellZ()) - minimumZ;
+                var spill = spill(terrain, x, z, settings.lakeDepth());
+                if (spill == null) continue;
+                boolean[] lake = flood(terrain, x, z, spill.elevation() - 1, false, settings.maximumLakeColumns());
+                if (lake == null) continue;
+                MutableColumn[] columns = new MutableColumn[SIZE * SIZE];
+                for (int cell = 0; cell < lake.length; cell++) if (lake[cell])
+                    columns[cell] = new MutableColumn(spill.elevation() - 1,
+                            spill.elevation() - 1 - settings.lakeDepth(), RiverChannelColumn.Kind.LAKE);
+                int stage = spill.elevation() - 1;
+                int receiverY = terrain.height(spill.path().getLast() % SIZE, spill.path().getLast() / SIZE);
+                for (int step = 0; step + 1 < spill.path().size(); step++) {
+                    int cell = spill.path().get(step);
+                    if (lake[cell]) continue;
+                    int next = spill.path().get(step + 1);
+                    stage = Math.max(receiverY, Math.min(stage, terrain.height(cell % SIZE, cell / SIZE) - 1));
+                    var column = new MutableColumn(stage, stage - settings.streamDepth(), RiverChannelColumn.Kind.STREAM);
+                    column.x = next % SIZE - cell % SIZE;
+                    column.z = next / SIZE - cell / SIZE;
+                    column.speed = 1;
+                    columns[cell] = column;
+                }
+                if (!addDrops(columns, settings)) continue;
+                int writes = validate(columns, terrain, settings);
+                if (writes > 0 && writes <= settings.maximumWrites())
+                    return result(mix(identity ^ basin.cellKey()), columns, writes);
+            }
+        }
         var targets = network.nodes().stream().filter(node ->
                         node.terminal() == RiverNetworkPlanner.Terminal.RECEIVING_WATER
                                 || settings.lakes() && node.terminal() == RiverNetworkPlanner.Terminal.CLOSED_BASIN)
@@ -64,19 +100,79 @@ public final class RiverCatchmentPlanner {
             if (!addDrops(columns, settings)) continue;
             int writes = validate(columns, terrain, settings);
             if (writes < 1 || writes > settings.maximumWrites()) continue;
-            List<RiverChannelColumn> result = new ArrayList<>();
-            for (int cell = 0; cell < columns.length; cell++) {
-                MutableColumn column = columns[cell];
-                if (column == null) continue;
-                float length = (float) Math.hypot(column.x, column.z);
-                result.add(new RiverChannelColumn(cell % SIZE, cell / SIZE, column.waterY, column.floorY,
-                        column.topY, length > 0 ? column.x / length : 0,
-                        length > 0 ? column.z / length : 0, column.speed, column.kind));
-            }
-            return new Plan(mix(identity ^ target.cellKey()), result, writes);
+            return result(mix(identity ^ target.cellKey()), columns, writes);
         }
         return Plan.EMPTY;
     }
+
+    private static Plan result(long identity, MutableColumn[] columns, int writes) {
+        List<RiverChannelColumn> result = new ArrayList<>();
+        for (int cell = 0; cell < columns.length; cell++) {
+            MutableColumn column = columns[cell];
+            if (column == null) continue;
+            float length = (float) Math.hypot(column.x, column.z);
+            result.add(new RiverChannelColumn(cell % SIZE, cell / SIZE, column.waterY, column.floorY,
+                    column.topY, length > 0 ? column.x / length : 0,
+                    length > 0 ? column.z / length : 0, column.speed, column.kind));
+        }
+        return new Plan(identity, result, writes);
+    }
+
+    /**
+     * Minimax flood over the complete captured tile. A known receiver is usable
+     * only below every unknown boundary spill, so a higher convenient exit can
+     * never hide an unresolved lower outlet. Equal costs use distance then cell.
+     */
+    private static Spill spill(RiverTileTerrain terrain, int startX, int startZ, int maximumRise) {
+        int[] costs = new int[SIZE * SIZE];
+        int[] distances = new int[costs.length];
+        int[] parents = new int[costs.length];
+        Arrays.fill(costs, Integer.MAX_VALUE);
+        Arrays.fill(distances, Integer.MAX_VALUE);
+        Arrays.fill(parents, -1);
+        var queue = new PriorityQueue<SpillNode>(Comparator.comparingInt(SpillNode::elevation)
+                .thenComparingInt(SpillNode::distance).thenComparingInt(SpillNode::cell));
+        int start = startX + startZ * SIZE;
+        costs[start] = terrain.height(startX, startZ);
+        distances[start] = 0;
+        queue.add(new SpillNode(start, costs[start], 0));
+        int maximum = costs[start] + maximumRise;
+        int unknown = Integer.MAX_VALUE;
+        SpillNode receiver = null;
+        while (!queue.isEmpty()) {
+            var node = queue.remove();
+            if (node.elevation() != costs[node.cell()] || node.distance() != distances[node.cell()]) continue;
+            int x = node.cell() % SIZE;
+            int z = node.cell() / SIZE;
+            if (x == 0 || z == 0 || x == SIZE - 1 || z == SIZE - 1) {
+                unknown = Math.min(unknown, node.elevation());
+                continue;
+            }
+            if (terrain.water(x, z)) {
+                if (terrain.height(x, z) < node.elevation() && receiver == null) receiver = node;
+                continue;
+            }
+            for (int[] direction : CARDINALS) {
+                int nx = x + direction[0];
+                int nz = z + direction[1];
+                int next = nx + nz * SIZE;
+                int cost = Math.max(node.elevation(), terrain.height(nx, nz));
+                int distance = node.distance() + 1;
+                if (cost > maximum || cost > costs[next] || cost == costs[next] && distance >= distances[next]) continue;
+                costs[next] = cost;
+                distances[next] = distance;
+                parents[next] = node.cell();
+                queue.add(new SpillNode(next, cost, distance));
+            }
+        }
+        if (receiver == null || receiver.elevation() >= unknown) return null;
+        ArrayDeque<Integer> path = new ArrayDeque<>();
+        for (int cell = receiver.cell(); cell != -1; cell = parents[cell]) path.addFirst(cell);
+        return new Spill(receiver.elevation(), List.copyOf(path));
+    }
+
+    private record SpillNode(int cell, int elevation, int distance) { }
+    private record Spill(int elevation, List<Integer> path) { }
 
     private static boolean[] flood(RiverTileTerrain terrain, int startX, int startZ, int waterY,
                                    boolean receiving, int maximumColumns) {

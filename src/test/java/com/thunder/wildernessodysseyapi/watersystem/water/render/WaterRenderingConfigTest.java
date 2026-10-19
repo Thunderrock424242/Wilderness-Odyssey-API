@@ -10,6 +10,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WaterRenderingConfigTest {
 
     @Test
+    void environmentalPoolEmissionsHaveIndependentQualityAndDistanceCaps() {
+        assertEquals(0, WaterRenderingConfig.environmentalParticleBudget(
+                WaterRenderingConfig.WaterQuality.LOW, false, true));
+        assertEquals(6, WaterRenderingConfig.environmentalParticleBudget(
+                WaterRenderingConfig.WaterQuality.CINEMATIC, false, true));
+        assertEquals(4, WaterRenderingConfig.environmentalParticleBudget(
+                WaterRenderingConfig.WaterQuality.CINEMATIC, true, true));
+        assertEquals(0, WaterRenderingConfig.environmentalParticleBudget(
+                WaterRenderingConfig.WaterQuality.HIGH, false, false));
+        assertEquals(0, WaterRenderingConfig.riverEffectDistanceBlocks(WaterRenderingConfig.WaterQuality.LOW));
+        assertTrue(WaterRenderingConfig.riverEffectDistanceBlocks(WaterRenderingConfig.WaterQuality.HIGH) <= 24);
+    }
+
+    @Test
     void clockTideInformationDefaultsToContextualVisibility() {
         assertTrue(WaterRenderingConfig.SHOW_CLOCK_TIDE_TOOLTIP.getDefault());
         assertTrue(WaterRenderingConfig.SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY.getDefault());

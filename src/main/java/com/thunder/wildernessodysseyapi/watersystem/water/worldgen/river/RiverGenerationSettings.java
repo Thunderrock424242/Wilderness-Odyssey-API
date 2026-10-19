@@ -4,7 +4,14 @@ package com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river;
 public record RiverGenerationSettings(boolean enabled, double frequency, int minimumContributingCells,
                                       int streamDepth, int lakeDepth, int maximumCut,
                                       int maximumLakeColumns, int maximumWrites,
-                                      boolean lakes, boolean waterfalls, boolean naturalBanks) {
+                                      boolean lakes, boolean waterfalls, boolean naturalBanks, long planningIdentity) {
+    /** Retains the local-generation construction API and its explicit conservative mode. */
+    public RiverGenerationSettings(boolean enabled, double frequency, int minimumContributingCells,
+            int streamDepth, int lakeDepth, int maximumCut, int maximumLakeColumns, int maximumWrites,
+            boolean lakes, boolean waterfalls, boolean naturalBanks) {
+        this(enabled, frequency, minimumContributingCells, streamDepth, lakeDepth, maximumCut,
+                maximumLakeColumns, maximumWrites, lakes, waterfalls, naturalBanks, 0);
+    }
     public RiverGenerationSettings {
         if (!Double.isFinite(frequency) || frequency < 0 || frequency > 1
                 || minimumContributingCells < 1 || minimumContributingCells > 64
@@ -23,7 +30,8 @@ public record RiverGenerationSettings(boolean enabled, double frequency, int min
         value = value * 31 + maximumCut;
         value = value * 31 + maximumLakeColumns;
         value = value * 31 + maximumWrites;
-        return value * 31 + (enabled ? 1 : 0) + (lakes ? 2 : 0)
+        long local = value * 31 + (enabled ? 1 : 0) + (lakes ? 2 : 0)
                 + (waterfalls ? 4 : 0) + (naturalBanks ? 8 : 0);
+        return planningIdentity == 0 ? local : local * 31 + planningIdentity;
     }
 }

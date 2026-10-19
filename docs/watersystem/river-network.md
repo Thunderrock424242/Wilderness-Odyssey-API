@@ -1,12 +1,14 @@
 # Wilderness River Network
 
-## Scope and authority map (18 October 2026)
+## Scope and authority map (19 October 2026)
 
-This is an incremental implementation of the river-network brief. The bounded
-planning API and loaded-terrain inspection remain read-only. An opt-in generation
-pass now consumes exact post-carver captures to place complete local tributaries
-and sealed pools. This local fallback does not provide large connected watersheds
-or claim completion of the full requested river system.
+This is an incremental implementation of the river-network brief. New supported
+Overworld terrain can use bounded, seed-based source-to-existing-water routes,
+variable channel widths/depths, continuous bends and confluences. Exact post-carver
+terrain remains the final write authority. Local sealed pools and certified lake
+outlets provide a conservative fallback. Generation remains disabled by default.
+This is not yet a complete global watershed generator or a verified full-pack
+visual/multiplayer release; the remaining limits below are part of the contract.
 
 | Responsibility | Existing owner and integration boundary |
 | --- | --- |
@@ -48,7 +50,78 @@ separately. Thus a noise height prediction is useful but cannot certify the
 final terrain, protected structures, cave walls or receiving fluid surface.
 Arbitrary custom generators have no proven chunk-free terrain contract.
 
-## Planning contract
+## Connected noise planning and exact placement
+
+`RiverConnectedPlanner` uses a world-aligned 16-block D8 lattice. A climate-weighted
+source is emitted only when its entire bounded, strictly descending route reaches
+predicted existing water. Unknown terrain, pits and work frontiers reject the
+route. The presets admit at most 4/8/12 edges; they do not invent sea-level exits
+or route flat inland plateaus uphill. A fixed four-step upstream area selects a
+capped radius independently of the requesting tile and accepted source count.
+All sources that could reach an edge are included in each query's overlap halo.
+Topology keys and ordering use seed/world coordinates, independent of completion
+order. Contribution counts are bounded source counts, not exact global catchment
+area or a spendable water volume.
+
+`RiverNoiseTerrain` uses the actual generator's `getBaseColumn` and immutable
+biome source. The height accessor has no chunk-request API. The current supported
+class is exactly `NoiseBasedChunkGenerator`; custom subclasses are skipped.
+Structure adaptation, carvers and decoration are not promised by this prediction.
+
+`RiverSourcePlanning` certifies the complete fine geometry of each source route
+before admitting any of that route. A bad downstream ridge or receiving inlet
+cannot leave an upstream fragment in another tile. The complete route includes
+fine shoreline, cut-depth and exposed-bank checks against predicted terrain.
+`RiverChannelShape` then unions admitted geometry before clipping a tile halo.
+Widths respond to bounded upstream area, larger channels deepen centrally, and gentle
+slopes receive bounded connected bends. Confluence stages use the lower compatible
+surface; only inputs at that minimum stage contribute direction. Fine noise samples reconcile the exact receiving
+shoreline across the channel width. This is not a terrain-optimizing valley
+search, outer-bend erosion model, delta or braid generator. Steep/unsafe predicted
+geometry can still be rejected by the actual terrain certificate. Merging routes
+retains the original maximum-drop policy for physical admission; an unrelated
+unsupported merged curtain cannot erase a different route's predicted geometry.
+
+`RiverConnectedGeneration` writes only the invoking chunk, under one short fixed
+mutation lock after immutable planning. It reads only Minecraft's already-admitted
+CARVERS dependencies, with no chunk futures or extra requests. It rejects old or
+upgrading chunks, structure starts/references, stale captures, foreign solids,
+missing supports, open banks, incompatible receivers and over-budget cuts/writes.
+Replaceable dry plants in the channel can be cleared; solid features and block
+entities remain protected. Every own-slice check finishes before its first write.
+Native receiving water retains its exact states and inventory. Generated columns
+use the existing mapper/span authority, without sparse parcels or regional credit.
+
+Read-only prediction does not make independently rejected physical slices atomic
+across an entire multi-tile route. A protected chunk, old/new boundary, cave or
+foreign decorator can veto one slice after another has been admitted. The current
+conservative fallback cannot guarantee an uninterrupted globally certified river
+through every such interaction. This is a remaining limitation, not evidence of
+full arbitrary-mod chunk-order independence.
+
+`RiverGenerationPlanning` reuses bounded Data Engine caches: 8192 raw predictions
+and 128 immutable results per world, at most eight installed world caches, weak
+world keys and explicit unload cleanup. A complete invocation counts both coarse
+and fine samples against its configured cap (at most 4096). Repeated raster work
+is also capped at 128 times that sample limit; the union retains at most 16384
+columns and visits at most 131072 input columns. Exhaustion discards the entire
+invocation, including any earlier provisionally admitted routes. A tile that
+exhausts its budget may still suppress geometry that another query can afford;
+this conservative fallback is not a universal border-continuity guarantee.
+Concurrent cache misses may duplicate bounded pure calculations,
+without waiting on another generation task. There is no new executor or global
+river tick loop. Statistics expose hits/misses, calculations, budget rejections,
+retained samples, elapsed planning time, rejected fine routes, aggregate raster
+visits and fixed-enum physical veto counters. Reading an absent world's rejection
+statistics does not install a cache.
+
+The local lake planner additionally uses a bounded minimax flood to locate the
+lowest known saddle. It accepts an outlet only below every unresolved boundary
+spill, fills the basin below that saddle, and validates a descending connection
+to actual receiving water. A lower unknown spill cannot be replaced by a higher
+convenient known outlet. Closed high lakes remain valid without an invented exit.
+
+## Original local planning contract
 
 `RiverTerrainSnapshot` captures a fixed world-aligned coarse rectangle and halo
 through a caller-supplied read-only `TerrainSampler`. Missing samples remain
@@ -96,14 +169,14 @@ Its output describes present loaded terrain, not a seed-wide generation preview.
    32 by 32 block tiles, preflight supports/walls/protection/write permissions,
    then write native generated water and compact reach metadata.
 
-Later work must expand the certified planning contract for large catchments,
-refine lake spill/outlet geometry, variable river widths and meanders, add bank
-ecology hooks, and drive existing foam/spray/audio LOD from validated reaches.
+The continuation adds bounded connected topology, adaptive raster geometry,
+certified local spill outlets, data-driven bank hooks and reach-driven cosmetics.
+Large globally certified catchments and the remaining acceptance work stay open.
 Permanent generated rivers may change current/discharge, but physical stage
 changes remain gated on funded geometry transactions. No legacy-world carving
 or automatic migration is permitted.
 
-## Opt-in local generation
+## Local fallback and generation ownership
 
 `riverWorldgen` in `config/wildernessodysseyapi/wildernessodysseyapi-common.toml`
 owns new terrain settings. `enabled=false` is the default. The first supported
@@ -143,8 +216,9 @@ The write budget rejects the entire plan when exceeded. New water uses
 4096 units per full block, with no sparse runtime inventory or regional credit.
 Biome-aware beds use gravel, clay, sand, mud or stone. Supported drops are bounded
 to four blocks; these are small falling transitions, not tall mountain waterfalls.
-Current radius is one block, so broad rivers, braiding, deltas, point bars and
-terrain-adaptive meanders remain future work.
+This local fallback retains a one-block stream radius. The connected path uses
+the separate configured variable radius; braiding, deltas, point bars and a
+terrain-optimizing centerline search remain future work.
 
 Captured topology is independent of mutable decoration. The actual writer still
 fails closed if another feature alters the site first. Consequently arbitrary
@@ -252,10 +326,48 @@ component costs, not a before/after speedup of world generation or the modpack.
 No production worldgen, GPU, network or heap-retention comparison was measured.
 There is no river-wide polling, planner worker queue or growing global cache.
 
+## Bank ecology, climate and presentation
+
+Validated datapacks in `data/<namespace>/river/banks/*.json` select immutable bank
+profiles by biome IDs/tags, priority, and stable resource-ID tie breaking. Nine
+bundled profiles cover plains, forest, jungle, desert, badlands, swamp, beach,
+mountain and glacial biomes. A profile contains `priority`, `biome_tags`, `biomes`,
+weighted `bed`, and optional weighted `plants` arrays. Each entry uses `block`
+and optional positive integer `weight`. Unknown fields, unsafe blocks, duplicate
+entries and oversized inputs reject the complete reload, retaining the last valid
+snapshot. Profiles are limited to 64 with at most 16 selectors/palette entries;
+native inert beds and single-block native plants are explicitly whitelisted.
+
+`riverBanks.dataDrivenPalettes=true` enables materials. `vegetation=false` keeps
+new vegetation opt-in; `vegetationChance=0.18` and `maximumVegetationWrites=8`
+bound same-chunk placements. Candidates require a dry native bank, natural
+foundation, nearby source water, `canSurvive`, unprotected new terrain and remaining
+write budget. No arbitrary biome decoration is replayed and no animals are spawned.
+
+`EcosystemServices.riverHabitat` exposes only actual loaded wet reaches: biome,
+body identity, depth/surface, composed m/s current, clarity, sediment, flooding and
+existing climate-service **air** temperature. It is not a fish spawner or water
+temperature simulation. Drinking safety now uses the shared physical current,
+converted once to its existing blocks/tick threshold. Weather's existing bounded
+water probe recognizes generated river/spring/lake/ocean spans outside vanilla
+river biomes. Existing rain, groundwater, snowmelt, seasonal freezing, finite flood
+and sediment owners remain authoritative; no second inventory/calendar is added.
+
+Existing client effect owners now derive foam, mist/spray and audio from reach
+kind, physical current, confluence and supported drop. Zero motion produces zero
+new whitewater energy; lake reaches remain calm. The existing 48-slot local pool
+advects foam and leaf/twig block flecks on the shared visible surface, removes
+dry/missing/falling destinations, and applies a shared quality/distance emission
+cap. Independent foam/spray/debris/audio toggles are available in the existing
+client water config. These are cosmetic particles, not persistent floating items
+or a new renderer. Interactive appearance and audio balance remain unverified.
+
 ## Current integration and persistence
 
-`RiverGenerationChunk` adds a version-one chunk attachment without changing old
-water or watershed schemas. It retains temporary terrain only until a tile is
+`RiverGenerationChunk` writes version two and reads versions one and two without
+changing the compact stride or existing water/watershed schemas. The new version
+accepts configured falling intervals up to 16 blocks; old data remain valid.
+It retains temporary terrain only until its owning generation slice is
 processed. Completed sparse reach columns store waterbody identity, physical
 stage/floor/top, normalized continuous direction, kind and a Manning speed limit.
 The synchronized payload excludes all terrain captures and is capped at 256
@@ -275,8 +387,9 @@ melt, sediment, foam/debris and entity forces keep their existing owners.
 Falling generated columns retain physical falling fluid and compact falling
 spans. They use native fluid geometry rather than a horizontal custom wave sheet;
 the hybrid surface does not add waves or metadata stage offsets to that curtain.
-New tall-waterfall spray, plunge-pool effects and downward reach forces are not
-implemented. Existing bounded cosmetic effects can react to the shared current.
+Reach-aware impact mist/spray is now derived at an actual wet base. A tall
+mountain plunge-pool generator and additional downward gameplay forces are not
+implemented; native falling fluid and the current entity owner retain physics.
 
 ## Configuration and fresh-world acceptance
 
@@ -286,6 +399,11 @@ creating a disposable test world:
 ```toml
 [riverWorldgen]
 enabled = true
+connectedNetworks = true
+planningQuality = "STANDARD"
+maximumTerrainSamples = 4096
+maximumChannelRadius = 4
+maximumWaterfallDrop = 4
 frequency = 0.35
 minimumContributingCells = 3
 streamDepth = 1
@@ -298,9 +416,12 @@ waterfalls = true
 naturalBanks = true
 ```
 
-`enabled` defaults to **false**. Frequency is the probability of attempting an
-eligible 32 by 32 block tile; protection and geometry checks can reject it.
-`maximumCut`, depths and write limits use blocks/block writes. This pass supports
+`enabled` defaults to **false**. Frequency weights connected sources by biome
+rainfall and controls local fallback attempts; protection and geometry checks can
+reject either path. Planning presets/topology settings should be changed only
+with an understood transition at unexplored terrain, preferably in a new world.
+`maximumCut` and depths use blocks. `maximumWrites` bounds block writes per
+invoking connected chunk slice or complete local 2-by-2 tile. This pass supports
 small tributaries and pools; finding a valid basin is not guaranteed near spawn.
 Existing glacial streams are superseded only inside this supported generator
 contract. Other generators keep their established glacial behavior.
@@ -336,22 +457,84 @@ Physical flood/stage changes remain gated on the established funded transactions
 
 ## Remaining work and acceptance limits
 
-The full requested network is **unfinished**. This delivery does not provide
-large cross-tile watersheds, certified global contributing area, broad lowland
-rivers, adaptive widths/depths, terrain-aware meanders, braiding, deltas/point bars,
-climate-selected springs/wetlands, full lake spill/outlet networks, tall mountain
-waterfalls, riverbank vegetation or new physical floating debris. Biome-specific
-beds are implemented; bank ecology remains separate. Existing seasonal and
-sediment simulation is reused, without a new generation/climate coupling or new
-river erosion policy. There is no automatic legacy-world migration.
+The full requested network is **unfinished**. Bounded cross-tile routes, capped
+variable widths/depths, connected bends, local spill outlets, bank profiles,
+opt-in vegetation, habitat queries and reach-aware cosmetics are implemented.
+Still missing are an atomic whole-route physical certificate across arbitrary
+protected/old/cave/decorator boundaries, large global watershed area, robust
+valley-optimized headwaters across plateaus, outer-bend/point-bar geometry,
+braids/deltas, climate-selected spring/wetland generation, large lake networks
+and a validated tall-mountain waterfall/plunge generator. Existing erosion and
+finite seasonal/flood models are reused. Permanent baselines are not physically
+dried or lowered without a funded geometry transaction; this remains gated.
 
-Full noise-world visual quality and order independence across arbitrary modded
+The native noise acceptance now exercises a real positive connected sample with
+forward/reversed FULL requests. This is limited seeded acceptance, not full
+noise-world visual quality or order independence across arbitrary modded
 decoration, Tectonic/Terralith/Chunky/C2ME combinations, shader/Embeddium visuals,
 and two-client acceptance remain unverified. The flag remains opt-in for that
 reason. Dedicated GameTest startup confirms common code does not require client
 render classes, but does not establish all optional-mod compatibility.
 
-### Earlier feature-worktree command ledger
+## 19 October continuation validation
+
+The current continuation was validated serially with Java 21.0.6, the checked-in
+wrapper and isolated output. The completed command was:
+
+```powershell
+.\gradlew.bat waterSimulationTest renderingTest :test runGameTestServer :build riverNetworkBenchmark '-PcodexBuildDir=.codex-build' '-PauditGameTestRun=river-source-final' '-Dforge.enabledGameTestNamespaces=wildernessodysseyapi_river_tests,wildernessodysseyapi_river_acceptance_tests,wildernessodysseyapi_water_safety_tests' '-Dneoforge.enabledGameTestNamespaces=wildernessodysseyapi_river_tests,wildernessodysseyapi_river_acceptance_tests,wildernessodysseyapi_water_safety_tests' --no-parallel --console=plain
+```
+
+`completion-final-validation.log` completed successfully in **2m 49s**:
+
+| Check | Actual result |
+| --- | --- |
+| Water suite | 199 tests, 40 suites, zero failures/errors/skips |
+| Rendering suite | 315 tests, 71 suites, zero failures/errors/skips |
+| Full root Java suite | 1699 tests, 445 suites, zero failures/errors; four existing skips |
+| Dedicated GameTests | All 43 required tests passed; startup, execution, saving and shutdown completed |
+| Native positive acceptance | 122 river columns in four FULL chunks, physical chunk crossing, matching forward/reversed physical+reach snapshots, matching save/reload with generation disabled |
+| Optional vegetation | Enabled live-survival placement, disablement, denied writes, one remaining write, solid-feature preservation and no sparse inventory all passed |
+| Root packaging | `:build` passed; 89 inspected production/nested classes match compiled bytes |
+| Packaged resources | Nine valid bank profiles, native acceptance template and river lifecycle mixin present |
+
+Three root-suite skips need Windows symbolic-link privileges; the fourth is the
+separate opt-in large bunker fixture. No system permissions were changed. The
+artifact is `.codex-build/libs/wildernessodysseyapi-5.0.0.jar`, 30014244 bytes,
+SHA-256 `abdc156a110171d843c146a39d85f0f383428628d9f7b0dda17cf6f5172c906d`.
+
+The native acceptance used the standard Overworld density generator with a fixed
+plains biome. Its bounded search evaluated 20 query tiles before finding a valid
+site near block coordinates (-512, 128); eligibility is not guaranteed near spawn.
+The physical order/reload checks exercise native generation scheduling and actual
+blocks, not only detached ProtoChunk fixtures. They remain a limited seeded sample.
+
+| Measured operation | Mean ms | p95 ms | p99 ms |
+| --- | ---: | ---: | ---: |
+| Real standard-noise column prediction, 64 columns | 2.1608 | 3.2448 | 33.8521 |
+| Real Amplified-noise column prediction, 64 columns | 1.1241 | 1.4145 | 1.7087 |
+| Native standard planning query, 20 queries | 220.1200 | 527.7706 | 755.5492 |
+| Synthetic complete source plan, standard slope | 12.2529 | 13.2441 | 13.7600 |
+| Synthetic detailed/rugged topology, no admitted outlet | 1.4733 | 1.6771 | 1.9266 |
+
+The synthetic source benchmark uses 50 warmups and 200 measured iterations. Its
+standard case retains 348 halo columns with 3363 samples and 110250 raster visits;
+the rugged case rejects all routes and is not equivalent generation work. Real
+Amplified measurements cover prediction only, not a heavy-world generation run.
+The first four-chunk native FULL batch took **1137.3191 ms** with generation
+enabled; the same seed, request order and batching with generation disabled took
+**376.8526 ms** in a subsequently warmed JVM. This single sequential pair includes
+different cache/JIT states and supports no stable overhead ratio or speedup claim.
+The cold-query cost is material; generation remains opt-in. No GPU, network-byte,
+heap-retention, full-modpack or two-client performance comparison was measured.
+
+Earlier failures were useful regressions: completed neighbor wrappers were being
+treated as new terrain; fine inlet lowering could resume uphill; future falling
+curtains could be rejected as air; pending neighbor clearance could be missed;
+whole-query fine rejection could erase a neighboring tile's route. Each received
+a focused regression and correction. The final green run includes those fixes.
+
+### Earlier feature-worktree command ledger (historical local milestone)
 
 - `final-validation.log`: water **165/165**, rendering **325/325**, GameTests
   **31/31** in `run-audit-river-generation-04`, benchmark and root `:build` passed

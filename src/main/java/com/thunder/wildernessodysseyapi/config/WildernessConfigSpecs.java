@@ -94,6 +94,7 @@ public final class WildernessConfigSpecs {
         GlacialConfig.defineCommon(builder);
         CoastalWorldgenConfig.defineCommon(builder);
         RiverWorldgenConfig.defineCommon(builder);
+        com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.bank.RiverBankConfig.defineCommon(builder);
         com.thunder.wildernessodysseyapi.worldgen.anomaly.config.AnomalyWorldgenConfig.defineCommon(builder);
         AsyncThreadingConfig.define(builder);
         OwnershipConfig.define(builder);
