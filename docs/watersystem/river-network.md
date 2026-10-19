@@ -580,6 +580,33 @@ changed sources match packaged bytes; nine bank profiles and the native acceptan
 template are present. Source/diff checks passed. The GPU, visual and multiplayer
 acceptance boundaries above remain unchanged by this package proof.
 
+### Merge comparison against current in-dev
+
+The 19 October comparison fetched `in-dev` at
+`4533cb7f6338f6211ed95bbe7a5abe0d2cd03cb1`. It is already an ancestor of the PR
+branch, with zero upstream commits missing. `git merge-tree --write-tree` against
+that base produced exactly the current branch tree, and GitHub reported the PR
+mergeable. The diff retains the current OPC, WAGE and coastal base changes;
+the added behavior remains in river generation and its existing water consumers.
+
+The wider GitHub GameTest run on `ada9c94c` exposed one shared-fixture failure:
+`shallowWetlandUsesPartialCanonicalVolume` attempted to record its claim with a
+dimension-wide allowance of 16 while the shared ledger already had 19 entries.
+That fixture was byte-for-byte identical to `in-dev` before this correction. The
+same unmodified 56-test group passed locally, demonstrating that a local pass
+alone did not cover CI's shared-ledger state. All three related flood fixtures now
+allow one entry beyond the existing ledger size, without clearing other fixtures'
+claims, changing production bounds or weakening ownership/volume assertions.
+
+`merge-compare-green.log` completed successfully in **1m 25s**. Compilation, all
+eight `TemporaryFloodSavedDataTest` unit tests, all **99 required GameTests** from
+the default/river/native-acceptance/water-safety namespaces, and JAR packaging
+passed together. The native run again retained 122 connected columns. The final
+comparison artifact is 30075801 bytes, SHA-256
+`e4ca4ca4649b4aa04ee53a6c0d9dc1c7ac3031dcb949f67a8e8ae6230b0799fd`;
+148 inspected production/nested classes match compiled bytes. Fresh GitHub checks
+on the pushed comparison revision must complete before remote CI is called green.
+
 ### Earlier feature-worktree command ledger (historical local milestone)
 
 - `final-validation.log`: water **165/165**, rendering **325/325**, GameTests
