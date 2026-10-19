@@ -112,20 +112,52 @@ rise per four shoreline-distance blocks, with a configurable maximum cut
 high cliffs, or enters a cave. The whole cut and its foundation are checked
 before writing; chunks with structure starts or references are conservatively
 excluded. These changes also require new chunks.
+The cut returns gradually to the original bank between fourteen and twenty
+blocks from water so its inland cutoff cannot create a sudden four-block wall.
 
-After the bands are complete, the same feature evaluates sixteen deterministic
-four-by-four anchors rather than simulating every beach block. Eligible anchors
-can place terrain-aligned driftwood, calcite or dead-coral shell beds, rock
-clusters, contained two-by-two tide pools, beach scrub or grass, cold ice
-fragments, and rare nearshore sea stacks. All placements stay in the feature's
-origin chunk and use vanilla blocks, so no new block registry or texture atlas
-is required. Tide pools are persistent worldgen water; the moving surf itself
-never places or removes fluid blocks.
+The feature now samples its available terrain once in a bounded 56 by 56 area,
+with a twenty-block shore search. Height and biome queries are cached for the
+invocation. Contacts use the nearest sampled open-water boundary instead of
+eight sparse rays, and are fixed before the feature writes terrain or pools.
+Two-by-two pools cannot seed a new coastline. Unknown chunks are skipped;
+there is no height-based guessed shoreline or chunk-edge terrain fallback.
+The placed feature has no random single-position biome gate: it runs once for
+its biome generation stage and checks each origin-chunk column itself.
 
-The tropical back-beach can also receive one small palm-shaped tree per chunk,
-using connected jungle logs and drooping jungle-leaf fronds. The full tree must
-fit within the origin chunk and clear air before any block is placed. Ordinary
-water-edge trees and plains-grass features are not injected into this biome,
+Temperate sand extends into gentle dunes and patchy coastal meadow. Dune
+beaches use a broader ridge with continuous distance-to-shore taper and two
+noise scales, keeping the added rise bounded by the existing configuration.
+Rocky coasts retain their existing landform while gaining coherent stone,
+andesite and gravel bands and small preflighted boulders. Cold shores emphasize
+gray gravel, coarse sediment and patchy snow, with at most one ice fragment
+formation per chunk. Their vanilla `freeze_top_layer` feature is omitted so it
+does not replace that patchwork with a uniform generation-time snow blanket;
+normal later weather remains authoritative. Glacial shores layer snow and
+packed ice with occasional blue-ice accents. Full offshore icebergs remain
+owned by `IcebergFormationFeature` in `iceberg_coast`; coastal details no longer
+select stone sea stacks for glacial beaches. All earthwork tapers at actual
+land-biome boundaries rather than at chunk coordinates.
+
+After the bands, thirty-two irregular deterministic detail candidates can place
+shore-aligned driftwood, calcite or dead-coral shell beds, compact boulders,
+contained tide pools, grouped vegetation, small ice outcrops, and rare rocky
+sea stacks. The hard limits are twelve successful small details, two fallen
+logs, and three rock/ice formations per chunk. Driftwood tries both directions
+along the shoreline and progressively shorter connected logs on supported,
+level ground. Tide pools verify their floor and rim; sea stacks preflight every
+column against its own ocean floor before any write. Structure starts or
+references veto both surface work and details. All placements stay in the
+origin chunk and use native blocks. Tide pools are persistent generation-time
+water; moving surf never places or removes fluids.
+
+Tropical palms have a separate budget of twenty suitable-root attempts and at
+most two successes. Roots are sampled where a complete crown can fit, seven to
+twenty blocks from water, with six-block root spacing and five-to-eight-block
+trunk heights. Crowns have connected rising inner leaves and drooping frond
+tips; leaning direction varies deterministically. A density-dependent grove
+roll keeps some chunks open. The full tree must fit in the origin chunk, have
+natural solid root support, and clear its complete crown before any write.
+Ordinary water-edge trees and plains-grass features are not injected into this biome,
 and the coastal detail placer never uses dead bushes on tropical sand. The
 biome supplies explicit lush grass/foliage colors and a turquoise water palette.
 
@@ -133,9 +165,9 @@ biome supplies explicit lush grass/foliage colors and a turquoise water palette.
 
 Common world-generation settings live under `coastalWorldgen`:
 
-- `enableBeachBiomeFamily` defaults to `false`: custom beaches are opt-in;
-- saved explicit values remain in effect; existing installations with `true`
-  must change that value to `false` and restart to disable future placement;
+- `enableBeachBiomeFamily` defaults to `true`: custom beaches are enabled for new configurations;
+- saved explicit values remain in effect; existing installations with `false`
+  must change that value to `true` and restart to enable future placement;
 - biome registrations remain available for existing worlds;
 - the entire family and each individual biome replacement can be disabled;
 - terrain bands can be disabled independently;
@@ -143,6 +175,21 @@ Common world-generation settings live under `coastalWorldgen`:
 - `maximumTropicalBankCutBlocks` controls tropical grading (0 to disable, at most 6).
 - sparse details have a global density control and separate vegetation,
   driftwood, tide-pool, rock/outcrop, and ice-fragment switches.
+- `coastalDetailDensity` retains its default of `0.55` (range 0–1).
+- `palmDensity`, `driftwoodDensity`, and `rockClusterDensity` are new multipliers,
+  each defaulting to `1.0` (range 0–2); zero disables that content. The existing
+  vegetation switch and global density also gate palms. Rock density controls
+  boulders and rocky sea stacks; the existing rock switch also controls shell beds.
+
+The development preset in [coastal-development.toml](coastal-development.toml)
+explicitly enables all six beaches and the existing polar system. Merge its
+sections into `config/wildernessodysseyapi-common.toml`, restart, and generate a
+disposable world or explore new chunks. Do not replace the whole config file
+with the excerpt. The family is enabled by default; saved configuration values remain in effect.
+Glacial placement still requires `polarGlacialBiomes.enablePolarBiomeSystem`;
+the remaining snowy beaches use the cold profile. Startup diagnostics now
+verify enabled coastal identifiers alongside the polar family in the active
+Overworld biome source, rather than only confirming listener registration.
 
 Client presentation settings live with the existing water rendering config:
 
@@ -240,6 +287,55 @@ the renderer skipped some fluid callbacks for occluded cells; rejecting such a
 receipt after suppressing other tops could leave rectangular ocean gaps.
 Changed masks and builds begun before the ownership request still reject stale
 receipts. Nothing in this handshake removes server water or edits terrain.
+
+## Decoration diagnosis and regression commands
+
+The old missing-detail behavior had several cumulative causes:
+
+1. The beach family previously defaulted to disabled, and saved configurations
+   can still contain `false`. Registered biome resources alone do not insert a
+   biome into a running world's source. Existing chunks are not decorated again
+   when the setting changes.
+2. A random `in_square` position, heightmap and `biome` filter gated a feature
+   that already scans its whole chunk. Sampling an inland or ocean point could
+   therefore reject a chunk containing a perfectly valid authored beach.
+3. Sixteen four-by-four detail anchors shared one presence roll and one variant
+   roll. A tropical palm needed the meadow band beyond ten blocks, a water
+   contact within fourteen blocks, and a complete crown inside the origin chunk.
+   That narrow intersection rejected most otherwise reasonable roots. The
+   all-air preflight also rejected harmless low plants, and only one successful
+   palm was allowed. The new placement retains complete-crown safety, samples
+   fitting roots directly and allows a replaceable low plant only at the root.
+4. Driftwood tried one tangent direction and one length, so chunk edges or a
+   single unsuitable support discarded the whole opportunity. Retrying the
+   other direction and shorter, level logs improves success without partial logs.
+
+Run the pure profile/resource/surf regressions with:
+
+```powershell
+.\gradlew.bat :coastalTest '-PcoastalTestsOnly=true' '-PcodexBuildDir=.codex-build' --no-parallel
+```
+
+Run block placement, structure metadata, configuration and real Lithostitched
+codec checks through the existing NeoForge JUnit launch with:
+
+```powershell
+.\gradlew.bat :test '-PcoastalTestsOnly=true' '-PcodexBuildDir=.codex-build' --no-parallel
+```
+
+The optional source filter only changes which tests Gradle compiles and selects.
+It does not replace the Minecraft compiler, dependencies or mod loader. The
+scoped NeoForge report is under `.codex-build/reports/tests/coastalIntegration/`;
+the pure report is under `.codex-build/reports/tests/coastalTest/`. Ordinary
+`test` without the property retains the full suite. Keep Gradle runs serial.
+
+The controlled shore fixture uses 128 seeds and a flat, unobstructed, fully
+tropical back-beach. Its placement counts are discoverability regressions, not
+measurements of natural-biome frequency or proof of in-game appearance. The
+six material-profile checks bound height queries to at most 3,136 and biome
+queries to at most 576 per invocation; sea-stack floor checks have their own
+five-column bound. No worldgen timing or render/GPU speedup is established by
+these counts.
 
 ## Validation checklist
 

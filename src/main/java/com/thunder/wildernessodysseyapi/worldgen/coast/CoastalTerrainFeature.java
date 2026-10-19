@@ -2,16 +2,13 @@ package com.thunder.wildernessodysseyapi.worldgen.coast;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalWaveProfile;
-import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import com.thunder.wildernessodysseyapi.worldgen.coast.config.CoastalWorldgenConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
@@ -19,20 +16,11 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Supplies explicit surface ownership for Wilderness beach biome identifiers.
- *
- * <p>Vanilla's overworld surface rule checks exact vanilla beach keys, so a
- * custom biome cannot rely on that rule to receive sand or gravel. This feature
- * scans only its 16 by 16 origin chunk, reads only available worldgen-region
- * neighbors, and writes bounded natural surface columns.</p>
+ * Owns the six custom beaches' natural surface bands and bounded details.
+ * Vanilla's exact-key beach surface rules do not handle these biome identifiers.
+ * A placement owns only its origin chunk and never loads a neighboring chunk.
  */
 public final class CoastalTerrainFeature extends Feature<NoneFeatureConfiguration> {
-
-    private static final int WATER_SEARCH_DISTANCE = 14;
-    private static final int[][] DIRECTIONS = {
-            {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-            {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
-    };
     private static final AtomicBoolean LOGGED_FAILURE = new AtomicBoolean();
 
     public CoastalTerrainFeature() {
@@ -41,310 +29,134 @@ public final class CoastalTerrainFeature extends Feature<NoneFeatureConfiguratio
 
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
-        boolean terrainEnabled = CoastalWorldgenConfig.ENABLE_COASTAL_TERRAIN_BANDS.get();
-        boolean detailsEnabled = CoastalWorldgenConfig.ENABLE_COASTAL_DETAILS.get()
+        boolean terrain = CoastalWorldgenConfig.ENABLE_COASTAL_TERRAIN_BANDS.get();
+        boolean details = CoastalWorldgenConfig.ENABLE_COASTAL_DETAILS.get()
                 && CoastalWorldgenConfig.COASTAL_DETAIL_DENSITY.get() > 0.0;
-        if (!CoastalWorldgenConfig.ENABLE_BEACH_BIOME_FAMILY.get()
-                || (!terrainEnabled && !detailsEnabled)) {
-            return false;
-        }
+        if (!CoastalWorldgenConfig.ENABLE_BEACH_BIOME_FAMILY.get() || (!terrain && !details)) return false;
         try {
-            return placeChunk(context.level(), context.origin());
+            return placeChunk(context.level(), context.origin(), terrain, details);
         } catch (RuntimeException exception) {
             if (LOGGED_FAILURE.compareAndSet(false, true)) {
-                ModConstants.LOGGER.error(
-                        "Coastal terrain generation failed at {}; subsequent failures use normal worldgen diagnostics",
-                        context.origin(),
-                        exception
-                );
+                ModConstants.LOGGER.error("Coastal terrain generation failed at {}; subsequent failures use normal worldgen diagnostics",
+                        context.origin(), exception);
             }
             return false;
         }
     }
 
-    private static boolean placeChunk(WorldGenLevel level, BlockPos origin) {
+    private static boolean placeChunk(WorldGenLevel level, BlockPos origin, boolean terrain, boolean details) {
         int minimumX = origin.getX() & ~15;
         int minimumZ = origin.getZ() & ~15;
-        var originChunk = level.getChunk(minimumX >> 4, minimumZ >> 4);
-        // Conservative whole-chunk veto: never lower a structure's foundation,
-        // including structures whose start lives in a neighboring chunk.
-        boolean canGrade = originChunk.getAllStarts().isEmpty()
-                && originChunk.getAllReferences().values().stream().allMatch(java.util.Set::isEmpty);
+        var chunk = level.getChunk(minimumX >> 4, minimumZ >> 4);
+        // The same guard covers earthwork AND decorations. Structure foundations
+        // may use natural materials, and references may name an unavailable start.
+        if (!chunk.getAllStarts().isEmpty()
+                || chunk.getAllReferences().values().stream().anyMatch(references -> !references.isEmpty())) {
+            return false;
+        }
+        CoastalGenerationArea area = new CoastalGenerationArea(level, minimumX, minimumZ);
         boolean placed = false;
-        if (CoastalWorldgenConfig.ENABLE_COASTAL_TERRAIN_BANDS.get()) {
-            for (int localZ = 0; localZ < 16; localZ++) {
-                for (int localX = 0; localX < 16; localX++) {
-                    int x = minimumX + localX;
-                    int z = minimumZ + localZ;
-                    int topY = surfaceY(level, x, z);
-                    BlockPos top = new BlockPos(x, topY, z);
-                    CoastalWaveProfile.ShoreType shoreType = ModBiomes
-                            .coastalShoreType(level.getBiome(top))
-                            .orElse(null);
-                    if (shoreType == null || level.getFluidState(top).is(FluidTags.WATER)) {
-                        continue;
+        if (terrain) {
+            for (int z = minimumZ; z < minimumZ + 16; z++) {
+                for (int x = minimumX; x < minimumX + 16; x++) {
+                    var type = area.shoreType(x, z);
+                    var water = area.contact(x, z);
+                    BlockPos top = area.surface(x, z);
+                    if (type == null || water == null || area.column(x, z).water()
+                            || !CoastalGenerationArea.natural(level.getBlockState(top))) continue;
+                    double weight = area.biomeWeight(x, z);
+                    double broad = CoastalTerrainProfile.noise(level.getSeed(), x, z, 29, 0xA0761D6478BD642FL);
+                    double fine = CoastalTerrainProfile.noise(level.getSeed(), x, z, 9, 0xE7037ED1A0B428DBL);
+                    if (weight == 0.0 || (weight < 1.0 && broad * 0.8 + fine * 0.2 > weight * 2.0 - 1.0)) continue;
+                    var zone = CoastalTerrainProfile.zone(type, water.distance(), broad);
+                    if (type == CoastalWaveProfile.ShoreType.TROPICAL) {
+                        top = gradeTropicalBank(level, area, top, water.distance(), weight);
+                        area.surface(top);
                     }
-                    BlockState existing = level.getBlockState(top);
-                    if (!isNaturalSurface(existing)) {
-                        continue;
-                    }
-
-                    int distanceToWater = nearestWaterDistance(level, x, topY, z);
-                    if (canGrade && shoreType == CoastalWaveProfile.ShoreType.TROPICAL) {
-                        top = gradeTropicalBank(level, top, distanceToWater);
-                    }
-                    if (distanceToWater > WATER_SEARCH_DISTANCE) {
-                        // Replacement beaches remain transitions even at a chunk
-                        // edge where the worldgen region cannot expose the ocean.
-                        distanceToWater = Math.min(
-                                WATER_SEARCH_DISTANCE,
-                                7 + Math.max(0, topY - level.getSeaLevel()) * 2
-                        );
-                    }
-                    CoastalTerrainProfile.Zone zone = CoastalTerrainProfile.zone(
-                            shoreType, distanceToWater);
-                    double broadNoise = noise(
-                            level.getSeed(), x, z, 19, 0xA0761D6478BD642FL);
-                    placed |= resurface(level, top, shoreType, zone, broadNoise);
+                    int rise = (int) Math.floor(weight * CoastalTerrainProfile.duneHeight(type,
+                            water.distance(), broad, fine, CoastalWorldgenConfig.MAX_DUNE_RISE_BLOCKS.get()));
+                    placed |= resurface(level, area, top, type, zone, broad * 0.8 + fine * 0.2, rise);
                 }
             }
         }
-        if (CoastalWorldgenConfig.ENABLE_COASTAL_DETAILS.get()
-                && CoastalWorldgenConfig.COASTAL_DETAIL_DENSITY.get() > 0.0) {
-            placed |= CoastalDetailPlacer.place(level, minimumX, minimumZ);
-        }
+        if (details) placed |= CoastalDetailPlacer.place(level, area);
         return placed;
     }
 
-    private static BlockPos gradeTropicalBank(WorldGenLevel level, BlockPos top, int distance) {
-        int targetY = CoastalTerrainProfile.tropicalSurfaceHeight(
-                top.getY(), level.getSeaLevel(), distance,
-                CoastalWorldgenConfig.MAX_TROPICAL_BANK_CUT_BLOCKS.get());
-        if (targetY == top.getY()) {
-            return top;
+    private static BlockPos gradeTropicalBank(WorldGenLevel level, CoastalGenerationArea area,
+                                             BlockPos top, double distance, double weight) {
+        int target = CoastalTerrainProfile.tropicalSurfaceHeight(top.getY(), level.getSeaLevel(),
+                (int) Math.round(distance), CoastalWorldgenConfig.MAX_TROPICAL_BANK_CUT_BLOCKS.get());
+        target = top.getY() - (int) Math.floor((top.getY() - target) * weight);
+        if (target == top.getY() || !level.getBlockState(top.above()).isAir()) return top;
+        for (int y = target - 3; y <= top.getY(); y++) {
+            BlockPos pos = new BlockPos(top.getX(), y, top.getZ());
+            BlockState state = level.getBlockState(pos);
+            if (!area.canWrite(pos) || !CoastalGenerationArea.natural(state)
+                    || !state.getFluidState().isEmpty()) return top;
         }
-        // Verify the cut and its foundation before changing any blocks. Caves,
-        // fluids, block entities, and non-natural construction stop the operation.
-        for (int y = targetY - 3; y <= top.getY(); y++) {
-            BlockPos position = new BlockPos(top.getX(), y, top.getZ());
-            BlockState state = level.getBlockState(position);
-            if (!canWrite(level, position) || !isNaturalSurface(state)
-                    || state.hasBlockEntity() || !state.getFluidState().isEmpty()) {
-                return top;
-            }
-        }
-        for (int y = top.getY(); y > targetY; y--) {
+        for (int y = top.getY(); y > target; y--) {
             level.setBlock(new BlockPos(top.getX(), y, top.getZ()), Blocks.AIR.defaultBlockState(), 2);
         }
-        return new BlockPos(top.getX(), targetY, top.getZ());
+        return new BlockPos(top.getX(), target, top.getZ());
     }
 
-    private static boolean resurface(
-            WorldGenLevel level,
-            BlockPos top,
-            CoastalWaveProfile.ShoreType shoreType,
-            CoastalTerrainProfile.Zone zone,
-            double broadNoise
-    ) {
-        BlockState surface = surfaceState(shoreType, zone, broadNoise);
-        BlockState foundation = foundationState(surface, shoreType);
-        boolean changed = setNatural(level, top, surface);
-        for (int depth = 1; depth <= 3; depth++) {
-            changed |= setNatural(level, top.below(depth), foundation);
+    private static boolean resurface(WorldGenLevel level, CoastalGenerationArea area, BlockPos top,
+                                     CoastalWaveProfile.ShoreType type, CoastalTerrainProfile.Zone zone,
+                                     double noise, int rise) {
+        // Preflight the whole foundation and raised column: never leave floating
+        // sand above a cave or cap an existing tree, plant, or construction.
+        for (int depth = 0; depth <= 3; depth++) {
+            BlockPos pos = top.below(depth);
+            if (!area.canWrite(pos) || !CoastalGenerationArea.natural(level.getBlockState(pos))) return false;
         }
-
-        int rise = CoastalTerrainProfile.duneRise(
-                shoreType,
-                zone,
-                broadNoise,
-                CoastalWorldgenConfig.MAX_DUNE_RISE_BLOCKS.get()
-        );
         for (int offset = 1; offset <= rise; offset++) {
-            BlockPos raised = top.above(offset);
-            if (!canWrite(level, raised) || !level.getBlockState(raised).isAir()) {
-                break;
-            }
-            level.setBlock(raised, Blocks.SAND.defaultBlockState(), 2);
-            changed = true;
+            BlockPos pos = top.above(offset);
+            if (!area.canWrite(pos) || !level.getBlockState(pos).isAir()) return false;
         }
-
-        BlockPos decoration = top.above(rise + 1);
-        if ((shoreType == CoastalWaveProfile.ShoreType.COLD
-                || shoreType == CoastalWaveProfile.ShoreType.GLACIAL)
-                && canWrite(level, decoration)
-                && level.getBlockState(decoration).isAir()
-                && broadNoise > -0.32) {
-            int layers = 1 + (int) Math.floor(Math.min(0.999, (broadNoise + 1.0) * 0.5) * 3.0);
-            level.setBlock(
-                    decoration,
-                    Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, layers),
-                    2
-            );
-            changed = true;
+        BlockState surface = surfaceState(type, zone, noise);
+        BlockState foundation = foundationState(surface, type);
+        level.setBlock(top, surface, 2);
+        for (int depth = 1; depth <= 3; depth++) level.setBlock(top.below(depth), foundation, 2);
+        for (int offset = 1; offset <= rise; offset++) {
+            level.setBlock(top.above(offset), Blocks.SAND.defaultBlockState(), 2);
         }
-        if (shoreType == CoastalWaveProfile.ShoreType.GLACIAL
-                && (zone == CoastalTerrainProfile.Zone.ICE_STRAND
-                || zone == CoastalTerrainProfile.Zone.GLACIAL_BEACH)
-                && broadNoise > 0.76
-                && canWrite(level, decoration)
-                && level.getBlockState(decoration).isAir()) {
-            level.setBlock(decoration, Blocks.PACKED_ICE.defaultBlockState(), 2);
-            changed = true;
+        BlockPos finalTop = top.above(rise);
+        area.surface(finalTop);
+        BlockPos snow = finalTop.above();
+        boolean cold = type == CoastalWaveProfile.ShoreType.COLD;
+        boolean glacial = type == CoastalWaveProfile.ShoreType.GLACIAL;
+        double snowThreshold = cold ? 0.05 : -0.65;
+        if ((cold || glacial) && noise > snowThreshold && area.canWrite(snow)
+                && level.getBlockState(snow).isAir()) {
+            level.setBlock(snow, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS,
+                    1 + (int) Math.min(3, Math.max(0, (noise + 1.0) * (glacial ? 2.0 : 1.0)))), 2);
         }
-        return changed;
-    }
-
-    private static BlockState surfaceState(
-            CoastalWaveProfile.ShoreType shoreType,
-            CoastalTerrainProfile.Zone zone,
-            double noise
-    ) {
-        return switch (zone) {
-            case STRANDLINE, OPEN_BEACH, DUNE -> shoreType == CoastalWaveProfile.ShoreType.DUNE
-                    && noise > 0.72
-                    ? Blocks.RED_SAND.defaultBlockState()
-                    : Blocks.SAND.defaultBlockState();
-            case COASTAL_MEADOW -> Blocks.GRASS_BLOCK.defaultBlockState();
-            case ROCKY_STRAND -> noise > 0.30
-                    ? Blocks.GRAVEL.defaultBlockState()
-                    : Blocks.STONE.defaultBlockState();
-            case ROCKY_SLOPE -> noise > 0.48
-                    ? Blocks.ANDESITE.defaultBlockState()
-                    : Blocks.STONE.defaultBlockState();
-            case GRAVEL_STRAND -> noise > 0.20
-                    ? Blocks.GRAVEL.defaultBlockState()
-                    : Blocks.SAND.defaultBlockState();
-            case COLD_BEACH -> noise > 0.42
-                    ? Blocks.GRAVEL.defaultBlockState()
-                    : Blocks.COARSE_DIRT.defaultBlockState();
-            case SNOWY_MEADOW -> Blocks.GRASS_BLOCK.defaultBlockState();
-            case ICE_STRAND -> noise > 0.18
-                    ? Blocks.PACKED_ICE.defaultBlockState()
-                    : Blocks.GRAVEL.defaultBlockState();
-            case GLACIAL_BEACH -> noise > 0.35
-                    ? Blocks.GRAVEL.defaultBlockState()
-                    : Blocks.PACKED_ICE.defaultBlockState();
-            case SNOWFIELD -> Blocks.SNOW_BLOCK.defaultBlockState();
-        };
-    }
-
-    private static BlockState foundationState(
-            BlockState surface,
-            CoastalWaveProfile.ShoreType shoreType
-    ) {
-        if (surface.is(BlockTags.SAND)) {
-            return surface.is(Blocks.RED_SAND)
-                    ? Blocks.RED_SANDSTONE.defaultBlockState()
-                    : Blocks.SANDSTONE.defaultBlockState();
-        }
-        if (surface.is(Blocks.GRASS_BLOCK)
-                || surface.is(Blocks.COARSE_DIRT)) {
-            return Blocks.DIRT.defaultBlockState();
-        }
-        if (surface.is(Blocks.SNOW_BLOCK)) {
-            return shoreType == CoastalWaveProfile.ShoreType.GLACIAL
-                    ? Blocks.PACKED_ICE.defaultBlockState()
-                    : Blocks.DIRT.defaultBlockState();
-        }
-        if (shoreType == CoastalWaveProfile.ShoreType.GLACIAL
-                && surface.is(Blocks.PACKED_ICE)) {
-            return Blocks.BLUE_ICE.defaultBlockState();
-        }
-        return Blocks.STONE.defaultBlockState();
-    }
-
-    private static int nearestWaterDistance(
-            WorldGenLevel level,
-            int originX,
-            int originY,
-            int originZ
-    ) {
-        for (int distance = 1; distance <= WATER_SEARCH_DISTANCE; distance++) {
-            for (int[] direction : DIRECTIONS) {
-                int x = originX + direction[0] * distance;
-                int z = originZ + direction[1] * distance;
-                if (!level.hasChunk(x >> 4, z >> 4)) {
-                    continue;
-                }
-                int surfaceY = surfaceY(level, x, z);
-                if (Math.abs(surfaceY - originY) <= 8
-                        && level.getFluidState(new BlockPos(x, surfaceY, z)).is(FluidTags.WATER)) {
-                    return distance;
-                }
-            }
-        }
-        return WATER_SEARCH_DISTANCE + 1;
-    }
-
-    private static int surfaceY(WorldGenLevel level, int x, int z) {
-        return level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) - 1;
-    }
-
-    private static boolean setNatural(
-            WorldGenLevel level,
-            BlockPos position,
-            BlockState replacement
-    ) {
-        if (!canWrite(level, position) || !isNaturalSurface(level.getBlockState(position))) {
-            return false;
-        }
-        level.setBlock(position, replacement, 2);
         return true;
     }
 
-    private static boolean canWrite(WorldGenLevel level, BlockPos position) {
-        return position.getY() >= level.getMinBuildHeight()
-                && position.getY() < level.getMaxBuildHeight()
-                && level.ensureCanWrite(position);
+    private static BlockState surfaceState(CoastalWaveProfile.ShoreType type,
+                                           CoastalTerrainProfile.Zone zone, double noise) {
+        return switch (zone) {
+            case STRANDLINE, OPEN_BEACH, DUNE -> type == CoastalWaveProfile.ShoreType.DUNE && noise > 0.72
+                    ? Blocks.RED_SAND.defaultBlockState() : Blocks.SAND.defaultBlockState();
+            case COASTAL_MEADOW, SNOWY_MEADOW -> Blocks.GRASS_BLOCK.defaultBlockState();
+            case ROCKY_STRAND -> (noise > 0.12 ? Blocks.GRAVEL : Blocks.STONE).defaultBlockState();
+            case ROCKY_SLOPE -> (noise > 0.36 ? Blocks.ANDESITE : Blocks.STONE).defaultBlockState();
+            case GRAVEL_STRAND -> (noise > -0.55 ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState();
+            case COLD_BEACH -> (noise > 0.25 ? Blocks.COARSE_DIRT : Blocks.GRAVEL).defaultBlockState();
+            case ICE_STRAND -> (noise > 0.16 ? Blocks.PACKED_ICE : Blocks.GRAVEL).defaultBlockState();
+            case GLACIAL_BEACH -> (noise > 0.32 ? Blocks.SNOW_BLOCK : Blocks.PACKED_ICE).defaultBlockState();
+            case SNOWFIELD -> (noise < -0.55 ? Blocks.STONE : Blocks.SNOW_BLOCK).defaultBlockState();
+        };
     }
 
-    private static boolean isNaturalSurface(BlockState state) {
-        return state.is(BlockTags.DIRT)
-                || state.is(BlockTags.SAND)
-                || state.is(BlockTags.BASE_STONE_OVERWORLD)
-                || state.is(Blocks.GRAVEL)
-                || state.is(Blocks.CLAY)
-                || state.is(Blocks.SNOW)
-                || state.is(Blocks.SNOW_BLOCK)
-                || state.is(Blocks.ICE)
-                || state.is(Blocks.PACKED_ICE)
-                || state.is(Blocks.BLUE_ICE);
+    private static BlockState foundationState(BlockState surface, CoastalWaveProfile.ShoreType type) {
+        if (surface.is(BlockTags.SAND)) return (surface.is(Blocks.RED_SAND)
+                ? Blocks.RED_SANDSTONE : Blocks.SANDSTONE).defaultBlockState();
+        if (surface.is(Blocks.GRASS_BLOCK) || surface.is(Blocks.COARSE_DIRT)) return Blocks.DIRT.defaultBlockState();
+        if (surface.is(Blocks.SNOW_BLOCK) || (type == CoastalWaveProfile.ShoreType.GLACIAL
+                && surface.is(Blocks.PACKED_ICE))) return Blocks.PACKED_ICE.defaultBlockState();
+        return Blocks.STONE.defaultBlockState();
     }
-
-    private static double noise(long seed, int x, int z, int scale, long salt) {
-        int safeScale = Math.max(2, scale);
-        int cellX = Math.floorDiv(x, safeScale);
-        int cellZ = Math.floorDiv(z, safeScale);
-        double fractionX = Math.floorMod(x, safeScale) / (double) safeScale;
-        double fractionZ = Math.floorMod(z, safeScale) / (double) safeScale;
-        double smoothX = smoothStep(fractionX);
-        double smoothZ = smoothStep(fractionZ);
-        double northWest = lattice(seed, cellX, cellZ, salt);
-        double northEast = lattice(seed, cellX + 1, cellZ, salt);
-        double southWest = lattice(seed, cellX, cellZ + 1, salt);
-        double southEast = lattice(seed, cellX + 1, cellZ + 1, salt);
-        return lerp(lerp(northWest, northEast, smoothX),
-                lerp(southWest, southEast, smoothX), smoothZ);
-    }
-
-    private static double lattice(long seed, int cellX, int cellZ, long salt) {
-        long value = seed ^ salt
-                ^ (long) cellX * 0x9E3779B97F4A7C15L
-                ^ (long) cellZ * 0xC2B2AE3D27D4EB4FL;
-        value ^= value >>> 30;
-        value *= 0xBF58476D1CE4E5B9L;
-        value ^= value >>> 27;
-        value *= 0x94D049BB133111EBL;
-        value ^= value >>> 31;
-        return ((value >>> 11) * 0x1.0p-53) * 2.0 - 1.0;
-    }
-
-    private static double smoothStep(double value) {
-        return value * value * (3.0 - 2.0 * value);
-    }
-
-    private static double lerp(double start, double end, double amount) {
-        return start + (end - start) * amount;
-    }
-
 }

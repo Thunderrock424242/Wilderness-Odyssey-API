@@ -16,19 +16,27 @@ final class TropicalPalmPlacer {
     private TropicalPalmPlacer() {
     }
 
-    /** Places one preflighted tree; the coastal detail owner enforces the one-per-chunk cap. */
+    /** Places one preflighted tree; the coastal detail owner supplies bounded attempts and spacing. */
     static boolean place(
             WorldGenLevel level, BlockPos ground, int minimumX, int minimumZ,
             int height, int leanX, int leanZ
     ) {
+        if (!CoastalGenerationArea.natural(level.getBlockState(ground))
+                || !level.getBlockState(ground).isFaceSturdy(level, ground, net.minecraft.core.Direction.UP)
+                || !CoastalGenerationArea.natural(level.getBlockState(ground.below()))) {
+            return false;
+        }
         List<Part> parts = shape(height, leanX, leanZ);
         for (Part part : parts) {
             BlockPos position = ground.offset(part.x(), part.y(), part.z());
             if (position.getX() < minimumX || position.getX() >= minimumX + 16
                     || position.getZ() < minimumZ || position.getZ() >= minimumZ + 16
+                    || position.getY() < level.getMinBuildHeight()
                     || position.getY() >= level.getMaxBuildHeight()
                     || !level.ensureCanWrite(position)
-                    || !level.getBlockState(position).isAir()) {
+                    || !(level.getBlockState(position).isAir()
+                    || (part.trunk() && part.y() == 1
+                    && CoastalGenerationArea.clear(level.getBlockState(position))))) {
                 return false;
             }
         }
@@ -43,7 +51,7 @@ final class TropicalPalmPlacer {
 
     /** Pure, bounded shape shared with regression tests; all branches remain face-connected. */
     static List<Part> shape(int requestedHeight, int directionX, int directionZ) {
-        int height = Math.max(5, Math.min(7, requestedHeight));
+        int height = Math.max(5, Math.min(8, requestedHeight));
         int leanX = Integer.signum(directionX);
         int leanZ = leanX == 0 ? Integer.signum(directionZ) : 0;
         if (leanX == 0 && leanZ == 0) {
@@ -66,8 +74,11 @@ final class TropicalPalmPlacer {
             for (int step = 1; step <= length; step++) {
                 int x = leanX + direction[0] * step;
                 int z = leanZ + direction[1] * step;
-                int y = height - (step == 3 ? 1 : 0);
+                int y = height + (step == 1 ? 1 : 0) - (step == 3 ? 1 : 0);
                 blocks.putIfAbsent(new Offset(x, y, z), false);
+                // Vertical elbows join the rising inner crown to the drooping
+                // tips, keeping every frond connected under leaf-distance updates.
+                if (step <= 2) blocks.putIfAbsent(new Offset(x, height, z), false);
                 if (diagonal) {
                     // Bridge diagonals so leaves do not become isolated decaying islands.
                     blocks.putIfAbsent(new Offset(x - direction[0], y, z), false);
@@ -84,10 +95,8 @@ final class TropicalPalmPlacer {
     private static int leafDistance(Part leaf, List<Part> parts) {
         int distance = 7;
         for (Part part : parts) {
-            if (part.trunk()) {
-                distance = Math.min(distance, Math.abs(leaf.x() - part.x())
-                        + Math.abs(leaf.y() - part.y()) + Math.abs(leaf.z() - part.z()));
-            }
+            if (part.trunk()) distance = Math.min(distance, Math.abs(leaf.x() - part.x())
+                    + Math.abs(leaf.y() - part.y()) + Math.abs(leaf.z() - part.z()));
         }
         return Math.max(1, distance);
     }
