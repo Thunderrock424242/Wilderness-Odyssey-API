@@ -134,6 +134,8 @@ public final class RaymarchedCloudShaders {
         cloudShader.safeGetUniform("DetailStrength").set((float) settings.volumetricDetailStrength());
         cloudShader.safeGetUniform("RaymarchSteps").set(settings.raymarchSteps());
         cloudShader.safeGetUniform("LightingSteps").set(current.quality().lightingSteps());
+        cloudShader.safeGetUniform("DensityBoundsEnabled").set(
+                WildernessRenderingFramework.cloudDensityBoundsEnabled() ? 1 : 0);
         Vec3 color = baseColor == null ? new Vec3(1.0, 1.0, 1.0) : baseColor;
         cloudShader.safeGetUniform("CloudColor").set(
                 (float) color.x,

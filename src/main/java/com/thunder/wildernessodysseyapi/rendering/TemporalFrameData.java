@@ -48,9 +48,26 @@ public record TemporalFrameData(
         );
     }
 
-    /** Temporal reconstruction requires at least color, depth, motion, and jitter. */
+    /** Spatial reconstruction needs a correctly sized color image from a named backend. */
+    public boolean hasSpatialReconstructionInputs() {
+        return color.filter(this::matchesRenderResolution)
+                .filter(image -> image.backendId() != null && !image.backendId().isBlank()).isPresent();
+    }
+
+    /** Temporal reconstruction also requires matching depth/motion images and explicit jitter. */
     public boolean hasTemporalReconstructionInputs() {
-        return color.isPresent() && depth.isPresent() && motionVectors.isPresent() && jitter.isPresent();
+        return hasSpatialReconstructionInputs() && matchesColor(depth) && matchesColor(motionVectors)
+                && (reactiveMask.isEmpty() || matchesColor(reactiveMask)) && jitter.isPresent()
+                && (exposure.isEmpty() || (Double.isFinite(exposure.getAsDouble()) && exposure.getAsDouble() > 0));
+    }
+
+    private boolean matchesColor(Optional<ImageHandle> image) {
+        return image.filter(this::matchesRenderResolution)
+                .filter(value -> color.orElseThrow().backendId().equals(value.backendId())).isPresent();
+    }
+
+    private boolean matchesRenderResolution(ImageHandle image) {
+        return image.width() == renderResolution.width() && image.height() == renderResolution.height();
     }
 
     /** Marker implemented by backend-specific image wrappers, never raw cross-backend IDs. */
