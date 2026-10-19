@@ -150,7 +150,13 @@ neoForge {
                 gameDirectory = layout.buildDirectory.dir("run-ci-${name}").get().asFile
                 if (name == 'client') {
                     systemProperty 'wildernessodysseyapi.ciSmokeTest', 'true'
+                    systemProperty 'wildernessodysseyapi.ciSmokeTest.hideWindow', providers.gradleProperty('hideSmokeWindow').orElse('false').get()
                 }
+            }
+            if (name == 'client' && providers.gradleProperty('wageAcceptanceTest').isPresent()) {
+                if (ciSmokeTest.get()) throw new GradleException('Use either wageAcceptanceTest or ciSmokeTest, not both')
+                gameDirectory = layout.buildDirectory.dir('run-wage-acceptance').get().asFile
+                systemProperty 'wildernessodysseyapi.wageAcceptanceTest', 'true'
             }
             if (name in ['client', 'server', 'gameTestServer'] && tickEngineCompilerWorkaround.get()) {
                 jvmArgument '-XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine::finishTick'
@@ -985,10 +991,27 @@ tasks.register('renderingTest', Test) {
     maxHeapSize = '2g'
     filter {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.rendering.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.opc.core.JvmMetricsTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.weather.client.*'
     }
+}
+
+// Explicit hardware acceptance: ordinary tests remain usable without a display or GL driver.
+tasks.register('gpuRenderingTest', Test) {
+    group = 'verification'
+    description = 'Compiles the packaged cloud shaders and compares both density paths on a real OpenGL driver.'
+    dependsOn tasks.named('compileTestJava'), tasks.named('processResources')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    systemProperty 'wildernessodysseyapi.gpuTests', 'true'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.rendering.gpu.*'
+    }
+    // A successful cached result cannot validate the driver present on a later invocation.
+    outputs.upToDateWhen { false }
 }
 
 tasks.register('questTest', Test) {
