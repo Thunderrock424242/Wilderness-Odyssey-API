@@ -63,7 +63,7 @@ public final class RiverNetworkPlanner {
             }
         }
         order.sort(Comparator.<Integer>comparingInt(cell ->
-                terrain.terrainAt(x(layout, cell), z(layout, cell)).elevation()).reversed()
+                java.util.Objects.requireNonNull(terrain.terrainAt(x(layout, cell), z(layout, cell))).elevation()).reversed()
                 .thenComparingLong(cell -> cellKey(x(layout, cell), z(layout, cell))));
         for (int cell : order) if (downstream[cell] >= 0) area[downstream[cell]] += area[cell];
 
@@ -76,7 +76,7 @@ public final class RiverNetworkPlanner {
             int x = x(layout, cell);
             int z = z(layout, cell);
             int target = downstream[cell];
-            var sample = terrain.terrainAt(x, z);
+            var sample = java.util.Objects.requireNonNull(terrain.terrainAt(x, z));
             if (terminals[cell] == Terminal.UNRESOLVED) unresolved++;
             nodes.add(new Node(cellKey(x, z), reachId(terrain, x, z), x, z, sample.elevation(),
                     target < 0 ? x : x(layout, target), target < 0 ? z : z(layout, target),
@@ -94,7 +94,7 @@ public final class RiverNetworkPlanner {
         for (int cell : known) {
             int x = x(layout, cell);
             int z = z(layout, cell);
-            var sample = terrain.terrainAt(x, z);
+            var sample = java.util.Objects.requireNonNull(terrain.terrainAt(x, z));
             boolean frontier = false;
             for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) {
                 if (terrain.terrainAt(x + dx, z + dz) == null) frontier = true;

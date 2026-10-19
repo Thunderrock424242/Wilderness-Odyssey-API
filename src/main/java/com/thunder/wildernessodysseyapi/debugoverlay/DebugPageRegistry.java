@@ -8,7 +8,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.pages.SystemDebugPage;
 import com.thunder.wildernessodysseyapi.debugoverlay.pages.TargetDebugPage;
 import com.thunder.wildernessodysseyapi.debugoverlay.pages.VanillaRawDebugPage;
 import com.thunder.wildernessodysseyapi.debugoverlay.pages.WorldDebugPage;
-import com.thunder.wildernessodysseyapi.dataengine.debug.client.DataEngineDebugPage;
+import com.thunder.wildernessodysseyapi.opc.dataengine.debug.client.DataEngineDebugPage;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.LinkedHashMap;

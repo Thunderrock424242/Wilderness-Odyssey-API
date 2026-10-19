@@ -3,10 +3,10 @@ package com.thunder.wildernessodysseyapi.debugoverlay.provider;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugContext;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngineSnapshot;
-import com.thunder.wildernessodysseyapi.simulation.api.SimulationServices;
-import com.thunder.wildernessodysseyapi.simulation.debug.SimulationDebugSnapshot;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickEngineSnapshot;
+import com.thunder.wildernessodysseyapi.opc.simulation.api.SimulationServices;
+import com.thunder.wildernessodysseyapi.opc.simulation.debug.SimulationDebugSnapshot;
 import net.minecraft.client.Minecraft;
 
 import java.util.List;

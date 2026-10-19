@@ -1,5 +1,9 @@
 # Wilderness rendering framework
 
+The shared framework now lives under `com.thunder.wildernessodysseyapi.wage`.
+See the [WAGE package map](performance/wage-packages.md) for source locations and
+the Java import/rebuild migration.
+
 ## Purpose and non-goals
 
 The framework gives Wilderness water and localized weather a small shared
@@ -10,6 +14,11 @@ chunk buffers, and command submission.
 The framework does not implement Vulkan, DLSS, FSR, XeSS, a custom render graph,
 or vendor-specific native code. It records only capabilities that the active
 backend proves and leaves unavailable temporal inputs empty.
+
+The optional [WAGE experiment](performance/wage.md) extends this same frame
+owner with workload timing, bounded cloud-density optimization and diagnostic
+frame percentiles. It is disabled by default and does not replace the existing
+adaptive quality controller, terrain renderer or server performance coordinator.
 
 The ownership flow is:
 
@@ -164,7 +173,7 @@ usable today.
 
 ### Still OpenGL-specific and a future backend-adapter candidate
 
-- the `rendering.backend.opengl` and `gpuprofiler.client` packages are now
+- the `wage.backend.opengl` and `opc.diagnostics.gpu.client` packages are now
   deprecated for removal. They remain compiled only because Minecraft 1.21.1
   still requires the OpenGL compatibility path;
 - `WaterSceneCapture` reads framebuffer bindings and blits color/depth using

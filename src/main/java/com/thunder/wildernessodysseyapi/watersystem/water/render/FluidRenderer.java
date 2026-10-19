@@ -4,7 +4,7 @@ import com.thunder.wildernessodysseyapi.environment.glacial.client.GlacialWaterT
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.watersystem.water.mesh.FluidMesh;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHConstants;

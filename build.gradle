@@ -150,10 +150,16 @@ neoForge {
                 gameDirectory = layout.buildDirectory.dir("run-ci-${name}").get().asFile
                 if (name == 'client') {
                     systemProperty 'wildernessodysseyapi.ciSmokeTest', 'true'
+                    systemProperty 'wildernessodysseyapi.ciSmokeTest.hideWindow', providers.gradleProperty('hideSmokeWindow').orElse('false').get()
                 }
             }
+            if (name == 'client' && providers.gradleProperty('wageAcceptanceTest').isPresent()) {
+                if (ciSmokeTest.get()) throw new GradleException('Use either wageAcceptanceTest or ciSmokeTest, not both')
+                gameDirectory = layout.buildDirectory.dir('run-wage-acceptance').get().asFile
+                systemProperty 'wildernessodysseyapi.wageAcceptanceTest', 'true'
+            }
             if (name in ['client', 'server', 'gameTestServer'] && tickEngineCompilerWorkaround.get()) {
-                jvmArgument '-XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine::finishTick'
+                jvmArgument '-XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine::finishTick'
             }
             if (name in ['client', 'server', 'gameTestServer'] && biolithCompilerWorkaround.get()) {
                 jvmArgument '-XX:CompileCommand=exclude,net.minecraft.world.level.biome.Climate$RTree::biolith$searchTreeGet'
@@ -782,6 +788,52 @@ def structureGenOfflineRuntime = files(
         configurations.testRuntimeClasspath.filter { !it.name.startsWith('junit-fml-') }
 )
 
+// Optional source filter keeps focused coastal regressions on the normal ModDev
+// compile/JUnit launch path without compiling unrelated subsystem test suites.
+def coastalTestPatterns = [
+        'com/thunder/wildernessodysseyapi/worldgen/coast/**',
+        'com/thunder/wildernessodysseyapi/worldgen/biome/**',
+        'com/thunder/wildernessodysseyapi/environment/glacial/worldgen/**',
+        'com/thunder/wildernessodysseyapi/environment/glacial/PolarGlacialResourcesTest.java',
+        'com/thunder/wildernessodysseyapi/watersystem/ocean/coast/**',
+        'com/thunder/wildernessodysseyapi/watersystem/water/render/CoastalBreakerGeometryTest.java'
+]
+if (providers.gradleProperty('coastalTestsOnly').map { it.toBoolean() }.getOrElse(false)) {
+    tasks.named('compileTestJava', JavaCompile) {
+        setSource(fileTree('src/test/java') { coastalTestPatterns.each { include it } })
+    }
+    tasks.named('test', Test) {
+        binaryResultsDirectory = layout.buildDirectory.dir('test-results/coastalIntegration/binary')
+        reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/coastalIntegration')
+        reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/coastalIntegration')
+        filter {
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.coast.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.biome.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.worldgen.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.PolarGlacialResourcesTest'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.coast.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.CoastalBreakerGeometryTest'
+        }
+    }
+}
+
+tasks.register('coastalTest', Test) {
+    group = 'verification'
+    description = 'Runs pure coastal profiles, resources and existing surf regressions without mod bootstrap.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '2g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.coast.*'
+        excludeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.coast.CoastalPlacementTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.worldgen.GlacialTerrainProfileTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.PolarGlacialResourcesTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.coast.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.CoastalBreakerGeometryTest'
+    }
+}
+
 tasks.register('structureGenTest', Test) {
     group = 'verification'
     description = 'Runs focused StructureGen tests without starting Minecraft or loading project mods.'
@@ -830,6 +882,7 @@ tasks.register('playtestTest', Test) {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.feedback.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.telemetry.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.config.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.opc.config.*'
     }
 }
 
@@ -842,7 +895,7 @@ tasks.register('loadingProfilerTest', Test) {
     classpath = structureGenOfflineRuntime
     maxHeapSize = '1g'
     filter {
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.loading.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.opc.diagnostics.loading.*'
     }
 }
 
@@ -850,18 +903,15 @@ tasks.register('performanceDiagnosticsTest', Test) {
     group = 'verification'
     description = 'Runs performance observation, coordination, save-model and ownership regressions.'
     dependsOn tasks.named('compileTestJava')
+    dependsOn tasks.named('jar')
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = structureGenOfflineRuntime
     maxHeapSize = '1g'
     filter {
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.diagnostics.performance.*'
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.performance.*'
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.saving.coordinator.*'
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.async.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.opc.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.architecture.ChunkLifecycleIsolationTest'
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.config.PerformanceServerConfigTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.architecture.OpcPackageLayoutTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.mixinconfig.WildernessMixinConfigPluginTest'
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.loading.*'
     }
 }
 
@@ -951,16 +1001,34 @@ tasks.register('riverNetworkBenchmark', JavaExec) {
 tasks.register('renderingTest', Test) {
     group = 'verification'
     description = 'Runs rendering policy, water optics and client weather regressions without starting Minecraft.'
-    dependsOn tasks.named('compileTestJava')
+    dependsOn tasks.named('compileTestJava'), tasks.named('jar')
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = structureGenOfflineRuntime
     maxHeapSize = '2g'
     filter {
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.rendering.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.wage.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.architecture.WagePackageLayoutTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.opc.core.JvmMetricsTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.weather.client.*'
     }
+}
+
+// Explicit hardware acceptance: ordinary tests remain usable without a display or GL driver.
+tasks.register('gpuRenderingTest', Test) {
+    group = 'verification'
+    description = 'Compiles the packaged cloud shaders and compares both density paths on a real OpenGL driver.'
+    dependsOn tasks.named('compileTestJava'), tasks.named('processResources')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '1g'
+    systemProperty 'wildernessodysseyapi.gpuTests', 'true'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.wage.gpu.*'
+    }
+    // A successful cached result cannot validate the driver present on a later invocation.
+    outputs.upToDateWhen { false }
 }
 
 tasks.register('questTest', Test) {

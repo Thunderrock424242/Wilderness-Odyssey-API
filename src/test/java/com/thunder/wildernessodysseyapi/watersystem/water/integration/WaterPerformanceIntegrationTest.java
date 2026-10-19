@@ -1,10 +1,10 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.integration;
 
-import com.thunder.wildernessodysseyapi.performance.background.ActivityLevel;
-import com.thunder.wildernessodysseyapi.performance.tickengine.AdaptiveThrottle;
-import com.thunder.wildernessodysseyapi.performance.tickengine.SubsystemPolicy;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickPressure;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickPriority;
+import com.thunder.wildernessodysseyapi.opc.background.ActivityLevel;
+import com.thunder.wildernessodysseyapi.opc.tickengine.AdaptiveThrottle;
+import com.thunder.wildernessodysseyapi.opc.tickengine.SubsystemPolicy;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickPressure;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickPriority;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

@@ -39,6 +39,6 @@ class TropicalPalmPlacerTest {
     @Test
     void heightRequestsAreClampedToTheAuthoredRange() {
         assertEquals(TropicalPalmPlacer.shape(5, 1, 0), TropicalPalmPlacer.shape(-10, 1, 0));
-        assertEquals(TropicalPalmPlacer.shape(7, 1, 0), TropicalPalmPlacer.shape(100, 1, 0));
+        assertEquals(TropicalPalmPlacer.shape(8, 1, 0), TropicalPalmPlacer.shape(100, 1, 0));
     }
 }

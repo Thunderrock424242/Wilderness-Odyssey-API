@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
+import com.thunder.wildernessodysseyapi.wage.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.LocalizedCloudRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;

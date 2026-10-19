@@ -9,6 +9,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
+import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 import net.minecraft.client.CloudStatus;
@@ -110,21 +111,26 @@ public final class LocalizedCloudRenderer {
         Vec3 baseColor = baseCloudColor(level, partialTick);
         if (cloudStatus == CloudStatus.FANCY && RaymarchedCloudShaders.shouldUse(settings)) {
             deactivateCompatibilityClouds();
-            renderContinuousClouds(
-                    level,
-                    state,
-                    settings,
-                    renderTicks,
-                    partialTick,
-                    poseStack,
-                    camX,
-                    camY,
-                    camZ,
-                    frustumMatrix,
-                    projectionMatrix,
-                    cloudHeight,
-                    baseColor
-            );
+            WildernessRenderingFramework.beginCloudPass();
+            try {
+                renderContinuousClouds(
+                        level,
+                        state,
+                        settings,
+                        renderTicks,
+                        partialTick,
+                        poseStack,
+                        camX,
+                        camY,
+                        camZ,
+                        frustumMatrix,
+                        projectionMatrix,
+                        cloudHeight,
+                        baseColor
+                );
+            } finally {
+                WildernessRenderingFramework.endCloudPass();
+            }
             return;
         }
         deactivateContinuousClouds();

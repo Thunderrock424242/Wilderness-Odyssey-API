@@ -208,8 +208,9 @@ public final class RiverGenerationGameTests {
             var saved = WatershedSavedData.get(level);
             var basins = WatershedBasinSavedData.get(level);
             for (int z = 0; z < 2; z++) for (int x = 0; x < 2; x++) {
-                var neighbor = level.getChunkSource().getChunkNow(chunk.getPos().x + x, chunk.getPos().z + z);
-                helper.assertTrue(neighbor != null, "Smoothing fixture neighbor was not loaded");
+                var neighbor = java.util.Objects.requireNonNull(
+                        level.getChunkSource().getChunkNow(chunk.getPos().x + x, chunk.getPos().z + z),
+                        "Smoothing fixture neighbor was not loaded");
                 BlockPos water = new BlockPos(neighbor.getPos().getMinBlockX() + 8, position.getY(), neighbor.getPos().getMinBlockZ() + 8);
                 neighbor.getData(ModAttachments.GENERATED_WATER).recordCell(water,
                         GeneratedWaterChunk.Cell.of(8, false, GeneratedWaterChunk.BodyType.RIVER));
@@ -231,7 +232,7 @@ public final class RiverGenerationGameTests {
             WaterSimulationConfig.SMOOTH_RIVER_CURRENTS.set(oldSmoothing);
         }
         helper.assertTrue(volume.revision() == revision
-                        && CanonicalWater.getTracked(level, position).volumeUnits() == 4096,
+                        && java.util.Objects.requireNonNull(CanonicalWater.getTracked(level, position)).volumeUnits() == 4096,
                 "Reach sampling changed physical water inventory");
         helper.succeed();
     }
@@ -340,7 +341,10 @@ public final class RiverGenerationGameTests {
     public static void pendingNeighborFallingCurtainsMayOccupyCertifiedAir(GameTestHelper helper) {
         var edge = new RiverConnectedPlanner.Edge(7, 4321, 8, 8, 103, 24, 8, 99, 3, 1, false);
         var shape = RiverChannelShape.raster(List.of(edge), 0, 0, 32, 1, 4, true);
-        var terrain = RiverTileTerrain.create((x, z) -> shape.at(x, z) == null ? 108 : shape.at(x, z).waterY(),
+        var terrain = RiverTileTerrain.create((x, z) -> {
+                    var column = shape.at(x, z);
+                    return column == null ? 108 : column.waterY();
+                },
                 (x, z) -> false, (x, z) -> 0xFFFF);
         for (int first : new int[]{0, 1}) {
             var chunks = tile(helper, terrain);

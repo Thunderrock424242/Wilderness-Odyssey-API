@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /** No event exposes the boundary before structures and surface decoration mutate this terrain. */
 @Mixin(ChunkGenerator.class)
 public abstract class RiverGenerationLifecycleMixin {
+    @SuppressWarnings("DataFlowIssue") // The transformed receiver is the ChunkGenerator target.
     @Inject(method = "applyBiomeDecoration", at = @At("HEAD"))
     private void wildernessOdyssey$generateRivers(WorldGenLevel level, ChunkAccess chunk,
                                                  StructureManager structures, CallbackInfo ci) {

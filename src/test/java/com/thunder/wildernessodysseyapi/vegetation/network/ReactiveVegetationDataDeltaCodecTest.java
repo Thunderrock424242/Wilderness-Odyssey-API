@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.vegetation.network;
 
-import com.thunder.wildernessodysseyapi.dataengine.DataEngineIds;
-import com.thunder.wildernessodysseyapi.dataengine.network.DataDelta;
-import com.thunder.wildernessodysseyapi.dataengine.queue.UpdatePriority;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataEngineIds;
+import com.thunder.wildernessodysseyapi.opc.dataengine.network.DataDelta;
+import com.thunder.wildernessodysseyapi.opc.dataengine.queue.UpdatePriority;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationClimateState;
 import com.thunder.wildernessodysseyapi.vegetation.api.VegetationSeasonState;
 import net.minecraft.resources.ResourceLocation;

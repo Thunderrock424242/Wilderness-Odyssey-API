@@ -189,10 +189,11 @@ public final class BiomeCompatibilityBootstrap {
      * listener registration as proof that a biome became locatable.</p>
      */
     private static void diagnoseAppliedBiomeInjectors(ServerStartedEvent event) {
-        List<ResourceKey<Biome>> expectedPolarBiomes = enabledPolarBiomes();
-        if (expectedPolarBiomes.isEmpty()) {
+        List<ResourceKey<Biome>> expectedBiomes = java.util.stream.Stream.concat(
+                enabledPolarBiomes().stream(), enabledCoastalBiomes().stream()).distinct().toList();
+        if (expectedBiomes.isEmpty()) {
             ModConstants.LOGGER.info(
-                    "No polar biome injectors are enabled; active Overworld biome-source verification skipped."
+                    "No polar or coastal biome injectors are enabled; active Overworld biome-source verification skipped."
             );
             return;
         }
@@ -206,7 +207,7 @@ public final class BiomeCompatibilityBootstrap {
                 .stream()
                 .flatMap(holder -> holder.unwrapKey().stream())
                 .collect(Collectors.toSet());
-        List<ResourceLocation> missingBiomes = expectedPolarBiomes.stream()
+        List<ResourceLocation> missingBiomes = expectedBiomes.stream()
                 .filter(key -> !possibleBiomes.contains(key))
                 .map(ResourceKey::location)
                 .toList();
@@ -219,9 +220,9 @@ public final class BiomeCompatibilityBootstrap {
         if (missingBiomes.isEmpty()) {
             ModConstants.LOGGER.info(
                     "Lithostitched biome injectors applied to the active Overworld biome source: "
-                            + "all {} enabled polar biomes are present among {} possible biomes "
+                            + "all {} enabled polar/coastal biomes are present among {} possible biomes "
                             + "(data bootstrap loaded: {}).",
-                    expectedPolarBiomes.size(),
+                    expectedBiomes.size(),
                     possibleBiomes.size(),
                     dataBootstrapLoaded
             );
@@ -230,12 +231,26 @@ public final class BiomeCompatibilityBootstrap {
 
         ModConstants.LOGGER.warn(
                 "Lithostitched listener registration did not produce a complete active Overworld biome source; "
-                        + "missing {} of {} enabled polar biomes: {} (data bootstrap loaded: {}).",
+                        + "missing {} of {} enabled polar/coastal biomes: {} (data bootstrap loaded: {}).",
                 missingBiomes.size(),
-                expectedPolarBiomes.size(),
+                expectedBiomes.size(),
                 missingBiomes,
                 dataBootstrapLoaded
         );
+    }
+
+    static List<ResourceKey<Biome>> enabledCoastalBiomes() {
+        if (!CoastalWorldgenConfig.ENABLE_BEACH_BIOME_FAMILY.get()) return List.of();
+        java.util.ArrayList<ResourceKey<Biome>> enabled = new java.util.ArrayList<>(6);
+        if (CoastalWorldgenConfig.ENABLE_TEMPERATE_BEACH.get()) enabled.add(ModBiomes.TEMPERATE_BEACH_KEY);
+        if (CoastalWorldgenConfig.ENABLE_DUNE_BEACH.get()) enabled.add(ModBiomes.DUNE_BEACH_KEY);
+        if (CoastalWorldgenConfig.ENABLE_ROCKY_COAST.get()) enabled.add(ModBiomes.ROCKY_COAST_KEY);
+        if (CoastalWorldgenConfig.ENABLE_COLD_BEACH.get()) enabled.add(ModBiomes.COLD_BEACH_KEY);
+        if (CoastalWorldgenConfig.ENABLE_TROPICAL_BEACH.get()) enabled.add(ModBiomes.TROPICAL_BEACH_KEY);
+        if (CoastalWorldgenConfig.ENABLE_GLACIAL_BEACH.get() && GlacialConfig.ENABLE_POLAR_BIOME_SYSTEM.get()) {
+            enabled.add(ModBiomes.GLACIAL_BEACH_KEY);
+        }
+        return List.copyOf(enabled);
     }
 
     private static List<ResourceKey<Biome>> enabledPolarBiomes() {
@@ -258,7 +273,7 @@ public final class BiomeCompatibilityBootstrap {
         };
     }
 
-    private static void registerCoastalInjectors(
+    static void registerCoastalInjectors(
             HolderLookup.RegistryLookup<Biome> biomes,
             BiConsumer<ResourceLocation, BiomeInjector> registrar
     ) {

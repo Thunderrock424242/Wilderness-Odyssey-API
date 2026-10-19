@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.saving.coordinator.SavingCoordinator;
+import com.thunder.wildernessodysseyapi.opc.saving.SavingCoordinator;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;

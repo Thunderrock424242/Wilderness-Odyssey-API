@@ -478,7 +478,9 @@ render classes, but does not establish all optional-mod compatibility.
 
 ## 19 October continuation validation
 
-The current continuation was validated serially with Java 21.0.6, the checked-in
+### Initial continuation at 273734b9 (before latest-base integration)
+
+This continuation was validated serially with Java 21.0.6, the checked-in
 wrapper and isolated output. The completed command was:
 
 ```powershell
@@ -533,6 +535,50 @@ treated as new terrain; fine inlet lowering could resume uphill; future falling
 curtains could be rejected as air; pending neighbor clearance could be missed;
 whole-query fine rejection could erase a neighboring tile's route. Each received
 a focused regression and correction. The final green run includes those fixes.
+
+### Latest-base integration
+
+The first PR merge checks against `in-dev` commit `4533cb7f` failed compilation
+before Minecraft started: that base had moved Data Engine under OPC, while the
+new cache import still used its previous package. The PR branch was merged with
+that base and now imports the existing `opc.dataengine.cache.DataCache`, preserving
+the same cache implementation and API. No replacement cache owner was introduced.
+The 18 reported Qodana warnings received focused changes: known immutable samples
+and required test fixtures have explicit non-null assertions; integer coordinate
+decoding and long seed arithmetic are explicit; native search loops have braces;
+redundant shoreline iterations stop early. Two narrow mixin inspection annotations
+explain the runtime-transformed receiver instead of changing injection behavior.
+
+`base-integration-validation.log` completed successfully in **3m 16s**, with the
+same isolated serial command as above, plus explicit `compileJava` and without
+rerunning the unchanged benchmark; the audit world was `river-base-integration`.
+
+| Check on the merged base | Actual result |
+| --- | --- |
+| Water suite | 199 tests, 40 suites, zero failures/errors/skips |
+| Rendering suite | 343 tests, 80 suites, zero failures/errors; one opt-in GPU fixture skipped |
+| Full root Java suite | 1762 tests, 460 suites, zero failures/errors; five skips |
+| Dedicated GameTests | All 43 required tests passed; 122 connected columns, physical crossing, forward/reverse and save/reload checks passed again |
+| Root build | Passed |
+
+The additional skip is the upstream opt-in WAGE cloud GPU fixture; the other four
+retain the symbolic-link and large-bunker reasons above. No client or GPU proof is
+inferred from those skips. The native repeat measured 20 queries at mean 217.8602 ms,
+p95 498.4399 ms and p99 739.0447 ms; enabled/disabled four-FULL-chunk batches took
+1071.2035/419.4859 ms in the same sequential warmed-JVM comparison described above.
+These remain limited samples with material cold-query cost, not a speedup claim.
+
+After strengthening two canonical-current fixture preconditions, a final serial
+`compileJava runGameTestServer :jar` run in `river-fixture-final` passed all 43
+required tests again in **1m 20s** (`base-fixture-final.log`). The last native
+sample retained 122 columns and measured mean 214.4181 ms, p95 493.8669 ms, p99
+748.3888 ms across 20 queries; enabled/disabled batches took 1111.3809/365.9000 ms.
+The final packaged JAR is 30075790 bytes, SHA-256
+`06b0ec0dd0ffbb0798458df1cbde3e64d79035bc03d3b37d44e7080ccd0d4d58`.
+All 147 inspected compiled production/nested classes associated with this PR's
+changed sources match packaged bytes; nine bank profiles and the native acceptance
+template are present. Source/diff checks passed. The GPU, visual and multiplayer
+acceptance boundaries above remain unchanged by this package proof.
 
 ### Earlier feature-worktree command ledger (historical local milestone)
 

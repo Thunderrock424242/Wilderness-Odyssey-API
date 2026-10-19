@@ -162,5 +162,6 @@ public class ClientSetup {
     @SubscribeEvent
     public static void onRegisterClientReloadListeners(RegisterClientReloadListenersEvent event) {
         event.registerReloadListener(new ClientCoastalWaveProfiles());
+        com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework.registerReloadListener(event);
     }
 }

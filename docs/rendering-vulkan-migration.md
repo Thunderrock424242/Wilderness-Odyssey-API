@@ -15,7 +15,7 @@ depend on `RenderBackend`, `GPUCapabilities`, `RenderFrameContext`,
 
 | Legacy owner | Current responsibility | Vulkan replacement |
 | --- | --- | --- |
-| `rendering.backend.opengl` | capability capture, shader validation, scoped render-state restoration, asynchronous timestamp samples, owned timer cleanup | renderer-supported `RenderBackend` implementation |
+| `wage.backend.opengl` | capability capture, shader validation, scoped render-state restoration, asynchronous timestamp samples, owned timer cleanup | renderer-supported `RenderBackend` implementation |
 | `gpuprofiler.client` | OpenGL memory extensions, allocation tracking, debug callbacks, state snapshots, draw timing | backend telemetry and renderer-supported debug/timing hooks |
 | `WaterSceneCapture` | raw framebuffer color/depth blit and integer texture IDs | typed scene color/depth inputs supplied by the backend or render graph |
 | `StructureBlockRendererMixin` GL state reads | remembers depth-test and depth-mask state around the overlay | supported scoped render-state API |

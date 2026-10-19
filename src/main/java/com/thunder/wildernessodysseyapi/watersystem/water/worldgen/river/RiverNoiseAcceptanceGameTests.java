@@ -65,9 +65,11 @@ public final class RiverNoiseAcceptanceGameTests {
                     var timings = new ArrayList<Long>();
                     var queries = new ArrayDeque<ChunkPos>();
                     var visited = new HashSet<Long>();
-                    for (int z : new int[]{0, -128, 128, -256, 256, -512, 512})
-                        for (int x : new int[]{0, -128, 128, -256, 256, -512, 512})
-                        queries.add(new ChunkPos(x >> 4, z >> 4));
+                    for (int z : new int[]{0, -128, 128, -256, 256, -512, 512}) {
+                        for (int x : new int[]{0, -128, 128, -256, 256, -512, 512}) {
+                            queries.add(new ChunkPos(x >> 4, z >> 4));
+                        }
+                    }
                     while (!queries.isEmpty() && visited.size() < 64) {
                         var query = queries.removeFirst();
                         if (!visited.add(query.toLong())) continue;
@@ -97,8 +99,9 @@ public final class RiverNoiseAcceptanceGameTests {
                         for (var position : tile) {
                             var chunk = level.getChunk(position.x, position.z);
                             requested.add(position);
-                            var metadata = chunk.getExistingData(ModAttachments.RIVER_GENERATION).orElse(null);
-                            helper.assertTrue(metadata != null && metadata.processed(), "Native pipeline did not invoke the river lifecycle");
+                            var metadata = chunk.getExistingData(ModAttachments.RIVER_GENERATION).orElseThrow(
+                                    () -> new IllegalStateException("Native pipeline did not capture river terrain"));
+                            helper.assertTrue(metadata.processed(), "Native pipeline did not invoke the river lifecycle");
                             forward.put(position.toLong(), physicalSnapshot(level, chunk, metadata));
                             for (int lz = 0; lz < 16; lz++) for (int lx = 0; lx < 16; lx++) {
                                 var reach = metadata.reachAt(lx, lz);

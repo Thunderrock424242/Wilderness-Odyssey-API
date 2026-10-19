@@ -32,6 +32,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class NoiseBasedChunkGeneratorWaterMixin {
 
     /** Captures exact post-carver terrain without requesting any neighboring chunk. */
+    @SuppressWarnings("ConstantValue") // Mixin transforms this into the target generator class at runtime.
     @Inject(method = "applyCarvers", at = @At("RETURN"))
     private void wildernessOdyssey$captureRiverTerrain(WorldGenRegion region, long seed,
             RandomState random, BiomeManager biomes, StructureManager structures, ChunkAccess chunk,

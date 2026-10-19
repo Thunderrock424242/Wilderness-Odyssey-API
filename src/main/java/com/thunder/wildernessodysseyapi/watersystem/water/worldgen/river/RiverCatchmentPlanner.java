@@ -54,7 +54,9 @@ public final class RiverCatchmentPlanner {
                     stage = Math.max(receiverY, Math.min(stage, terrain.height(cell % SIZE, cell / SIZE) - 1));
                     var column = new MutableColumn(stage, stage - settings.streamDepth(), RiverChannelColumn.Kind.STREAM);
                     column.x = next % SIZE - cell % SIZE;
-                    column.z = next / SIZE - cell / SIZE;
+                    int nextZ = next / SIZE;
+                    int cellZ = cell / SIZE;
+                    column.z = nextZ - cellZ;
                     column.speed = 1;
                     columns[cell] = column;
                 }
@@ -297,6 +299,7 @@ public final class RiverCatchmentPlanner {
                     column.waterY = receivingY;
                     column.floorY = receivingY - settings.streamDepth();
                     column.topY = receivingY;
+                    break;
                 }
             }
         }

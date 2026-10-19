@@ -126,8 +126,8 @@ public final class QuestFoundationGameTests {
             var session = QuestServerEvents.session(server).orElseThrow();
             helper.assertTrue(session.runtime().isPresent() && session.ledger().isPresent(), "Mandatory tick must finish asynchronous quest storage startup");
             boolean disabled = Boolean.getBoolean("wildernessodysseyapi.questTests.disabledWorkers");
-            helper.assertTrue(com.thunder.wildernessodysseyapi.async.AsyncTaskManager.getConfigValues().enabled() != disabled
-                    && com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig.values().enabled() != disabled,
+            helper.assertTrue(com.thunder.wildernessodysseyapi.opc.async.AsyncTaskManager.getConfigValues().enabled() != disabled
+                    && com.thunder.wildernessodysseyapi.opc.dataengine.config.DataEngineConfig.values().enabled() != disabled,
                     "The run must actually load its intended shared-worker/DataEngine settings");
             helper.assertTrue(session.ioWorker().startsWith("WO-Quest-IO-") == disabled, "Opening must use the intended actual I/O worker");
             var quest = server.getCommands().getDispatcher().getRoot().getChild("wo").getChild("quest");

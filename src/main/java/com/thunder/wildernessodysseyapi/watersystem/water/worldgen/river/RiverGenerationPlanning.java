@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river;
 
-import com.thunder.wildernessodysseyapi.dataengine.cache.DataCache;
+import com.thunder.wildernessodysseyapi.opc.dataengine.cache.DataCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.RandomState;

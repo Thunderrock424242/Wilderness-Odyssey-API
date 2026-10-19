@@ -299,7 +299,12 @@ class AetherServerTest {
                 stalled.getOutputStream().write("GET /health HTTP/1.1\r\nHost: localhost\r\nX-Stalled: "
                         .getBytes(StandardCharsets.US_ASCII));
                 stalled.getOutputStream().flush();
-                assertEquals(-1, stalled.getInputStream().read(), "Incomplete headers must time out");
+                try {
+                    assertEquals(-1, stalled.getInputStream().read(), "Incomplete headers must time out");
+                } catch (java.net.SocketException closedConnection) {
+                    // Closing a timed-out request with unread bytes may send TCP RST rather than FIN.
+                    // SocketTimeoutException is deliberately not caught: the server must close it.
+                }
             }
             HttpRequest generate=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/v1/aether/generate"))
                     .header("Authorization","Bearer " + INFERENCE)

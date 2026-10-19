@@ -18,6 +18,7 @@ uniform float DistantRadius;
 uniform float DetailStrength;
 uniform int RaymarchSteps;
 uniform int LightingSteps;
+uniform int DensityBoundsEnabled;
 uniform vec3 CloudColor;
 uniform vec3 SunDirection;
 uniform vec3 LightningPosition;
@@ -262,15 +263,28 @@ float densityAt(vec3 localPoint, bool distant, int band, out float stormAmount) 
             float(band) * 1.7 - GameTime * 0.0008));
     float mediumShape = fractalNoise(vec3(mediumWorld * 0.88,
             vertical * (3.2 + tower * 3.8) - GameTime * 0.0022));
-    float fineShape = fractalNoise(vec3(fineWorld * 1.92 + 13.0,
-            vertical * 7.4 + GameTime * 0.0015));
-    float detail = mix(mediumShape, mediumShape * 0.76 + fineShape * 0.24,
-            clamp(DetailStrength, 0.0, 1.0));
     float shape = verticalProfile(vertical, wispy, layered, cellular, tower);
     float threshold = 0.73 - coverage * 0.36
             + (1.0 - shape) * 0.26
             + (0.52 - broadShape) * 0.18;
     float edgeWidth = mix(0.12, 0.075, clamp(DetailStrength, 0.0, 1.0));
+    // Each noise component is in [0,1] and the fractal weights sum to one.
+    // Reject only outside the entire fine-noise interval, with a rounding margin.
+    // The default/off path retains the original full evaluation below.
+    if (DensityBoundsEnabled != 0) {
+        float fineWeight = 0.24 * clamp(DetailStrength, 0.0, 1.0);
+        float minimumDetail = mediumShape * (1.0 - fineWeight);
+        if (minimumDetail + fineWeight < threshold - edgeWidth - 0.00001) {
+            return 0.0;
+        }
+        if (minimumDetail > threshold + edgeWidth + 0.00001) {
+            return coverage * fieldFade;
+        }
+    }
+    float fineShape = fractalNoise(vec3(fineWorld * 1.92 + 13.0,
+            vertical * 7.4 + GameTime * 0.0015));
+    float detail = mix(mediumShape, mediumShape * 0.76 + fineShape * 0.24,
+            clamp(DetailStrength, 0.0, 1.0));
     float density = smoothstep(threshold - edgeWidth, threshold + edgeWidth, detail);
 
     return density * coverage * fieldFade;

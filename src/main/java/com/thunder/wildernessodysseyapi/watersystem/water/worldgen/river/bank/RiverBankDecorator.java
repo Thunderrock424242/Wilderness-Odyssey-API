@@ -43,7 +43,7 @@ public final class RiverBankDecorator {
             int z = candidate.z();
             // Native survival checks remain inside the supplied chunk's terrain.
             if (x == 0 || x == 15 || z == 0 || z == 15) continue;
-            long entropy = RiverBankProfiles.mix(identity ^ (x + z * 16) * 0x9E3779B97F4A7C15L);
+            long entropy = RiverBankProfiles.mix(identity ^ (x + z * 16L) * 0x9E3779B97F4A7C15L);
             if ((entropy >>> 11) * 0x1.0p-53 >= probability) continue;
             int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
             BlockPos support = new BlockPos(chunk.getPos().getMinBlockX() + x, y, chunk.getPos().getMinBlockZ() + z);

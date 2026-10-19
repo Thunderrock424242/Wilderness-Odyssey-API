@@ -8,7 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.opc.async.AsyncTaskManager;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.BufferedReader;

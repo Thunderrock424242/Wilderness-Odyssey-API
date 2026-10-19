@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.cloak.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.core.ModRegistries;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuDiagnostics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;

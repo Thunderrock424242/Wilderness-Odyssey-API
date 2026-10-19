@@ -13,7 +13,7 @@ import com.thunder.wildernessodysseyapi.item.ModItems;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookEvents;
 import com.thunder.wildernessodysseyapi.meteor.event.MeteorImpactEvent;
 import com.thunder.wildernessodysseyapi.network.ModPayloads;
-import com.thunder.wildernessodysseyapi.performance.tickengine.PerformanceServerEvents;
+import com.thunder.wildernessodysseyapi.opc.tickengine.PerformanceServerEvents;
 import com.thunder.wildernessodysseyapi.radiation.RadiationTickHandler;
 import com.thunder.wildernessodysseyapi.server.ServerLifecycleEvents;
 import com.thunder.wildernessodysseyapi.simulation.integration.PopulationEcologySimulationSystem;
@@ -120,7 +120,7 @@ public final class WildernessOdysseyAPIMainModClass {
         NeoForge.EVENT_BUS.register(DistantWildlifeServerEvents.class);
         NeoForge.EVENT_BUS.register(MeteorImpactEvent.class);
         NeoForge.EVENT_BUS.register(PerformanceServerEvents.class);
-        NeoForge.EVENT_BUS.register(com.thunder.wildernessodysseyapi.diagnostics.performance.PerformanceDiagnosticEvents.class);
+        NeoForge.EVENT_BUS.register(com.thunder.wildernessodysseyapi.opc.diagnostics.PerformanceDiagnosticEvents.class);
         NeoForge.EVENT_BUS.register(TideWorldUpdater.class);
         NeoForge.EVENT_BUS.register(ModCommands.class);
         NeoForge.EVENT_BUS.register(ServerLifecycleEvents.class);

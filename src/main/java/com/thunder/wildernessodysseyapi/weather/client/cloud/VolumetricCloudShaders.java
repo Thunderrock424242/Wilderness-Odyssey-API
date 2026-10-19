@@ -2,11 +2,11 @@ package com.thunder.wildernessodysseyapi.weather.client.cloud;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
-import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
-import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
-import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
-import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
+import com.thunder.wildernessodysseyapi.wage.RenderingQuality;
+import com.thunder.wildernessodysseyapi.wage.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
+import com.thunder.wildernessodysseyapi.wage.compat.ShaderPackCompatibility;
+import com.thunder.wildernessodysseyapi.wage.performance.RenderQualityState;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;

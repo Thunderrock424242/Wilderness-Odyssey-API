@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
-import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
-import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
+import com.thunder.wildernessodysseyapi.wage.RenderingQuality;
+import com.thunder.wildernessodysseyapi.wage.performance.RenderQualityState;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import net.minecraft.world.level.Level;

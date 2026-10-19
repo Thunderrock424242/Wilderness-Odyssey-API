@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.vegetation.network;
 
-import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataEngine;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Objects;

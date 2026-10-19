@@ -1,8 +1,10 @@
 package com.thunder.wildernessodysseyapi.config;
 
-import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
+import com.thunder.wildernessodysseyapi.opc.config.PerformanceServerConfig;
+
+import com.thunder.wildernessodysseyapi.opc.async.AsyncThreadingConfig;
 import com.thunder.wildernessodysseyapi.ai.voice.config.AetherVoiceConfig;
-import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
+import com.thunder.wildernessodysseyapi.opc.dataengine.config.DataEngineConfig;
 import com.thunder.wildernessodysseyapi.debugoverlay.config.DebugOverlayConfig;
 import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
@@ -10,10 +12,10 @@ import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.environment.glacial.config.GlacialConfig;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
-import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
-import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
+import com.thunder.wildernessodysseyapi.opc.background.config.BackgroundEfficiencyConfig;
+import com.thunder.wildernessodysseyapi.opc.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
-import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
+import com.thunder.wildernessodysseyapi.wage.config.RendererConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
 import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;

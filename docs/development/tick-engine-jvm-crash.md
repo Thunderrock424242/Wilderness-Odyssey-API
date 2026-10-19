@@ -10,7 +10,7 @@ The preceding vegetation synchronization log is not evidence of causation.
 The Gradle development client, server, and GameTest run models now supply:
 
 ```text
--XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine::finishTick
+-XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine::finishTick
 ```
 
 This excludes only that method from JIT compilation. The tick engine still

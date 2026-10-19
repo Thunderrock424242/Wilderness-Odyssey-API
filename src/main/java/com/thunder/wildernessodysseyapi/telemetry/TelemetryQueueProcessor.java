@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.telemetry;
 
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.opc.async.AsyncTaskManager;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 

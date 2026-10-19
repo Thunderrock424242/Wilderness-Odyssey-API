@@ -30,7 +30,8 @@ public final class RiverNetworkGameTests {
         level.setBlock(position.below(), Blocks.STONE.defaultBlockState(), 3);
         CanonicalWater.set(level, position, WaterVolumeChunk.WaterCell.still(4096, 0), true, false);
         var chunk = level.getChunkAt(position);
-        var cell = CanonicalWater.getTracked(level, position);
+        var cell = java.util.Objects.requireNonNull(CanonicalWater.getTracked(level, position),
+                "Inspection fixture requires a tracked canonical cell");
         var state = chunk.getBlockState(position);
         var volume = chunk.getData(ModAttachments.WATER_VOLUME);
         long revision = volume.revision();
@@ -84,7 +85,8 @@ public final class RiverNetworkGameTests {
         var metadata = WatershedSavedData.get(level).getOrCreate(level, level.getChunkAt(position));
         metadata.apply(new WatershedSimulationModel.Result(
                 0, 0, 0, 0.2f, 0, 0, false, 0, 1, 0.06f, 0, 0, 0, 0), 0.8f, level.getGameTime());
-        var before = CanonicalWater.getTracked(level, position);
+        var before = java.util.Objects.requireNonNull(CanonicalWater.getTracked(level, position),
+                "Current ownership fixture requires moving canonical water");
         var environment = WildernessWaterAuthority.sampleEnvironment(level,
                 position.getX() + 0.5, position.getZ() + 0.5, 0);
         helper.assertTrue(WildernessWaterAuthority.getSurfaceHeight(level,

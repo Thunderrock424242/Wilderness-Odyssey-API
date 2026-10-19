@@ -1,0 +1,27 @@
+# Development preset: merge these sections into config/wildernessodysseyapi-common.toml.
+# Restart Minecraft/the server before creating a disposable test world. Do not
+# replace the whole common configuration with this excerpt or reset saved values.
+[coastalWorldgen]
+enableBeachBiomeFamily = true
+enableTemperateBeach = true
+enableDuneBeach = true
+enableRockyCoast = true
+enableColdBeach = true
+enableGlacialBeach = true
+enableTropicalBeach = true
+enableTerrainBands = true
+enableCoastalDetails = true
+enableCoastalVegetation = true
+enableDriftwood = true
+enableTidePools = true
+enableRockOutcrops = true
+enableIceFragments = true
+maximumDuneRiseBlocks = 2
+maximumTropicalBankCutBlocks = 4
+coastalDetailDensity = 0.55
+palmDensity = 1.0
+driftwoodDensity = 1.0
+rockClusterDensity = 1.0
+
+[polarGlacialBiomes]
+enablePolarBiomeSystem = true

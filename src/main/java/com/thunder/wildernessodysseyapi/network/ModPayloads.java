@@ -12,7 +12,7 @@ import com.thunder.wildernessodysseyapi.cinematic.network.SkipCinematicPayload;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakState;
 import com.thunder.wildernessodysseyapi.cloak.item.CloakTickHandler;
 import com.thunder.wildernessodysseyapi.cloak.network.CloakInputPayload;
-import com.thunder.wildernessodysseyapi.dataengine.network.DataEnginePayloads;
+import com.thunder.wildernessodysseyapi.opc.dataengine.network.DataEnginePayloads;
 import com.thunder.wildernessodysseyapi.ecosystem.client.EnvironmentalMemoryClientState;
 import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapPayload;
 import com.thunder.wildernessodysseyapi.ecosystem.debug.map.EcosystemDebugMapRequestPayload;

@@ -28,7 +28,7 @@ final class RiverBankCandidates {
             selected[x + z * 16] = true;
             result.add(new Column(x, z));
         }
-        result.sort(Comparator.comparingLong((Column column) -> RiverBankProfiles.mix(seed ^ (column.x() + column.z() * 16)))
+        result.sort(Comparator.comparingLong((Column column) -> RiverBankProfiles.mix(seed ^ (column.x() + column.z() * 16L)))
                 .thenComparingInt(column -> column.x() + column.z() * 16));
         return List.copyOf(result.subList(0, Math.min(maximum, result.size())));
     }

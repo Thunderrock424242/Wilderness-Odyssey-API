@@ -1,10 +1,10 @@
 package com.thunder.wildernessodysseyapi.simulation.integration;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
-import com.thunder.wildernessodysseyapi.dataengine.DataSystemRegistration;
-import com.thunder.wildernessodysseyapi.dataengine.async.AsyncDataTask;
-import com.thunder.wildernessodysseyapi.dataengine.queue.UpdatePriority;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataSystemRegistration;
+import com.thunder.wildernessodysseyapi.opc.dataengine.async.AsyncDataTask;
+import com.thunder.wildernessodysseyapi.opc.dataengine.queue.UpdatePriority;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
 import com.thunder.wildernessodysseyapi.ecosystem.api.EcosystemParticipation;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
@@ -17,11 +17,11 @@ import com.thunder.wildernessodysseyapi.ecosystem.simulation.AbstractEcosystemMo
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemCellKey;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemRegionSnapshot;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
-import com.thunder.wildernessodysseyapi.simulation.api.SimulationContext;
-import com.thunder.wildernessodysseyapi.simulation.api.SimulationRegionCollector;
-import com.thunder.wildernessodysseyapi.simulation.api.SimulationServices;
-import com.thunder.wildernessodysseyapi.simulation.api.SimulationSystem;
-import com.thunder.wildernessodysseyapi.simulation.region.SimulationRegion;
+import com.thunder.wildernessodysseyapi.opc.simulation.api.SimulationContext;
+import com.thunder.wildernessodysseyapi.opc.simulation.api.SimulationRegionCollector;
+import com.thunder.wildernessodysseyapi.opc.simulation.api.SimulationServices;
+import com.thunder.wildernessodysseyapi.opc.simulation.api.SimulationSystem;
+import com.thunder.wildernessodysseyapi.opc.simulation.region.SimulationRegion;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;

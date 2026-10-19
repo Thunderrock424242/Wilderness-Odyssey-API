@@ -4,7 +4,7 @@ import com.thunder.wildernessodysseyapi.ai.perf.MemoryStore;
 import com.thunder.wildernessodysseyapi.ai.story.provider.AetherBackendClient;
 import com.thunder.wildernessodysseyapi.ai.story.provider.AetherRequest;
 import com.thunder.wildernessodysseyapi.ai.story.provider.BackendStatus;
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.opc.async.AsyncTaskManager;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.loading.FMLPaths;
 

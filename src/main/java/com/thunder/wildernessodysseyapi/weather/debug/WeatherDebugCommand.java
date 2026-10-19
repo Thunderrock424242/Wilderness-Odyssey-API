@@ -267,7 +267,7 @@ public final class WeatherDebugCommand {
             source.sendSuccess(() -> Component.literal(line), false);
         }
         WeatherAuthority.PhysicsDiagnostics physics = authority.physicsDiagnostics(source.getLevel());
-        var engine = com.thunder.wildernessodysseyapi.dataengine.DataEngine.get().metricsSnapshot();
+        var engine = com.thunder.wildernessodysseyapi.opc.dataengine.DataEngine.get().metricsSnapshot();
         int terrainProbes = authority.terrainProbes(source.getLevel());
         source.sendSuccess(() -> Component.literal("Input capture terrain probes=" + terrainProbes
                 + " (maximum 4672 per pass; cached context retained for the admitted grid)."), false);

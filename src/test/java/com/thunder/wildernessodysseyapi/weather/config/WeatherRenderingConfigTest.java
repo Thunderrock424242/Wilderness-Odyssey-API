@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
-import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
+import com.thunder.wildernessodysseyapi.wage.RenderingQuality;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

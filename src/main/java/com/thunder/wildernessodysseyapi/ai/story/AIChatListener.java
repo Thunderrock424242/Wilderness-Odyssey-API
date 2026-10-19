@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.ai.story;
 
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.opc.async.AsyncTaskManager;
 import com.thunder.wildernessodysseyapi.ai.voice.network.AetherVoiceLinePayload;
 import com.thunder.wildernessodysseyapi.lorebook.LoreBookManager;
 import com.thunder.wildernessodysseyapi.meteor.api.MeteorSiteServices;
