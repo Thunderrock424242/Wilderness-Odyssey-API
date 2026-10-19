@@ -9,7 +9,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
-import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
+import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.weather.api.CloudType;
 import net.minecraft.client.CloudStatus;

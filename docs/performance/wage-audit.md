@@ -1,5 +1,9 @@
 # WAGE infrastructure audit and implementation plan
 
+This audit records the original layout. The current shared framework and WAGE
+implementation live under `wage`; see the [package map](wage-packages.md) when
+following the historical package names below.
+
 Date: 2026-10-17; isolated delivery prepared 2026-10-18. The initial audit was
 performed on the shared `in-dev` working tree, including its ongoing OPC package
 migration. The isolated worktree initially used clean `in-dev` commit `a9b56c66`.

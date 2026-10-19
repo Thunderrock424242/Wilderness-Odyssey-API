@@ -5,6 +5,10 @@ backend, frame context, config and cloud renderer. It does not own another threa
 pool, server budget, terrain renderer or weather simulation. See
 [`wage-audit.md`](wage-audit.md) for the pre-implementation ownership audit.
 
+The framework, backend contracts, policy/config and acceptance probe now live
+under `com.thunder.wildernessodysseyapi.wage`. See the
+[package map and Java API migration](wage-packages.md) for locations and ownership.
+
 ## Implemented scope
 
 - A pure, backend-neutral `AdaptiveGpuController`, with four modes, delayed-sample

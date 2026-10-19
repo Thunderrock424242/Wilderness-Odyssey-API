@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.anomaly.client;
 
 import com.thunder.wildernessodysseyapi.anomaly.config.AnomalyClientConfig;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
+import com.thunder.wildernessodysseyapi.wage.compat.ShaderPackCompatibility;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.ParticleStatus;
 import net.minecraft.client.multiplayer.ClientLevel;

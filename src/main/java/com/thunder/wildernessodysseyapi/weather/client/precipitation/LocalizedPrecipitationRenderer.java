@@ -15,7 +15,7 @@ import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudAltitudeModel;
 import com.thunder.wildernessodysseyapi.weather.client.cloud.CloudFieldSample;
 import com.thunder.wildernessodysseyapi.weather.client.precipitation.PrecipitationImpactModel.ImpactSurface;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
-import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
+import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.ParticleStatus;

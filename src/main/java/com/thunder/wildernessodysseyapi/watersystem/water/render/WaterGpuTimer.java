@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
-import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackend;
+import com.thunder.wildernessodysseyapi.wage.backend.RenderBackend;
 
 import java.util.Optional;
 

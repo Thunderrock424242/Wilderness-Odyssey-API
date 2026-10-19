@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.weather.config;
 
 import com.thunder.wildernessodysseyapi.config.WildernessConfigSpecs;
-import com.thunder.wildernessodysseyapi.rendering.RenderingQuality;
-import com.thunder.wildernessodysseyapi.rendering.performance.RenderQualityState;
+import com.thunder.wildernessodysseyapi.wage.RenderingQuality;
+import com.thunder.wildernessodysseyapi.wage.performance.RenderQualityState;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**

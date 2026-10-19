@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.mojang.blaze3d.platform.GlUtil;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.rendering.GPUCapabilities;
-import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.wage.GPUCapabilities;
+import com.thunder.wildernessodysseyapi.wage.backend.RenderBackends;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;

@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.client;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
+import com.thunder.wildernessodysseyapi.wage.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.api.WindManager;
 import com.thunder.wildernessodysseyapi.weather.api.WindSample;

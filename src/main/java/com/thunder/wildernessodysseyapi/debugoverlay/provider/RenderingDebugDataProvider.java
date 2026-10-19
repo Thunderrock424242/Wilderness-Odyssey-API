@@ -6,8 +6,8 @@ import com.thunder.wildernessodysseyapi.debugoverlay.DebugPageContributorRegistr
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
 import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuProfiler;
-import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
-import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
+import com.thunder.wildernessodysseyapi.wage.backend.RenderBackends;
+import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderDiagnostics;
 import com.thunder.wildernessodysseyapi.weather.client.WeatherClientEvents;

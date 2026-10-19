@@ -15,7 +15,7 @@ import com.thunder.wildernessodysseyapi.opc.background.BackgroundEfficiencyManag
 import com.thunder.wildernessodysseyapi.opc.background.config.BackgroundEfficiencyConfig;
 import com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine;
 import com.thunder.wildernessodysseyapi.opc.tickengine.config.TickEngineConfig;
-import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
+import com.thunder.wildernessodysseyapi.wage.config.RendererConfig;
 import com.thunder.wildernessodysseyapi.opc.simulation.core.SimulationEngine;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;

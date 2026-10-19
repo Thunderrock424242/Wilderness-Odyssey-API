@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
-import com.thunder.wildernessodysseyapi.rendering.GPUCapabilities;
+import com.thunder.wildernessodysseyapi.wage.GPUCapabilities;
 
 import java.util.Locale;
 

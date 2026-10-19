@@ -16,7 +16,7 @@ import com.thunder.wildernessodysseyapi.opc.background.config.BackgroundEfficien
 import com.thunder.wildernessodysseyapi.opc.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationRelayConfig;
 import com.thunder.wildernessodysseyapi.riftfall.config.RiftfallConfig;
-import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
+import com.thunder.wildernessodysseyapi.wage.config.RendererConfig;
 import com.thunder.wildernessodysseyapi.structureblock.config.StructureBlockConfig;
 import com.thunder.wildernessodysseyapi.telemetry.EventTelemetryConfig;
 import com.thunder.wildernessodysseyapi.telemetry.PlayerTelemetryConfig;

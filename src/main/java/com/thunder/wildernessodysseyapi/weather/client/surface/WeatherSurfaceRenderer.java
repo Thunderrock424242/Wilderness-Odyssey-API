@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.weather.client.surface;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.thunder.wildernessodysseyapi.rendering.compat.ShaderPackCompatibility;
+import com.thunder.wildernessodysseyapi.wage.compat.ShaderPackCompatibility;
 import com.thunder.wildernessodysseyapi.weather.api.SurfaceWeatherState;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;

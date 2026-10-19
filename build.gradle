@@ -985,12 +985,13 @@ tasks.register('waterSimulationTest', Test) {
 tasks.register('renderingTest', Test) {
     group = 'verification'
     description = 'Runs rendering policy, water optics and client weather regressions without starting Minecraft.'
-    dependsOn tasks.named('compileTestJava')
+    dependsOn tasks.named('compileTestJava'), tasks.named('jar')
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = structureGenOfflineRuntime
     maxHeapSize = '2g'
     filter {
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.rendering.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.wage.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.architecture.WagePackageLayoutTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.opc.core.JvmMetricsTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.*'
@@ -1008,7 +1009,7 @@ tasks.register('gpuRenderingTest', Test) {
     maxHeapSize = '1g'
     systemProperty 'wildernessodysseyapi.gpuTests', 'true'
     filter {
-        includeTestsMatching 'com.thunder.wildernessodysseyapi.rendering.gpu.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.wage.gpu.*'
     }
     // A successful cached result cannot validate the driver present on a later invocation.
     outputs.upToDateWhen { false }
