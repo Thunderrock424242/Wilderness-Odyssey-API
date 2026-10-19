@@ -14,6 +14,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ClientWaterChunkSnapshotTest {
 
     @Test
+    void lateReachMetadataSurvivesGeneratedAndSparseUpdatesInEitherOrder() {
+        var reaches = new com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverGenerationChunk();
+        reaches.complete(91, 0, 0, java.util.List.of(new com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverChannelColumn(
+                2, 3, 63, 57, 63, 1, 0, 1.2f,
+                com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverChannelColumn.Kind.STREAM)));
+        var sparse = new WaterVolumeChunk();
+        sparse.set(new BlockPos(2, 63, 3), WaterVolumeChunk.WaterCell.still(0,
+                WaterVolumeChunk.FLAG_GENERATED_OVERRIDE | WaterVolumeChunk.FLAG_DRY_OVERRIDE));
+        var first = new ClientWaterChunkSnapshot(0, 0, null, 0, new int[0]).withRivers(reaches.snapshot())
+                .withGenerated(generatedColumn().snapshot()).withSparse(sparse.revision(), sparse.toNetworkArray());
+        var last = new ClientWaterChunkSnapshot(0, 0, generatedColumn().snapshot(), sparse.revision(), sparse.toNetworkArray())
+                .withRivers(reaches.snapshot());
+        assertEquals(first.rivers().reachAt(2, 3), last.rivers().reachAt(2, 3));
+        assertEquals(91, first.rivers().basinId());
+        assertEquals(62, first.column(2, 3).surfaceBlockY());
+        assertEquals(first.column(2, 3), last.column(2, 3));
+    }
+
+    @Test
     void submergedDepositRaisesResolvedBedWithoutChangingGeneratedBaseline() {
         GeneratedWaterChunk generated = generatedColumn();
         WaterVolumeChunk sparse = new WaterVolumeChunk();

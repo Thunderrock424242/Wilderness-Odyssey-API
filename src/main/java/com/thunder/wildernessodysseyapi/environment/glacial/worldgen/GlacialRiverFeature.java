@@ -2,6 +2,8 @@ package com.thunder.wildernessodysseyapi.environment.glacial.worldgen;
 
 import com.thunder.wildernessodysseyapi.environment.glacial.GlacialBiomeManager;
 import com.thunder.wildernessodysseyapi.environment.glacial.config.GlacialConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverNetworkFeature;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverWorldgenConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
@@ -24,7 +26,8 @@ public final class GlacialRiverFeature extends Feature<NoneFeatureConfiguration>
 
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
-        if (!GlacialConfig.ENABLE_POLAR_BIOME_SYSTEM.get()
+        if ((RiverWorldgenConfig.enabled() && RiverNetworkFeature.supports(context.level(), context.chunkGenerator()))
+                || !GlacialConfig.ENABLE_POLAR_BIOME_SYSTEM.get()
                 || !GlacialConfig.ENABLE_GLACIAL_RIVERS.get()) {
             return false;
         }

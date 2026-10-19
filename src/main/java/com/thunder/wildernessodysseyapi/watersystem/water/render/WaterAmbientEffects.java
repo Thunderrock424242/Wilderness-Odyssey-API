@@ -155,12 +155,14 @@ public final class WaterAmbientEffects {
                     level,
                     new BlockPos(blockX, column.surfaceBlockY(), blockZ)
             );
+            float currentX = column.currentX(localFlow.currentX());
+            float currentZ = column.currentZ(localFlow.currentZ());
             float shore = shorelineFactor(level, blockX, blockZ);
             float intensity = surfaceSprayIntensity(
                     sea.strength(),
                     sea.breakingStrength(),
                     column.oceanWeight() / 255.0f,
-                    column.currentSpeed() + localFlow.currentStrength(),
+                    (float) Math.hypot(currentX, currentZ),
                     shore
             );
             if (random.nextFloat() >= intensity) {
@@ -176,9 +178,9 @@ public final class WaterAmbientEffects {
                 continue;
             }
             double velocityX = sea.windDirectionX() * intensity * 0.055
-                    + (column.velocityX() + localFlow.currentX()) * 0.035;
+                    + currentX * 0.035;
             double velocityZ = sea.windDirectionZ() * intensity * 0.055
-                    + (column.velocityZ() + localFlow.currentZ()) * 0.035;
+                    + currentZ * 0.035;
             if (localFlow.confluence() || intensity >= 0.52f) {
                 WaterEnvironmentalEffectPool.offer(
                         WaterEnvironmentalEffectPool.Kind.FOAM,

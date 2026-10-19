@@ -1,5 +1,8 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.network;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.RiverCurrentField;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverGenerationChunk;
+
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import net.minecraft.core.BlockPos;
@@ -23,6 +26,7 @@ public final class ClientWaterChunkSnapshot {
     private final GeneratedWaterChunk.Snapshot generated;
     private final long sparseRevision;
     private final int[] sparseCells;
+    private final RiverGenerationChunk.Snapshot rivers;
     private final short[] surfaceY = new short[COLUMN_COUNT];
     private final short[] floorY = new short[COLUMN_COUNT];
     private final byte[] fillAmount = new byte[COLUMN_COUNT];
@@ -34,6 +38,7 @@ public final class ClientWaterChunkSnapshot {
     private final byte[] bodyType = new byte[COLUMN_COUNT];
     private final int[] waterTint = new int[COLUMN_COUNT];
     private final boolean[] surfaceCovered = new boolean[COLUMN_COUNT];
+    private final boolean[] falling = new boolean[COLUMN_COUNT];
 
     /** Builds and resolves one complete immutable chunk snapshot. */
     public ClientWaterChunkSnapshot(
@@ -43,11 +48,17 @@ public final class ClientWaterChunkSnapshot {
             long sparseRevision,
             int[] sparseCells
     ) {
+        this(chunkX, chunkZ, generated, sparseRevision, sparseCells, RiverGenerationChunk.Snapshot.EMPTY);
+    }
+
+    private ClientWaterChunkSnapshot(int chunkX, int chunkZ, GeneratedWaterChunk.Snapshot generated,
+            long sparseRevision, int[] sparseCells, RiverGenerationChunk.Snapshot rivers) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
         this.generated = generated;
         this.sparseRevision = Math.max(0L, sparseRevision);
         this.sparseCells = sortedSparseCopy(sparseCells);
+        this.rivers = rivers;
         Arrays.fill(surfaceY, NO_SURFACE);
         Arrays.fill(floorY, NO_SURFACE);
         resolveColumns();
@@ -55,7 +66,7 @@ public final class ClientWaterChunkSnapshot {
 
     /** Returns a copy with a newer generated baseline and the same sparse overrides. */
     public ClientWaterChunkSnapshot withGenerated(GeneratedWaterChunk.Snapshot nextGenerated) {
-        return new ClientWaterChunkSnapshot(chunkX, chunkZ, nextGenerated, sparseRevision, sparseCells);
+        return new ClientWaterChunkSnapshot(chunkX, chunkZ, nextGenerated, sparseRevision, sparseCells, rivers);
     }
 
     /** Returns a copy with a newer sparse revision and the same generated baseline. */
@@ -63,7 +74,7 @@ public final class ClientWaterChunkSnapshot {
         if (nextRevision < sparseRevision) {
             return this;
         }
-        return new ClientWaterChunkSnapshot(chunkX, chunkZ, generated, nextRevision, nextSparseCells);
+        return new ClientWaterChunkSnapshot(chunkX, chunkZ, generated, nextRevision, nextSparseCells, rivers);
     }
 
     /** Returns a copy with one exact contiguous sparse delta, or {@code null} on a revision gap. */
@@ -80,8 +91,14 @@ public final class ClientWaterChunkSnapshot {
             return null;
         }
         int[] merged = WaterVolumeChunk.mergeNetworkDelta(sparseCells, upserts, tombstones);
-        return new ClientWaterChunkSnapshot(chunkX, chunkZ, generated, nextRevision, merged);
+        return new ClientWaterChunkSnapshot(chunkX, chunkZ, generated, nextRevision, merged, rivers);
     }
+
+    public ClientWaterChunkSnapshot withRivers(RiverGenerationChunk.Snapshot next) {
+        return new ClientWaterChunkSnapshot(chunkX, chunkZ, generated, sparseRevision, sparseCells, next);
+    }
+
+    public RiverGenerationChunk.Snapshot rivers() { return rivers; }
 
     /** Samples one resolved surface column, or {@link Column#DRY}. */
     public Column column(int localX, int localZ) {
@@ -102,7 +119,8 @@ public final class ClientWaterChunkSnapshot {
                 velocityZ[index],
                 GeneratedWaterChunk.BodyType.values()[Byte.toUnsignedInt(bodyType[index])],
                 waterTint[index],
-                surfaceCovered[index]
+                surfaceCovered[index],
+                falling[index]
         );
     }
 
@@ -142,11 +160,11 @@ public final class ClientWaterChunkSnapshot {
     /** Approximate primitive memory retained by this snapshot. */
     public int estimatedBytes() {
         int generatedBytes = generatedEstimatedBytes();
-        return generatedBytes + Integer.BYTES * sparseCells.length
+        return generatedBytes + rivers.estimatedBytes() + Integer.BYTES * sparseCells.length
                 + Short.BYTES * (surfaceY.length + floorY.length)
                 + fillAmount.length + oceanWeight.length + riverWeight.length + lakeWeight.length
                 + Float.BYTES * (velocityX.length + velocityZ.length)
-                + bodyType.length + Integer.BYTES * waterTint.length + surfaceCovered.length;
+                + bodyType.length + Integer.BYTES * waterTint.length + surfaceCovered.length + falling.length;
     }
 
     /** Compact generated-baseline bytes retained by this snapshot. */
@@ -255,6 +273,7 @@ public final class ClientWaterChunkSnapshot {
         floorY[column] = (short) Math.max(Short.MIN_VALUE + 1, Math.min(Short.MAX_VALUE, resolvedFloorY));
         fillAmount[column] = (byte) Math.max(1, Math.min(8, amount));
         surfaceCovered[column] = covered;
+        falling[column] = bodySpan != null && bodySpan.cell().falling();
         velocityX[column] = finiteOrZero(resolvedVelocityX);
         velocityZ[column] = finiteOrZero(resolvedVelocityZ);
         if (bodySpan == null) {
@@ -355,8 +374,16 @@ public final class ClientWaterChunkSnapshot {
             float velocityZ,
             GeneratedWaterChunk.BodyType bodyType,
             int waterTint,
-            boolean surfaceCovered
+            boolean surfaceCovered,
+            boolean falling
     ) {
+        /** Retains the existing construction shape for render integrations. */
+        public Column(boolean wet, int surfaceBlockY, int floorY, int amount, int oceanWeight,
+                int riverWeight, int lakeWeight, float velocityX, float velocityZ,
+                GeneratedWaterChunk.BodyType bodyType, int waterTint, boolean surfaceCovered) {
+            this(wet, surfaceBlockY, floorY, amount, oceanWeight, riverWeight, lakeWeight,
+                    velocityX, velocityZ, bodyType, waterTint, surfaceCovered, false);
+        }
         public static final Column DRY = new Column(false, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f,
                 GeneratedWaterChunk.BodyType.LAKE, GeneratedWaterChunk.Cell.DEFAULT_WATER_TINT, false);
 
@@ -373,6 +400,18 @@ public final class ClientWaterChunkSnapshot {
         /** Horizontal canonical flow magnitude retained for client-only material motion. */
         public float currentSpeed() {
             return wet ? (float) Math.sqrt(velocityX * velocityX + velocityZ * velocityZ) : 0.0f;
+        }
+
+        /** Shared server/client ownership policy: moving sparse detail replaces regional motion. */
+        public float currentX(float backgroundX) {
+            return RiverCurrentField.currentX(
+                    velocityX, velocityZ, backgroundX);
+        }
+
+        /** Uses the same whole-vector owner as currentX, including zero transverse motion. */
+        public float currentZ(float backgroundZ) {
+            return RiverCurrentField.currentZ(
+                    velocityX, velocityZ, backgroundZ);
         }
     }
 }

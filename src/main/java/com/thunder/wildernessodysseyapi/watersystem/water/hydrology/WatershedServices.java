@@ -5,6 +5,7 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWatershedSnapshotStore;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverReachServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -52,6 +53,9 @@ public final class WatershedServices {
         WatershedChunkState state;
         long basinId;
         if (level instanceof ServerLevel serverLevel) {
+            if (serverLevel.getChunkSource().getChunkNow(position.getX() >> 4, position.getZ() >> 4) == null) {
+                return WatershedLocalFlow.NONE;
+            }
             state = WatershedSavedData.get(serverLevel).state(
                     net.minecraft.world.level.ChunkPos.asLong(position.getX() >> 4, position.getZ() >> 4)
             );
@@ -74,9 +78,24 @@ public final class WatershedServices {
         int cell = WatershedDrainageGrid.cell(position.getX(), position.getZ());
         int contributingCells = grid.accumulation(cell);
         WatershedConditions conditions = state.conditions(basinId);
-        // Packed conditions now carry Manning-derived velocity. Local terrain
-        // metadata remains useful for inspection, but must not amplify or turn
-        // that physical current into a second heuristic gameplay force.
+        float currentX = conditions.currentX();
+        float currentZ = conditions.currentZ();
+        if (WaterSimulationConfig.smoothRiverCurrents() && river(conditions)) {
+            var home = new RiverCurrentField.Sample(basinId, currentX, currentZ, true);
+            var current = RiverCurrentField.interpolate(position.getX() + 0.5, position.getZ() + 0.5,
+                    home, (x, z) -> cachedRiverCurrent(level, x, z));
+            currentX = current.currentX();
+            currentZ = current.currentZ();
+        }
+        var reach = RiverReachServices.sample(level, position);
+        if (reach != null) {
+            var current = RiverReachServices.current(
+                    reach.reach(), currentX, currentZ);
+            currentX = current.currentX();
+            currentZ = current.currentZ();
+        }
+        // Direction is retained as compact D8 inspection metadata. The actual
+        // vector may be continuous and never gains heuristic accumulation speed.
         var direction = conditions.downstreamDirection();
         return new WatershedLocalFlow(
                 basinId,
@@ -84,8 +103,28 @@ public final class WatershedServices {
                 direction,
                 contributingCells,
                 grid.confluence(cell),
-                conditions.currentX(),
-                conditions.currentZ()
+                currentX,
+                currentZ
         );
+    }
+
+    private static RiverCurrentField.Sample cachedRiverCurrent(Level level, int chunkX, int chunkZ) {
+        WatershedConditions conditions;
+        if (level instanceof ServerLevel server) {
+            if (server.getChunkSource().getChunkNow(chunkX, chunkZ) == null) return null;
+            var state = WatershedSavedData.get(server).state(net.minecraft.world.level.ChunkPos.asLong(chunkX, chunkZ));
+            if (state == null) return null;
+            long basin = WatershedBasinSavedData.get(server).resolve(state.localBasinId());
+            conditions = state.conditions(basin);
+        } else {
+            conditions = ClientWatershedSnapshotStore.get(level, chunkX, chunkZ);
+        }
+        return river(conditions) ? new RiverCurrentField.Sample(conditions.basinId(),
+                conditions.currentX(), conditions.currentZ(), true) : null;
+    }
+
+    private static boolean river(WatershedConditions conditions) {
+        return conditions.waterFeature() == WatershedConditions.WaterFeature.RIVER
+                || conditions.waterFeature() == WatershedConditions.WaterFeature.STREAM;
     }
 }

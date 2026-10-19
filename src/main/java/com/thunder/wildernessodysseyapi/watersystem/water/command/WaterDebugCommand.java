@@ -16,6 +16,8 @@ import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWater
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSimulationDiagnostics;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.LoadedRiverTerrain;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverNetworkPlanner;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
@@ -41,6 +43,9 @@ public final class WaterDebugCommand {
     /** Registers the {@code /wowater} diagnostics command tree. */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("wowater")
+                .then(Commands.literal("riverplan")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(context -> riverPlan(context.getSource())))
                 .then(Commands.literal("budget")
                         .requires(source -> source.hasPermission(2))
                         .executes(context -> budget(context, sourceBlockPos(context.getSource())))
@@ -122,6 +127,24 @@ public final class WaterDebugCommand {
                                         context,
                                         IntegerArgumentType.getInteger(context, "radius")
                                 )))));
+    }
+
+    private static int riverPlan(CommandSourceStack source) {
+        long started = System.nanoTime();
+        var terrain = LoadedRiverTerrain.capture(source.getLevel(), sourceBlockPos(source));
+        var plan = RiverNetworkPlanner.plan(terrain);
+        long sinks = plan.nodes().stream().filter(node -> node.terminal()
+                == RiverNetworkPlanner.Terminal.CLOSED_BASIN).count();
+        long receivers = plan.nodes().stream().filter(node -> node.terminal()
+                == RiverNetworkPlanner.Terminal.RECEIVING_WATER).count();
+        long confluences = plan.nodes().stream().filter(RiverNetworkPlanner.Node::confluence).count();
+        double milliseconds = (System.nanoTime() - started) / 1_000_000.0;
+        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+                "WO river plan: loaded=%d/100, unresolved=%d, coarse basins=%d, receiving water=%d, confluences=%d, %.3f ms",
+                plan.nodes().size(), plan.unresolvedCells(), sinks, receivers, confluences, milliseconds)), false);
+        source.sendSuccess(() -> Component.literal(
+                "Read-only loaded terrain; catchment area is a lower bound. No carving or seed-wide generation preview."), false);
+        return 1;
     }
 
     private static int budget(CommandContext<CommandSourceStack> context, BlockPos pos) {

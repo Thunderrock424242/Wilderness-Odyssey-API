@@ -38,6 +38,7 @@
     "CoordinatorLevelChunkDirtyMixin",
     "CoordinatorChunkSaveMixin",
     "NoiseBasedChunkGeneratorWaterMixin",
+    "RiverGenerationLifecycleMixin",
     "ProtoChunkWaterMixin",
     "SableWaterShapeMixin",
     "ServerboundSetStructureBlockPacketMixin",

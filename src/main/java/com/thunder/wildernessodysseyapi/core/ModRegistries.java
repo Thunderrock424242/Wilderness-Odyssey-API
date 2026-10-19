@@ -21,6 +21,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlockE
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftBlocks;
 import com.thunder.wildernessodysseyapi.temporalrift.registry.TemporalRiftWorldgen;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverNetworkFeature;
 import com.thunder.wildernessodysseyapi.worldgen.coast.CoastalTerrainFeature;
 import com.thunder.wildernessodysseyapi.worldgen.processor.ModProcessors;
 import net.minecraft.core.registries.Registries;
@@ -66,6 +67,9 @@ public final class ModRegistries {
     /** Bounded terrain-following meltwater channel pass. */
     public static final DeferredHolder<Feature<?>, GlacialRiverFeature> GLACIAL_RIVER_FEATURE =
             FEATURES.register("glacial_river", GlacialRiverFeature::new);
+    /** Generation-only bounded tributaries and sealed pools before surface decoration. */
+    public static final DeferredHolder<Feature<?>, RiverNetworkFeature> RIVER_NETWORK_FEATURE =
+            FEATURES.register("river_network", RiverNetworkFeature::new);
     /** Structure-aware surface fissure pass. */
     public static final DeferredHolder<Feature<?>, GlacialCrevasseFeature> GLACIAL_CREVASSE_FEATURE =
             FEATURES.register("glacial_crevasse", GlacialCrevasseFeature::new);

@@ -23,6 +23,7 @@ import com.thunder.wildernessodysseyapi.temporalrift.config.TemporalRiftConfig;
 import com.thunder.wildernessodysseyapi.vegetation.config.VegetationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.render.WaterRenderingConfig;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverWorldgenConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
 import com.thunder.wildernessodysseyapi.worldgen.config.StructureConfig;
@@ -92,6 +93,7 @@ public final class WildernessConfigSpecs {
         defineCategory(builder, "structures", StructureConfig::define);
         GlacialConfig.defineCommon(builder);
         CoastalWorldgenConfig.defineCommon(builder);
+        RiverWorldgenConfig.defineCommon(builder);
         com.thunder.wildernessodysseyapi.worldgen.anomaly.config.AnomalyWorldgenConfig.defineCommon(builder);
         AsyncThreadingConfig.define(builder);
         OwnershipConfig.define(builder);

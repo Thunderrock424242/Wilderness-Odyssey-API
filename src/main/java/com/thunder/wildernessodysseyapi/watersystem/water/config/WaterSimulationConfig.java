@@ -56,6 +56,7 @@ public final class WaterSimulationConfig {
     public static ModConfigSpec.IntValue HYDROLOGY_MIN_TRANSFER_UNITS;
     public static ModConfigSpec.IntValue HYDROLOGY_MAX_LEDGER_ENTRIES;
     public static ModConfigSpec.BooleanValue ENABLE_WATERSHED_SIMULATION;
+    public static ModConfigSpec.BooleanValue SMOOTH_RIVER_CURRENTS;
     public static ModConfigSpec.DoubleValue WATERSHED_RAINFALL_ACCUMULATION_RATE;
     public static ModConfigSpec.DoubleValue WATERSHED_SNOWMELT_RATE;
     public static ModConfigSpec.BooleanValue ENABLE_WATERSHED_GROUNDWATER;
@@ -234,6 +235,9 @@ public final class WaterSimulationConfig {
         ENABLE_WATERSHED_SIMULATION = builder
                 .comment("Enable deterministic loaded-only watershed metadata and river-condition updates.")
                 .define("enabled", true);
+        SMOOTH_RIVER_CURRENTS = builder
+                .comment("Interpolate cached Manning currents between loaded river chunks in the same basin. Opt-in; does not alter water volume, stage or terrain.")
+                .define("smoothRiverCurrents", false);
         WATERSHED_RAINFALL_ACCUMULATION_RATE = builder
                 .comment("Normalized rainfall memory added by one fully intense precipitation pass.")
                 .defineInRange("rainfallAccumulationRate", 0.045, 0.0, 0.5);
@@ -533,6 +537,11 @@ public final class WaterSimulationConfig {
     /** Returns whether chunk-scale watershed conditions are active. */
     public static boolean watershedSimulationEnabled() {
         return ENABLE_WATERSHED_SIMULATION.get();
+    }
+
+    /** Optional spatial refinement of existing discharge, shared by server and synchronized clients. */
+    public static boolean smoothRiverCurrents() {
+        return SMOOTH_RIVER_CURRENTS.get();
     }
 
     /** Returns normalized rainfall memory added by one simulation pass. */
