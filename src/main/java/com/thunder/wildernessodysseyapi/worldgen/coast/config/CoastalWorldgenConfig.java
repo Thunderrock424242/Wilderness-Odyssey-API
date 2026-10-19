@@ -25,6 +25,9 @@ public final class CoastalWorldgenConfig {
     public static ModConfigSpec.IntValue MAX_DUNE_RISE_BLOCKS;
     public static ModConfigSpec.IntValue MAX_TROPICAL_BANK_CUT_BLOCKS;
     public static ModConfigSpec.DoubleValue COASTAL_DETAIL_DENSITY;
+    public static ModConfigSpec.DoubleValue PALM_DENSITY;
+    public static ModConfigSpec.DoubleValue DRIFTWOOD_DENSITY;
+    public static ModConfigSpec.DoubleValue ROCK_CLUSTER_DENSITY;
 
     static {
         WildernessConfigSpecs.initialize();
@@ -38,9 +41,9 @@ public final class CoastalWorldgenConfig {
         ).push("coastalWorldgen");
 
         ENABLE_BEACH_BIOME_FAMILY = builder.comment(
-                "Opt in to replacing eligible vanilla beach climate slots with the Wilderness coastal family.",
+                "Replace eligible vanilla beach climate slots with the Wilderness coastal family.",
                 "Natural-coast surf works independently of this world-generation option.")
-                .define("enableBeachBiomeFamily", false);
+                .define("enableBeachBiomeFamily", true);
         ENABLE_TEMPERATE_BEACH = toggle(
                 builder,
                 "enableTemperateBeach",
@@ -74,7 +77,7 @@ public final class CoastalWorldgenConfig {
         ENABLE_DRIFTWOOD = toggle(
                 builder,
                 "enableDriftwood",
-                "Place rare terrain-aligned fallen logs on eligible beaches."
+                "Place terrain-aligned fallen logs on eligible beaches."
         );
         ENABLE_TIDE_POOLS = toggle(
                 builder,
@@ -100,6 +103,12 @@ public final class CoastalWorldgenConfig {
         COASTAL_DETAIL_DENSITY = builder
                 .comment("Global density multiplier for sparse coastal details. Zero disables detail placement and one uses the authored maximum density.")
                 .defineInRange("coastalDetailDensity", 0.55, 0.0, 1.0);
+        PALM_DENSITY = builder.comment("Tropical back-beach palm density multiplier. Zero disables palms; vegetation and detail switches still apply. At most two palms per chunk.")
+                .defineInRange("palmDensity", 1.0, 0.0, 2.0);
+        DRIFTWOOD_DENSITY = builder.comment("Fallen-log density multiplier within the coastal detail budget. Zero disables driftwood.")
+                .defineInRange("driftwoodDensity", 1.0, 0.0, 2.0);
+        ROCK_CLUSTER_DENSITY = builder.comment("Boulder and rocky sea-stack density multiplier within the coastal detail budget. Zero disables rock clusters.")
+                .defineInRange("rockClusterDensity", 1.0, 0.0, 2.0);
         builder.pop();
     }
 

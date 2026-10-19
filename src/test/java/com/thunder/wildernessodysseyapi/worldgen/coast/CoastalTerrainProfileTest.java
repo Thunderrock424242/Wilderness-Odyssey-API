@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalWaveProfi
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CoastalTerrainProfileTest {
 
@@ -16,7 +17,7 @@ class CoastalTerrainProfileTest {
         assertEquals(CoastalTerrainProfile.Zone.DUNE,
                 CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.TEMPERATE, 9));
         assertEquals(CoastalTerrainProfile.Zone.COASTAL_MEADOW,
-                CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.TEMPERATE, 14));
+                CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.TEMPERATE, 16));
     }
 
     @Test
@@ -79,8 +80,19 @@ class CoastalTerrainProfileTest {
         assertEquals(62, CoastalTerrainProfile.tropicalSurfaceHeight(62, 63, 12, 4));
         assertEquals(61, CoastalTerrainProfile.tropicalSurfaceHeight(61, 63, 1, 4));
         assertEquals(80, CoastalTerrainProfile.tropicalSurfaceHeight(80, 63, 1, 4));
-        assertEquals(67, CoastalTerrainProfile.tropicalSurfaceHeight(67, 63, 15, 4));
+        assertEquals(67, CoastalTerrainProfile.tropicalSurfaceHeight(67, 63, 21, 4));
         assertEquals(67, CoastalTerrainProfile.tropicalSurfaceHeight(67, 63, 1, 0));
+    }
+
+    @Test
+    void tropicalGradingTapersBackToTheInlandBankWithoutACutoffWall() {
+        int previous = CoastalTerrainProfile.tropicalSurfaceHeight(70, 63, 1, 4);
+        for (int distance = 2; distance <= 21; distance++) {
+            int next = CoastalTerrainProfile.tropicalSurfaceHeight(70, 63, distance, 4);
+            assertTrue(Math.abs(next - previous) <= 1, "Bank cutoff wall at distance " + distance);
+            previous = next;
+        }
+        assertEquals(70, previous);
     }
 
     @Test
@@ -115,5 +127,64 @@ class CoastalTerrainProfileTest {
                 0.9,
                 0.0,
                 1.0));
+    }
+
+    @Test
+    void duneRidgesTaperOnBothSidesAndStayContinuousAcrossChunkAndNegativeCoordinates() {
+        var type = CoastalWaveProfile.ShoreType.DUNE;
+        assertEquals(0, CoastalTerrainProfile.duneHeight(type, 1, 1, 1, 4));
+        assertEquals(0, CoastalTerrainProfile.duneHeight(type, 21, 1, 1, 4));
+        assertTrue(CoastalTerrainProfile.duneHeight(type, 13, 0.5, 0.5, 4) >= 3);
+        for (int z = -32; z <= 32; z++) {
+            int previous = 0;
+            for (int x = -32; x <= 32; x++) {
+                double broad = CoastalTerrainProfile.noise(31, x, z, 29, 5);
+                double fine = CoastalTerrainProfile.noise(31, x, z, 9, 7);
+                int rise = CoastalTerrainProfile.duneHeight(type, 13, broad, fine, 4);
+                assertTrue(rise >= 0 && rise <= 4);
+                if (x > -32) assertTrue(Math.abs(rise - previous) <= 1, "No chunk-coordinate ridge steps");
+                previous = rise;
+                assertEquals(broad, CoastalTerrainProfile.noise(31, x, z, 29, 5));
+                if (x % 16 == 0) {
+                    assertTrue(Math.abs(broad - CoastalTerrainProfile.noise(31, x - 1, z, 29, 5)) < 0.12);
+                }
+            }
+        }
+    }
+
+    @Test
+    void eachBiomeKeepsDistinctBandsAndPolarOffshoreFormationsStayWithTheGlacialOwner() {
+        assertEquals(CoastalTerrainProfile.Zone.DUNE,
+                CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.DUNE, 18));
+        assertEquals(CoastalTerrainProfile.Zone.COASTAL_MEADOW,
+                CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.TEMPERATE, 18));
+        assertEquals(CoastalTerrainProfile.Zone.SNOWY_MEADOW,
+                CoastalTerrainProfile.zone(CoastalWaveProfile.ShoreType.COLD, 12));
+        for (int roll = 0; roll < 100; roll++) {
+            assertTrue(CoastalTerrainProfile.detail(CoastalWaveProfile.ShoreType.GLACIAL,
+                    CoastalTerrainProfile.Zone.ICE_STRAND, 0, roll / 100.0, 1)
+                    != CoastalTerrainProfile.Detail.SEA_STACK);
+        }
+    }
+
+    @Test
+    void deterministicDetailRollsRespondMonotonicallyToDensityAcrossAllProfiles() {
+        for (var type : CoastalWaveProfile.ShoreType.values()) {
+            int sparse = 0;
+            int full = 0;
+            for (int index = 0; index < 10000; index++) {
+                double presence = CoastalTerrainProfile.hashUnit(10, index, -index, 17);
+                double variant = CoastalTerrainProfile.hashUnit(10, index, -index, 23);
+                var zone = CoastalTerrainProfile.zone(type, 6);
+                var low = CoastalTerrainProfile.detail(type, zone, presence, variant, 0.25);
+                var high = CoastalTerrainProfile.detail(type, zone, presence, variant, 1);
+                if (low != CoastalTerrainProfile.Detail.NONE) {
+                    sparse++;
+                    assertEquals(low, high);
+                }
+                if (high != CoastalTerrainProfile.Detail.NONE) full++;
+            }
+            assertTrue(sparse > 200 && full > sparse * 3 && full < 5000, type.toString());
+        }
     }
 }

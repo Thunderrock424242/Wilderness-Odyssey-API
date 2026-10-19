@@ -782,6 +782,52 @@ def structureGenOfflineRuntime = files(
         configurations.testRuntimeClasspath.filter { !it.name.startsWith('junit-fml-') }
 )
 
+// Optional source filter keeps focused coastal regressions on the normal ModDev
+// compile/JUnit launch path without compiling unrelated subsystem test suites.
+def coastalTestPatterns = [
+        'com/thunder/wildernessodysseyapi/worldgen/coast/**',
+        'com/thunder/wildernessodysseyapi/worldgen/biome/**',
+        'com/thunder/wildernessodysseyapi/environment/glacial/worldgen/**',
+        'com/thunder/wildernessodysseyapi/environment/glacial/PolarGlacialResourcesTest.java',
+        'com/thunder/wildernessodysseyapi/watersystem/ocean/coast/**',
+        'com/thunder/wildernessodysseyapi/watersystem/water/render/CoastalBreakerGeometryTest.java'
+]
+if (providers.gradleProperty('coastalTestsOnly').map { it.toBoolean() }.getOrElse(false)) {
+    tasks.named('compileTestJava', JavaCompile) {
+        setSource(fileTree('src/test/java') { coastalTestPatterns.each { include it } })
+    }
+    tasks.named('test', Test) {
+        binaryResultsDirectory = layout.buildDirectory.dir('test-results/coastalIntegration/binary')
+        reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/coastalIntegration')
+        reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/coastalIntegration')
+        filter {
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.coast.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.biome.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.worldgen.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.PolarGlacialResourcesTest'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.coast.*'
+            includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.CoastalBreakerGeometryTest'
+        }
+    }
+}
+
+tasks.register('coastalTest', Test) {
+    group = 'verification'
+    description = 'Runs pure coastal profiles, resources and existing surf regressions without mod bootstrap.'
+    dependsOn tasks.named('compileTestJava')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = structureGenOfflineRuntime
+    maxHeapSize = '2g'
+    filter {
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.coast.*'
+        excludeTestsMatching 'com.thunder.wildernessodysseyapi.worldgen.coast.CoastalPlacementTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.worldgen.GlacialTerrainProfileTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.glacial.PolarGlacialResourcesTest'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.coast.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.CoastalBreakerGeometryTest'
+    }
+}
+
 tasks.register('structureGenTest', Test) {
     group = 'verification'
     description = 'Runs focused StructureGen tests without starting Minecraft or loading project mods.'

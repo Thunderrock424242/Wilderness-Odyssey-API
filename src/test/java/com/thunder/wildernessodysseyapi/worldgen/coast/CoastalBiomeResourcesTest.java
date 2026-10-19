@@ -34,7 +34,8 @@ class CoastalBiomeResourcesTest {
             JsonArray stages = biome.getAsJsonArray("features");
             assertEquals(11, stages.size(), biomeName);
             assertTrue(contains(stages, "wildernessodysseyapi:coastal_terrain"), biomeName);
-            assertTrue(contains(stages, "minecraft:freeze_top_layer"), biomeName);
+            assertEquals(!biomeName.equals("cold_beach"), contains(stages, "minecraft:freeze_top_layer"),
+                    "Cold beaches use patchy coastal snow instead of a uniform generation-time blanket");
             assertTrue(biome.getAsJsonObject("spawners").has("monster"), biomeName);
         }
     }
@@ -71,7 +72,9 @@ class CoastalBiomeResourcesTest {
                 configured.get("type").getAsString());
         assertEquals("wildernessodysseyapi:coastal_terrain",
                 placed.get("feature").getAsString());
-        assertEquals(3, placed.getAsJsonArray("placement").size());
+        // The feature scans and checks each column. A random single-position
+        // biome filter would discard mixed chunks before that scan can run.
+        assertEquals(0, placed.getAsJsonArray("placement").size());
     }
 
     private static boolean contains(JsonArray stages, String expected) {

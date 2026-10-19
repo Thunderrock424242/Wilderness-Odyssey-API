@@ -38,13 +38,55 @@ public final class CoastalTerrainProfile {
         if (distance <= 2) {
             return Zone.STRANDLINE;
         }
-        if (distance <= 6) {
+        if (distance <= 8) {
             return Zone.OPEN_BEACH;
         }
-        if (distance <= 11) {
+        if (distance <= (type == CoastalWaveProfile.ShoreType.DUNE ? 20 : 14)) {
             return Zone.DUNE;
         }
         return Zone.COASTAL_MEADOW;
+    }
+
+    /** Broad, world-coordinate contour variation avoids straight material bands. */
+    public static Zone zone(CoastalWaveProfile.ShoreType type, double distance, double contour) {
+        return zone(type, (int) Math.round(Math.max(0.0, distance + contour * 2.0)));
+    }
+
+    /** A tapered ridge follows distance from water with two coherent scales of variation. */
+    public static int duneHeight(CoastalWaveProfile.ShoreType type, double distance,
+                                 double broad, double fine, int maximum) {
+        if (type != CoastalWaveProfile.ShoreType.DUNE
+                && type != CoastalWaveProfile.ShoreType.TEMPERATE) return 0;
+        int limit = type == CoastalWaveProfile.ShoreType.DUNE ? Math.min(4, maximum) : Math.min(1, maximum);
+        double width = type == CoastalWaveProfile.ShoreType.DUNE ? 16.0 : 10.0;
+        double band = Math.max(0.0, Math.min(1.0, (distance - 5.0) / width));
+        double ridge = Math.sin(band * Math.PI);
+        return Math.max(0, (int) Math.round(limit * ridge * (0.72 + broad * 0.20 + fine * 0.08)));
+    }
+
+    /** Smooth seeded value noise; floor division keeps negative coordinates continuous. */
+    static double noise(long seed, int x, int z, int scale, long salt) {
+        int cellX = Math.floorDiv(x, scale);
+        int cellZ = Math.floorDiv(z, scale);
+        double tx = Math.floorMod(x, scale) / (double) scale;
+        double tz = Math.floorMod(z, scale) / (double) scale;
+        tx = tx * tx * (3.0 - 2.0 * tx);
+        tz = tz * tz * (3.0 - 2.0 * tz);
+        double north = hashUnit(seed, cellX, cellZ, salt) * (1.0 - tx)
+                + hashUnit(seed, cellX + 1, cellZ, salt) * tx;
+        double south = hashUnit(seed, cellX, cellZ + 1, salt) * (1.0 - tx)
+                + hashUnit(seed, cellX + 1, cellZ + 1, salt) * tx;
+        return (north * (1.0 - tz) + south * tz) * 2.0 - 1.0;
+    }
+
+    static double hashUnit(long seed, int x, int z, long salt) {
+        long value = seed ^ salt ^ (long) x * 0x9E3779B97F4A7C15L ^ (long) z * 0xC2B2AE3D27D4EB4FL;
+        value ^= value >>> 30;
+        value *= 0xBF58476D1CE4E5B9L;
+        value ^= value >>> 27;
+        value *= 0x94D049BB133111EBL;
+        value ^= value >>> 31;
+        return (value >>> 11) * 0x1.0p-53;
     }
 
     /** Returns a deterministic quality-independent dune rise for one column. */
@@ -78,16 +120,22 @@ public final class CoastalTerrainProfile {
     public static int tropicalSurfaceHeight(
             int originalY, int seaLevel, int distanceToWater, int maximumCut
     ) {
-        if (maximumCut <= 0 || distanceToWater < 1 || distanceToWater > 14
+        if (maximumCut <= 0 || distanceToWater < 1 || distanceToWater > 20
                 || originalY < seaLevel - 1 || originalY > seaLevel + 8) {
             return originalY;
         }
         int beachGrade = seaLevel - 1 + distanceToWater / 4;
-        return Math.min(originalY, Math.max(originalY - Math.min(6, maximumCut), beachGrade));
+        int cutLimit = Math.min(6, maximumCut);
+        if (distanceToWater > 14) {
+            // Return to the original bank one block at a time rather than
+            // ending a four-to-six-block cut abruptly at the search boundary.
+            cutLimit = cutLimit * (20 - distanceToWater) / 6;
+        }
+        return Math.min(originalY, Math.max(originalY - cutLimit, beachGrade));
     }
 
     /**
-     * Selects one sparse persistent detail for a four-by-four coastal cell.
+     * Selects one persistent detail for a bounded coastal candidate.
      *
      * <p>The caller supplies stable unit rolls so placement stays deterministic
      * without allocating a random source per column. Returning {@link Detail#NONE}
@@ -165,10 +213,10 @@ public final class CoastalTerrainProfile {
 
     private static Detail coldDetail(Zone zone, double variant) {
         return switch (zone) {
-            case GRAVEL_STRAND -> variant < 0.18 ? Detail.TIDE_POOL
-                    : variant < 0.46 ? Detail.ICE_FRAGMENT
+            case GRAVEL_STRAND -> variant < 0.08 ? Detail.TIDE_POOL
+                    : variant < 0.18 ? Detail.ICE_FRAGMENT
                     : variant < 0.72 ? Detail.ROCK_CLUSTER : Detail.DRIFTWOOD;
-            case COLD_BEACH -> variant < 0.38 ? Detail.ICE_FRAGMENT
+            case COLD_BEACH -> variant < 0.10 ? Detail.ICE_FRAGMENT
                     : variant < 0.72 ? Detail.ROCK_CLUSTER : Detail.DRIFTWOOD;
             case SNOWY_MEADOW -> Detail.BEACH_GRASS;
             default -> Detail.ROCK_CLUSTER;
@@ -176,9 +224,7 @@ public final class CoastalTerrainProfile {
     }
 
     private static Detail glacialDetail(Zone zone, double variant) {
-        if (zone == Zone.ICE_STRAND && variant < 0.05) {
-            return Detail.SEA_STACK;
-        }
+        // Full offshore ice formations belong to the existing polar generator.
         if ((zone == Zone.ICE_STRAND || zone == Zone.GLACIAL_BEACH) && variant < 0.18) {
             return Detail.TIDE_POOL;
         }

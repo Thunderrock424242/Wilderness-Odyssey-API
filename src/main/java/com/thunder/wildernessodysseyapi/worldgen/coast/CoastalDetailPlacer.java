@@ -1,7 +1,6 @@
 package com.thunder.wildernessodysseyapi.worldgen.coast;
 
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalWaveProfile;
-import com.thunder.wildernessodysseyapi.worldgen.biome.ModBiomes;
 import com.thunder.wildernessodysseyapi.worldgen.coast.config.CoastalWorldgenConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -13,462 +12,279 @@ import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Places sparse persistent content after a coastal chunk's surface bands are complete.
- *
- * <p>Only sixteen deterministic four-by-four anchors are considered. Every
- * write is constrained to the feature origin chunk and natural terrain, while
- * neighbor reads stop at chunks already exposed by the worldgen region.</p>
+ * Bounded, deterministic coastal content using the terrain feature's shore snapshot.
+ * Thirty-two irregular small-detail candidates and twenty palm attempts are the
+ * hard limits; successful content is capped separately to keep the wet beach open.
  */
 final class CoastalDetailPlacer {
+    private CoastalDetailPlacer() { }
 
-    private static final int WATER_SEARCH_DISTANCE = 14;
-    private static final int[][] DIRECTIONS = {
-            {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-            {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
-    };
-
-    private CoastalDetailPlacer() {
-    }
-
-    /** Places configured details for one feature origin chunk. */
-    static boolean place(WorldGenLevel level, int minimumX, int minimumZ) {
-        boolean placed = false;
-        boolean palmPlaced = false;
+    static boolean place(WorldGenLevel level, CoastalGenerationArea area) {
+        boolean placed = placePalms(level, area);
         long seed = level.getSeed();
-        for (int cellZ = 0; cellZ < 16; cellZ += 4) {
-            for (int cellX = 0; cellX < 16; cellX += 4) {
-                int anchorX = minimumX + cellX + (int) Math.floor(
-                        hashUnit(seed, minimumX + cellX, minimumZ + cellZ,
-                                0xD1B54A32D192ED03L) * 4.0);
-                int anchorZ = minimumZ + cellZ + (int) Math.floor(
-                        hashUnit(seed, minimumX + cellX, minimumZ + cellZ,
-                                0xABC98388FB8FAC03L) * 4.0);
-                int topY = surfaceY(level, anchorX, anchorZ);
-                BlockPos top = new BlockPos(anchorX, topY, anchorZ);
-                if (level.getFluidState(top).is(FluidTags.WATER)
-                        || !isNaturalSurface(level.getBlockState(top))) {
-                    continue;
-                }
-                CoastalWaveProfile.ShoreType shoreType = ModBiomes
-                        .coastalShoreType(level.getBiome(top))
-                        .orElse(null);
-                if (shoreType == null) {
-                    continue;
-                }
-                WaterContact water = nearestWaterContact(level, anchorX, topY, anchorZ);
-                if (water == null) {
-                    continue;
-                }
-                CoastalTerrainProfile.Detail detail = CoastalTerrainProfile.detail(
-                        shoreType,
-                        CoastalTerrainProfile.zone(shoreType, water.distance()),
-                        hashUnit(seed, anchorX, anchorZ, 0x8CB92BA72F3D8DD7L),
-                        hashUnit(seed, anchorX, anchorZ, 0xDB4F0B9175AE2165L),
-                        CoastalWorldgenConfig.COASTAL_DETAIL_DENSITY.get()
-                );
-                if (enabled(detail)) {
-                    if (detail == CoastalTerrainProfile.Detail.PALM) {
-                        if (!palmPlaced) {
-                            int height = 5 + (int) (hashUnit(seed, anchorX, anchorZ,
-                                    0xD6E8FEB86659FD93L) * 3.0);
-                            palmPlaced = TropicalPalmPlacer.place(
-                                    level, top, minimumX, minimumZ, height,
-                                    water.directionX(), water.directionZ());
-                            placed |= palmPlaced;
-                        }
-                        continue;
-                    }
-                    placed |= placeDetail(
-                            level, minimumX, minimumZ, top, shoreType, detail, water, seed);
-                }
+        int details = 0;
+        int logs = 0;
+        int formations = 0;
+        for (int attempt = 0; attempt < 32 && details < 12; attempt++) {
+            int x = area.minimumX + (int) (roll(seed, area.minimumX, area.minimumZ, attempt, 11) * 16);
+            int z = area.minimumZ + (int) (roll(seed, area.minimumX, area.minimumZ, attempt, 23) * 16);
+            BlockPos top = area.surface(x, z);
+            var type = area.shoreType(x, z);
+            var water = area.contact(x, z);
+            if (type == null || water == null || area.column(x, z).water()
+                    || !CoastalGenerationArea.natural(level.getBlockState(top))) continue;
+            double patch = CoastalTerrainProfile.noise(seed, x, z, 13, 0xB8B34B2F33C9E0A7L);
+            double density = CoastalWorldgenConfig.COASTAL_DETAIL_DENSITY.get();
+            // Back-beach vegetation groups follow coherent patches; the strand
+            // retains a much lower occupancy even at the authored maximum.
+            density *= water.distance() > 6 ? 0.75 + (patch + 1.0) * 0.55 : 0.65;
+            var detail = CoastalTerrainProfile.detail(type, CoastalTerrainProfile.zone(type,
+                    water.distance(), patch * 0.5), roll(seed, x, z, attempt, 37),
+                    roll(seed, x, z, attempt, 41), density);
+            boolean success = switch (detail) {
+                case NONE -> false;
+                case BEACH_GRASS, PALM -> CoastalWorldgenConfig.ENABLE_COASTAL_VEGETATION.get()
+                        && placePlants(level, area, top, type, seed);
+                case DRIFTWOOD -> CoastalWorldgenConfig.ENABLE_DRIFTWOOD.get() && logs < 2
+                        && roll(seed, x, z, attempt, 53) < 0.7 * CoastalWorldgenConfig.DRIFTWOOD_DENSITY.get()
+                        && placeDriftwood(level, area, top, type, water, seed);
+                case SHELL_PATCH -> CoastalWorldgenConfig.ENABLE_ROCK_OUTCROPS.get()
+                        && placeShellPatch(level, area, top, type, seed);
+                case ROCK_CLUSTER, SEA_STACK -> CoastalWorldgenConfig.ENABLE_ROCK_OUTCROPS.get()
+                        && formations < 3
+                        && roll(seed, x, z, attempt, 59) < 0.7 * CoastalWorldgenConfig.ROCK_CLUSTER_DENSITY.get()
+                        && (detail == CoastalTerrainProfile.Detail.SEA_STACK
+                        ? placeSeaStack(level, area, water, seed)
+                        : placeMound(level, area, top, type, seed, false));
+                case TIDE_POOL -> CoastalWorldgenConfig.ENABLE_TIDE_POOLS.get()
+                        && water.distance() <= 4 && placeTidePool(level, area, top);
+                case ICE_FRAGMENT -> CoastalWorldgenConfig.ENABLE_ICE_FRAGMENTS.get()
+                        && formations < (type == CoastalWaveProfile.ShoreType.COLD ? 1 : 3)
+                        && placeMound(level, area, top, type, seed, true);
+            };
+            if (success) {
+                placed = true;
+                details++;
+                if (detail == CoastalTerrainProfile.Detail.DRIFTWOOD) logs++;
+                if (detail == CoastalTerrainProfile.Detail.ROCK_CLUSTER
+                        || detail == CoastalTerrainProfile.Detail.SEA_STACK
+                        || detail == CoastalTerrainProfile.Detail.ICE_FRAGMENT) formations++;
             }
         }
         return placed;
     }
 
-    private static boolean enabled(CoastalTerrainProfile.Detail detail) {
-        return switch (detail) {
-            case NONE -> false;
-            case BEACH_GRASS, PALM -> CoastalWorldgenConfig.ENABLE_COASTAL_VEGETATION.get();
-            case DRIFTWOOD -> CoastalWorldgenConfig.ENABLE_DRIFTWOOD.get();
-            case TIDE_POOL -> CoastalWorldgenConfig.ENABLE_TIDE_POOLS.get();
-            case ICE_FRAGMENT -> CoastalWorldgenConfig.ENABLE_ICE_FRAGMENTS.get();
-            case SHELL_PATCH, ROCK_CLUSTER, SEA_STACK ->
-                    CoastalWorldgenConfig.ENABLE_ROCK_OUTCROPS.get();
-        };
-    }
-
-    private static boolean placeDetail(
-            WorldGenLevel level,
-            int minimumX,
-            int minimumZ,
-            BlockPos top,
-            CoastalWaveProfile.ShoreType shoreType,
-            CoastalTerrainProfile.Detail detail,
-            WaterContact water,
-            long seed
-    ) {
-        return switch (detail) {
-            case NONE, PALM -> false; // Palms use the per-chunk cap in place().
-            case BEACH_GRASS -> placePlant(level, top, shoreType, seed);
-            case DRIFTWOOD -> placeDriftwood(
-                    level, minimumX, minimumZ, top, shoreType, water, seed);
-            case SHELL_PATCH -> placeShellPatch(
-                    level, minimumX, minimumZ, top, shoreType, seed);
-            case ROCK_CLUSTER -> placeRockCluster(
-                    level, minimumX, minimumZ, top, shoreType, seed);
-            case TIDE_POOL -> placeTidePool(level, minimumX, minimumZ, top);
-            case ICE_FRAGMENT -> placeIceFragment(
-                    level, minimumX, minimumZ, top, seed);
-            case SEA_STACK -> placeSeaStack(
-                    level, minimumX, minimumZ, top, water, seed);
-        };
-    }
-
-    private static boolean placePlant(
-            WorldGenLevel level,
-            BlockPos top,
-            CoastalWaveProfile.ShoreType shoreType,
-            long seed
-    ) {
-        BlockPos position = top.above();
-        if (!canWrite(level, position) || !level.getBlockState(position).isAir()) {
+    private static boolean placePalms(WorldGenLevel level, CoastalGenerationArea area) {
+        double density = CoastalWorldgenConfig.COASTAL_DETAIL_DENSITY.get()
+                * CoastalWorldgenConfig.PALM_DENSITY.get();
+        if (!CoastalWorldgenConfig.ENABLE_COASTAL_VEGETATION.get() || density <= 0
+                || roll(level.getSeed(), area.minimumX, area.minimumZ, 0, 71) >= Math.min(1, density * 1.7)) {
             return false;
         }
-        BlockState ground = level.getBlockState(top);
-        BlockState plant;
-        if (ground.is(BlockTags.SAND)) {
-            if (shoreType == CoastalWaveProfile.ShoreType.TROPICAL) {
-                return false; // Keep the warm strand open; no desert scrub on tropical sand.
+        long seed = level.getSeed();
+        int target = roll(seed, area.minimumX, area.minimumZ, 0, 73) < Math.min(0.7, density) ? 2 : 1;
+        List<BlockPos> palms = new ArrayList<>(2);
+        for (int attempt = 0; attempt < 20 && palms.size() < target; attempt++) {
+            // Sample roots where a complete crown CAN fit, instead of spending
+            // almost every chance on anchors destined to fail the chunk guard.
+            int x = area.minimumX + 4 + (int) (roll(seed, area.minimumX, area.minimumZ, attempt, 79) * 8);
+            int z = area.minimumZ + 4 + (int) (roll(seed, area.minimumX, area.minimumZ, attempt, 83) * 8);
+            var water = area.contact(x, z);
+            if (area.shoreType(x, z) != CoastalWaveProfile.ShoreType.TROPICAL || water == null
+                    || water.distance() < 7 || water.distance() > 20
+                    || area.column(x, z).water()) continue;
+            BlockPos top = area.surface(x, z);
+            if (palms.stream().anyMatch(other -> other.distSqr(top) < 36)) continue;
+            int height = 5 + (int) (roll(seed, x, z, attempt, 89) * 4);
+            int direction = (int) (roll(seed, x, z, attempt, 97) * 4);
+            int leanX = direction < 2 ? (direction == 0 ? 1 : -1) : 0;
+            int leanZ = direction >= 2 ? (direction == 2 ? 1 : -1) : 0;
+            if (TropicalPalmPlacer.place(level, top, area.minimumX, area.minimumZ, height, leanX, leanZ)) {
+                palms.add(top);
             }
-            plant = Blocks.DEAD_BUSH.defaultBlockState();
-        } else if (shoreType == CoastalWaveProfile.ShoreType.TROPICAL
-                && hashUnit(seed, top.getX(), top.getZ(), 0xF1357AEA2E62A9C5L) > 0.58) {
-            plant = Blocks.FERN.defaultBlockState();
-        } else {
-            plant = Blocks.SHORT_GRASS.defaultBlockState();
         }
-        if (!plant.canSurvive(level, position)) {
-            return false;
-        }
-        level.setBlock(position, plant, 2);
-        return true;
+        return !palms.isEmpty();
     }
 
-    private static boolean placeDriftwood(
-            WorldGenLevel level,
-            int minimumX,
-            int minimumZ,
-            BlockPos top,
-            CoastalWaveProfile.ShoreType shoreType,
-            WaterContact water,
-            long seed
-    ) {
-        int tangentX = water.directionZ() == 0 ? 0 : Integer.signum(-water.directionZ());
-        int tangentZ = water.directionX() == 0 ? 0 : Integer.signum(water.directionX());
-        if (tangentX == 0 && tangentZ == 0) {
-            tangentX = 1;
-        }
-        Direction.Axis axis = Math.abs(tangentX) >= Math.abs(tangentZ)
-                ? Direction.Axis.X : Direction.Axis.Z;
-        if (axis == Direction.Axis.X) {
-            tangentX = tangentX == 0 ? 1 : Integer.signum(tangentX);
-            tangentZ = 0;
-        } else {
-            tangentX = 0;
-            tangentZ = tangentZ == 0 ? 1 : Integer.signum(tangentZ);
-        }
-        BlockState log = switch (shoreType) {
-            case TROPICAL -> Blocks.JUNGLE_LOG.defaultBlockState();
-            case COLD, GLACIAL -> Blocks.SPRUCE_LOG.defaultBlockState();
-            default -> Blocks.OAK_LOG.defaultBlockState();
-        };
-        log = log.setValue(RotatedPillarBlock.AXIS, axis);
-        int length = 2 + (int) Math.floor(hashUnit(
-                seed, top.getX(), top.getZ(), 0x94D049BB133111EBL) * 3.0);
-        for (int offset = 0; offset < length; offset++) {
-            int x = top.getX() + tangentX * offset;
-            int z = top.getZ() + tangentZ * offset;
-            if (!insideOriginChunk(x, z, minimumX, minimumZ)) {
-                return false;
-            }
-            int y = surfaceY(level, x, z);
-            BlockPos support = new BlockPos(x, y, z);
-            BlockPos position = support.above();
-            if (Math.abs(y - top.getY()) > 1
-                    || !isNaturalSurface(level.getBlockState(support))
-                    || !canWrite(level, position)
-                    || !level.getBlockState(position).isAir()) {
-                return false;
-            }
-        }
-        for (int offset = 0; offset < length; offset++) {
-            int x = top.getX() + tangentX * offset;
-            int z = top.getZ() + tangentZ * offset;
-            int y = surfaceY(level, x, z);
-            level.setBlock(new BlockPos(x, y + 1, z), log, 2);
-        }
-        return true;
-    }
-
-    private static boolean placeShellPatch(
-            WorldGenLevel level,
-            int minimumX,
-            int minimumZ,
-            BlockPos top,
-            CoastalWaveProfile.ShoreType shoreType,
-            long seed
-    ) {
+    private static boolean placePlants(WorldGenLevel level, CoastalGenerationArea area, BlockPos top,
+                                       CoastalWaveProfile.ShoreType type, long seed) {
         boolean placed = false;
-        int count = 1 + (int) Math.floor(hashUnit(
-                seed, top.getX(), top.getZ(), 0xBF58476D1CE4E5B9L) * 3.0);
-        for (int index = 0; index < count; index++) {
-            int x = top.getX() + (index & 1);
-            int z = top.getZ() + (index >> 1);
-            if (!insideOriginChunk(x, z, minimumX, minimumZ)) {
-                continue;
+        for (int index = 0; index < 4; index++) {
+            int x = top.getX() + index % 2;
+            int z = top.getZ() + index / 2;
+            if (!area.inside(x, z)) continue;
+            BlockPos support = area.surface(x, z);
+            var water = area.contact(x, z);
+            if (area.shoreType(x, z) != type || water == null || water.distance() < 5
+                    || Math.abs(support.getY() - top.getY()) > 1) continue;
+            BlockPos pos = support.above();
+            if (!area.canWrite(pos) || !level.getBlockState(pos).isAir()) continue;
+            BlockState ground = level.getBlockState(support);
+            BlockState plant = (type == CoastalWaveProfile.ShoreType.TROPICAL
+                    || type == CoastalWaveProfile.ShoreType.COLD) ? Blocks.FERN.defaultBlockState()
+                    : Blocks.SHORT_GRASS.defaultBlockState();
+            if (ground.is(BlockTags.SAND)) {
+                if (type == CoastalWaveProfile.ShoreType.DUNE) {
+                    plant = Blocks.DEAD_BUSH.defaultBlockState();
+                } else if (water.distance() >= 7 && CoastalGenerationArea.natural(ground)
+                        && CoastalGenerationArea.natural(level.getBlockState(support.below()))) {
+                    // Native grass needs soil; bounded meadow islands provide a
+                    // supported sand-to-green transition rather than invalid grass on sand.
+                    level.setBlock(support, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                } else continue;
             }
-            BlockPos position = new BlockPos(x, surfaceY(level, x, z), z);
-            if (!level.getBlockState(position).is(BlockTags.SAND)
-                    || !canWrite(level, position)) {
-                continue;
-            }
-            level.setBlock(position,
-                    shoreType == CoastalWaveProfile.ShoreType.TROPICAL && index == 0
-                            ? Blocks.DEAD_BRAIN_CORAL_BLOCK.defaultBlockState()
-                            : Blocks.CALCITE.defaultBlockState(),
-                    2);
-            placed = true;
-        }
-        return placed;
-    }
-
-    private static boolean placeRockCluster(
-            WorldGenLevel level,
-            int minimumX,
-            int minimumZ,
-            BlockPos top,
-            CoastalWaveProfile.ShoreType shoreType,
-            long seed
-    ) {
-        boolean placed = false;
-        int count = 1 + (int) Math.floor(hashUnit(
-                seed, top.getX(), top.getZ(), 0x369DEA0F31A53F85L) * 3.0);
-        for (int index = 0; index < count; index++) {
-            int x = top.getX() + (index & 1);
-            int z = top.getZ() + (index >> 1);
-            if (!insideOriginChunk(x, z, minimumX, minimumZ)) {
-                continue;
-            }
-            int y = surfaceY(level, x, z);
-            BlockPos support = new BlockPos(x, y, z);
-            BlockPos position = support.above();
-            if (!isNaturalSurface(level.getBlockState(support))
-                    || !canWrite(level, position)
-                    || !level.getBlockState(position).isAir()) {
-                continue;
-            }
-            BlockState rock = shoreType == CoastalWaveProfile.ShoreType.GLACIAL
-                    ? Blocks.BLUE_ICE.defaultBlockState()
-                    : index % 2 == 0
-                    ? Blocks.ANDESITE.defaultBlockState()
-                    : Blocks.COBBLESTONE.defaultBlockState();
-            level.setBlock(position, rock, 2);
-            placed = true;
-        }
-        return placed;
-    }
-
-    private static boolean placeTidePool(
-            WorldGenLevel level,
-            int minimumX,
-            int minimumZ,
-            BlockPos top
-    ) {
-        int poolY = top.getY();
-        for (int offsetZ = 0; offsetZ < 2; offsetZ++) {
-            for (int offsetX = 0; offsetX < 2; offsetX++) {
-                int x = top.getX() + offsetX;
-                int z = top.getZ() + offsetZ;
-                BlockPos position = new BlockPos(x, poolY, z);
-                if (!insideOriginChunk(x, z, minimumX, minimumZ)
-                        || surfaceY(level, x, z) != poolY
-                        || !canWrite(level, position)
-                        || !isNaturalSurface(level.getBlockState(position))
-                        || !level.getBlockState(position.above()).isAir()) {
-                    return false;
-                }
-            }
-        }
-        for (int offsetZ = 0; offsetZ < 2; offsetZ++) {
-            for (int offsetX = 0; offsetX < 2; offsetX++) {
-                level.setBlock(
-                        new BlockPos(top.getX() + offsetX, poolY, top.getZ() + offsetZ),
-                        Blocks.WATER.defaultBlockState(),
-                        2
-                );
-            }
-        }
-        return true;
-    }
-
-    private static boolean placeIceFragment(
-            WorldGenLevel level,
-            int minimumX,
-            int minimumZ,
-            BlockPos top,
-            long seed
-    ) {
-        int count = 1 + (int) Math.floor(hashUnit(
-                seed, top.getX(), top.getZ(), 0x9E3779B97F4A7C15L) * 3.0);
-        boolean placed = false;
-        for (int index = 0; index < count; index++) {
-            int x = top.getX() + (index & 1);
-            int z = top.getZ() + (index >> 1);
-            if (!insideOriginChunk(x, z, minimumX, minimumZ)) {
-                continue;
-            }
-            BlockPos position = new BlockPos(x, surfaceY(level, x, z) + 1, z);
-            if (!canWrite(level, position) || !level.getBlockState(position).isAir()) {
-                continue;
-            }
-            level.setBlock(position, index == 0
-                    ? Blocks.BLUE_ICE.defaultBlockState()
-                    : Blocks.PACKED_ICE.defaultBlockState(), 2);
-            placed = true;
-        }
-        return placed;
-    }
-
-    private static boolean placeSeaStack(
-            WorldGenLevel level,
-            int minimumX,
-            int minimumZ,
-            BlockPos top,
-            WaterContact water,
-            long seed
-    ) {
-        int seawardX = water.x() + water.directionX() * 2;
-        int seawardZ = water.z() + water.directionZ() * 2;
-        if (!insideOriginChunk(seawardX, seawardZ, minimumX, minimumZ)) {
-            return false;
-        }
-        int waterSurfaceY = surfaceY(level, seawardX, seawardZ);
-        if (!level.getFluidState(new BlockPos(seawardX, waterSurfaceY, seawardZ))
-                .is(FluidTags.WATER)) {
-            return false;
-        }
-        int floorY = level.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, seawardX, seawardZ) - 1;
-        int depth = waterSurfaceY - floorY;
-        if (depth < 1 || depth > 10) {
-            return false;
-        }
-        int stackTopY = waterSurfaceY + 3 + (int) Math.floor(hashUnit(
-                seed, top.getX(), top.getZ(), 0xC2B2AE3D27D4EB4FL) * 5.0);
-        boolean placed = false;
-        int[][] footprint = {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        for (int index = 0; index < footprint.length; index++) {
-            int x = seawardX + footprint[index][0];
-            int z = seawardZ + footprint[index][1];
-            if (!insideOriginChunk(x, z, minimumX, minimumZ)) {
-                continue;
-            }
-            int columnTop = stackTopY - (index == 0 ? 0 : 2 + index % 2);
-            for (int y = floorY + 1; y <= columnTop; y++) {
-                BlockPos position = new BlockPos(x, y, z);
-                BlockState existing = level.getBlockState(position);
-                if (!canWrite(level, position)
-                        || !(existing.isAir()
-                        || level.getFluidState(position).is(FluidTags.WATER)
-                        || isNaturalSurface(existing))) {
-                    continue;
-                }
-                level.setBlock(position, (y + index) % 4 == 0
-                        ? Blocks.ANDESITE.defaultBlockState()
-                        : Blocks.STONE.defaultBlockState(), 2);
+            if (plant.canSurvive(level, pos)) {
+                level.setBlock(pos, plant, 2);
                 placed = true;
             }
         }
         return placed;
     }
 
-    private static WaterContact nearestWaterContact(
-            WorldGenLevel level,
-            int originX,
-            int originY,
-            int originZ
-    ) {
-        for (int distance = 1; distance <= WATER_SEARCH_DISTANCE; distance++) {
-            for (int[] direction : DIRECTIONS) {
-                int x = originX + direction[0] * distance;
-                int z = originZ + direction[1] * distance;
-                if (!level.hasChunk(x >> 4, z >> 4)) {
-                    continue;
+    static boolean placeDriftwood(WorldGenLevel level, CoastalGenerationArea area, BlockPos top,
+                                  CoastalWaveProfile.ShoreType type, CoastalGenerationArea.Contact water, long seed) {
+        int tangentX = Math.abs(water.directionZ()) >= Math.abs(water.directionX()) ? 1 : 0;
+        int tangentZ = tangentX == 0 ? 1 : 0;
+        BlockState log = (type == CoastalWaveProfile.ShoreType.TROPICAL ? Blocks.JUNGLE_LOG
+                : type == CoastalWaveProfile.ShoreType.COLD || type == CoastalWaveProfile.ShoreType.GLACIAL
+                ? Blocks.SPRUCE_LOG : Blocks.OAK_LOG).defaultBlockState().setValue(RotatedPillarBlock.AXIS,
+                tangentX == 1 ? Direction.Axis.X : Direction.Axis.Z);
+        int wanted = 2 + (int) (roll(seed, top.getX(), top.getZ(), 0, 101) * 3);
+        for (int length = wanted; length >= 2; length--) {
+            for (int sign : new int[]{1, -1}) {
+                List<BlockPos> positions = new ArrayList<>(4);
+                for (int offset = 0; offset < length; offset++) {
+                    int x = top.getX() + tangentX * offset * sign;
+                    int z = top.getZ() + tangentZ * offset * sign;
+                    if (!area.inside(x, z)) break;
+                    BlockPos support = area.surface(x, z);
+                    BlockPos pos = support.above();
+                    if (support.getY() != top.getY() || !area.canWrite(pos)
+                            || !CoastalGenerationArea.natural(level.getBlockState(support))
+                            || !level.getBlockState(support).isFaceSturdy(level, support, Direction.UP)
+                            || !CoastalGenerationArea.clear(level.getBlockState(pos))) break;
+                    positions.add(pos);
                 }
-                int surfaceY = surfaceY(level, x, z);
-                BlockPos position = new BlockPos(x, surfaceY, z);
-                if (Math.abs(surfaceY - originY) <= 8
-                        && level.getFluidState(position).is(FluidTags.WATER)) {
-                    return new WaterContact(
-                            distance, direction[0], direction[1], x, z);
+                if (positions.size() == length) {
+                    for (BlockPos pos : positions) level.setBlock(pos, log, 2);
+                    return true;
                 }
             }
         }
-        return null;
+        return false;
     }
 
-    private static int surfaceY(WorldGenLevel level, int x, int z) {
-        return level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z) - 1;
+    private static boolean placeShellPatch(WorldGenLevel level, CoastalGenerationArea area, BlockPos top,
+                                          CoastalWaveProfile.ShoreType type, long seed) {
+        boolean placed = false;
+        int count = 1 + (int) (roll(seed, top.getX(), top.getZ(), 0, 103) * 3);
+        for (int index = 0; index < count; index++) {
+            int x = top.getX() + index % 2;
+            int z = top.getZ() + index / 2;
+            if (!area.inside(x, z)) continue;
+            BlockPos pos = area.surface(x, z);
+            if (area.canWrite(pos) && level.getBlockState(pos).is(BlockTags.SAND)
+                    && CoastalGenerationArea.clear(level.getBlockState(pos.above()))) {
+                level.setBlock(pos, (type == CoastalWaveProfile.ShoreType.TROPICAL && index == 0
+                        ? Blocks.DEAD_BRAIN_CORAL_BLOCK : Blocks.CALCITE).defaultBlockState(), 2);
+                placed = true;
+            }
+        }
+        return placed;
     }
 
-    private static boolean canWrite(WorldGenLevel level, BlockPos position) {
-        return position.getY() >= level.getMinBuildHeight()
-                && position.getY() < level.getMaxBuildHeight()
-                && level.ensureCanWrite(position);
+    private static boolean placeMound(WorldGenLevel level, CoastalGenerationArea area, BlockPos top,
+                                     CoastalWaveProfile.ShoreType type, long seed, boolean ice) {
+        int height = ice || type == CoastalWaveProfile.ShoreType.ROCKY
+                ? 1 + (int) (roll(seed, top.getX(), top.getZ(), 0, 107) * 2) : 1;
+        BlockState material = (ice ? Blocks.PACKED_ICE
+                : roll(seed, top.getX(), top.getZ(), 0, 109) > 0.6 ? Blocks.ANDESITE : Blocks.STONE).defaultBlockState();
+        List<BlockPos> positions = new ArrayList<>(12);
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (Math.abs(dx) + Math.abs(dz) > 1) continue;
+                int x = top.getX() + dx;
+                int z = top.getZ() + dz;
+                if (!area.inside(x, z)) return false;
+                BlockPos support = area.surface(x, z);
+                if (Math.abs(support.getY() - top.getY()) > 1
+                        || !CoastalGenerationArea.natural(level.getBlockState(support))
+                        || !level.getBlockState(support).isFaceSturdy(level, support, Direction.UP)) return false;
+                int columnHeight = dx == 0 && dz == 0 ? height : 1;
+                for (int y = 1; y <= columnHeight; y++) {
+                    BlockPos pos = support.above(y);
+                    if (!area.canWrite(pos) || !CoastalGenerationArea.clear(level.getBlockState(pos))) return false;
+                    positions.add(pos);
+                }
+            }
+        }
+        for (BlockPos pos : positions) {
+            boolean blue = ice && type == CoastalWaveProfile.ShoreType.GLACIAL
+                    && pos.getX() == top.getX() && pos.getZ() == top.getZ();
+            level.setBlock(pos, blue ? Blocks.BLUE_ICE.defaultBlockState() : material, 2);
+        }
+        return true;
     }
 
-    private static boolean insideOriginChunk(
-            int x,
-            int z,
-            int minimumX,
-            int minimumZ
-    ) {
-        return x >= minimumX && x < minimumX + 16
-                && z >= minimumZ && z < minimumZ + 16;
+    static boolean placeTidePool(WorldGenLevel level, CoastalGenerationArea area, BlockPos top) {
+        int y = top.getY();
+        // Verify a solid floor and an intact natural rim before excavating. No
+        // fluids escape into caves, down a beach slope, or over the chunk edge.
+        for (int dz = -1; dz <= 2; dz++) {
+            for (int dx = -1; dx <= 2; dx++) {
+                BlockPos pos = top.offset(dx, 0, dz);
+                if (!area.canWrite(pos) || area.surface(pos.getX(), pos.getZ()).getY() < y
+                        || !CoastalGenerationArea.natural(level.getBlockState(pos))
+                        || !CoastalGenerationArea.natural(level.getBlockState(pos.below()))
+                        || !level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP)) return false;
+                if (dx >= 0 && dx < 2 && dz >= 0 && dz < 2
+                        && !CoastalGenerationArea.clear(level.getBlockState(pos.above()))) return false;
+            }
+        }
+        for (int dz = 0; dz < 2; dz++) {
+            for (int dx = 0; dx < 2; dx++) {
+                BlockPos pos = top.offset(dx, 0, dz);
+                if (!level.getBlockState(pos.above()).isAir()) level.setBlock(pos.above(), Blocks.AIR.defaultBlockState(), 2);
+                level.setBlock(pos, Blocks.WATER.defaultBlockState(), 2);
+            }
+        }
+        return true;
     }
 
-    private static boolean isNaturalSurface(BlockState state) {
-        return state.is(BlockTags.DIRT)
-                || state.is(BlockTags.SAND)
-                || state.is(BlockTags.BASE_STONE_OVERWORLD)
-                || state.is(Blocks.GRAVEL)
-                || state.is(Blocks.CLAY)
-                || state.is(Blocks.SNOW)
-                || state.is(Blocks.SNOW_BLOCK)
-                || state.is(Blocks.ICE)
-                || state.is(Blocks.PACKED_ICE)
-                || state.is(Blocks.BLUE_ICE);
+    static boolean placeSeaStack(WorldGenLevel level, CoastalGenerationArea area,
+                                         CoastalGenerationArea.Contact water, long seed) {
+        int x = water.x() + Integer.signum(water.directionX()) * 2;
+        int z = water.z() + Integer.signum(water.directionZ()) * 2;
+        int top = level.getSeaLevel() + 2 + (int) (roll(seed, x, z, 0, 113) * 3);
+        List<BlockPos> positions = new ArrayList<>(96);
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (Math.abs(dx) + Math.abs(dz) > 1) continue;
+                if (!area.inside(x + dx, z + dz)) return false;
+                int floor = level.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x + dx, z + dz) - 1;
+                int surface = area.column(x + dx, z + dz).y();
+                if (!area.column(x + dx, z + dz).water() || surface - floor < 1 || surface - floor > 10
+                        || !CoastalGenerationArea.natural(level.getBlockState(new BlockPos(x + dx, floor, z + dz)))) return false;
+                int columnTop = top - (dx == 0 && dz == 0 ? 0 : 2);
+                for (int y = floor + 1; y <= columnTop; y++) {
+                    BlockPos pos = new BlockPos(x + dx, y, z + dz);
+                    BlockState state = level.getBlockState(pos);
+                    if (!area.canWrite(pos) || !(state.isAir() || state.getFluidState().is(FluidTags.WATER))) return false;
+                    positions.add(pos);
+                }
+            }
+        }
+        for (BlockPos pos : positions) level.setBlock(pos, (pos.getY() < top - 1
+                ? Blocks.STONE : Blocks.ANDESITE).defaultBlockState(), 2);
+        return true;
     }
 
-    private static double hashUnit(long seed, int x, int z, long salt) {
-        long value = seed ^ salt
-                ^ (long) x * 0x9E3779B97F4A7C15L
-                ^ (long) z * 0xC2B2AE3D27D4EB4FL;
-        value ^= value >>> 30;
-        value *= 0xBF58476D1CE4E5B9L;
-        value ^= value >>> 27;
-        value *= 0x94D049BB133111EBL;
-        value ^= value >>> 31;
-        return (value >>> 11) * 0x1.0p-53;
-    }
-
-    private record WaterContact(
-            int distance,
-            int directionX,
-            int directionZ,
-            int x,
-            int z
-    ) {
+    private static double roll(long seed, int x, int z, int attempt, int salt) {
+        return CoastalTerrainProfile.hashUnit(seed, x, z, (long) salt * 0xD1B54A32D192ED03L
+                ^ (long) attempt * 0xABC98388FB8FAC03L);
     }
 }
