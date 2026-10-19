@@ -1,27 +1,28 @@
 # WAGE validation and acceptance
 
 Final local verification: 2026-10-19, Windows, JDK 21, NeoForge 21.1.262.
-The branch is based on `in-dev` commit `a9b56c66`. Validation uses the checked-in
+The initial base was `a9b56c66`; the final PR incorporates upstream `in-dev`
+commit `3892addb` before integration verification. Validation uses the checked-in
 wrapper, isolated `.codex-build` output and one development process at a time.
 The initial clean rendering baseline passed 301 cases before WAGE was applied.
 
 ## Final commands and results
 
 ```powershell
-.\gradlew.bat build renderingTest questCompatibilityTest gpuRenderingTest '-PcodexBuildDir=.codex-build' --no-parallel --console=plain
-.\gradlew.bat test '-PcodexBuildDir=.codex-build' --no-parallel --console=plain
+.\gradlew.bat build test renderingTest questCompatibilityTest gpuRenderingTest '-PcodexBuildDir=.codex-build' --no-parallel --console=plain
 ```
 
-Both completed successfully: packaging/subsystem/hardware verification in 37
-seconds and the explicit aggregate test command in 1 minute 11 seconds. This
-repository intentionally keeps API tests separate from `build`, so both commands
-are required. Packaging also completed the Aether standalone verification and
+The combined command completed successfully in **1 minute 54 seconds** on the
+merged tree. Before upstream integration, separate packaging/subsystem/hardware
+and aggregate-test invocations also passed in 37 seconds and 1 minute 11 seconds.
+This repository intentionally keeps API tests separate from `build`, so `test`
+must be requested explicitly. Packaging also completed the Aether standalone verification and
 structure-viewer distributions. Unchanged Aether/viewer tests were up-to-date
 from their completed passing runs; the API and changed rendering suites executed.
 
 | Task | Cases | Failures / errors | Skips |
 | --- | ---: | ---: | ---: |
-| API `:test` | 1,638 | 0 / 0 | 5 |
+| API `:test` | 1,662 | 0 / 0 | 5 |
 | `:aether-server:test` | 57 | 0 / 0 | 0 |
 | `:tools:structure-viewer:test` | 53 | 0 / 0 | 0 |
 | `:renderingTest` | 328 | 0 / 0 | 1 |
@@ -41,8 +42,11 @@ its read timeout and healthy-generation/outage checks remain enforced. Added
 pressure-sampler tests verify no full-system probe request, separate caches and
 clock rollback. They failed without the API and passed after implementation.
 
-Final logs and XML totals are local under `.codex-build/wage-pr-final-build.log`,
-`wage-pr-final-test.log`, `wage-pr-final-results.json` and `test-results/`.
+The merged API count includes 24 additional upstream coastal cases; WAGE's PR
+diff contains no coastal source changes. Final logs and totals are under
+`.codex-build/wage-pr-merged-validation.log`, `wage-pr-merged-results.json` and
+`test-results/`. The earlier `wage-pr-final-build.log`, `wage-pr-final-test.log`
+and `wage-pr-final-results.json` record the pre-integration verification.
 No logs, generated worlds, screenshots or build outputs are committed.
 
 ## Actual-driver shader correctness and timing
@@ -66,10 +70,11 @@ latest completed run measured:
 
 | GPU interval per batch | Normal path | Bounds enabled |
 | --- | ---: | ---: |
-| Median | 0.343040 ms | 0.294912 ms |
-| p95 | 0.377856 ms | 0.316416 ms |
+| Median | 0.343040 ms | 0.287744 ms |
+| p95 | 0.378880 ms | 0.304128 ms |
 
-The median batch interval is about 14% lower for this fixture. This is one
+The median batch interval is about 16% lower for this fixture. A preceding run
+measured approximately 14% lower (0.343040 versus 0.294912 ms). This is one
 controlled shader workload on one GPU/driver, not a Minecraft FPS result, a
 representative occupancy estimate or a universal speedup. No performance threshold
 is asserted by the test. Synchronous readback/query waiting occurs only in this
@@ -126,6 +131,9 @@ The incomplete fixture/log were preserved separately. No save-engine fix was mad
 
 Log: `.codex-build/wage-pr-world-acceptance-final.log`. Normal gameplay never
 collects these test samples, mutates test settings or stops automatically.
+These client traces preceded the upstream coastal merge, which changed no WAGE
+renderer/harness source. Full API, subsystem and driver tests were rerun after
+that merge; no additional in-world acceptance is inferred from the merge itself.
 
 ## Startup and dedicated-server smoke
 

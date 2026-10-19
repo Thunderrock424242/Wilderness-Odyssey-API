@@ -2,9 +2,10 @@
 
 Date: 2026-10-17; isolated delivery prepared 2026-10-18. The initial audit was
 performed on the shared `in-dev` working tree, including its ongoing OPC package
-migration. The final `codex/wage-in-dev` worktree is based on clean `in-dev`
-commit `a9b56c66` and carries only WAGE plus the independent `JvmMetrics` sampler
-it consumes. The rest of the OPC migration and river/coastal edits are excluded.
+migration. The isolated worktree initially used clean `in-dev` commit `a9b56c66`.
+Upstream coastal commit `3892addb` was subsequently merged for PR integration.
+The WAGE diff carries only this slice plus the independent `JvmMetrics` sampler
+it consumes; it excludes the rest of the OPC migration and river/coastal edits.
 
 ## Ownership and feasibility
 
