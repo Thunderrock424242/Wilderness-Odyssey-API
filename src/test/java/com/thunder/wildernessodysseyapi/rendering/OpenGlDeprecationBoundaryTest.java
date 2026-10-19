@@ -19,9 +19,9 @@ class OpenGlDeprecationBoundaryTest {
             System.getProperty("user.dir")
     )).resolve(Path.of("src", "main", "java"));
     private static final Set<String> DIRECT_OPENGL_OWNERS = Set.of(
-            "com/thunder/wildernessodysseyapi/gpuprofiler/client/GpuDiagnostics.java",
-            "com/thunder/wildernessodysseyapi/gpuprofiler/client/GpuMemoryProbe.java",
-            "com/thunder/wildernessodysseyapi/gpuprofiler/client/GpuProfiler.java",
+            "com/thunder/wildernessodysseyapi/opc/diagnostics/gpu/client/GpuDiagnostics.java",
+            "com/thunder/wildernessodysseyapi/opc/diagnostics/gpu/client/GpuMemoryProbe.java",
+            "com/thunder/wildernessodysseyapi/opc/diagnostics/gpu/client/GpuProfiler.java",
             "com/thunder/wildernessodysseyapi/mixin/StructureBlockRendererMixin.java",
             "com/thunder/wildernessodysseyapi/rendering/backend/opengl/OpenGlGpuTimer.java",
             "com/thunder/wildernessodysseyapi/rendering/backend/opengl/OpenGlRenderBackend.java",
@@ -50,7 +50,7 @@ class OpenGlDeprecationBoundaryTest {
         assertEquals(DIRECT_OPENGL_OWNERS, discovered,
                 "Direct OpenGL use must remain inside the documented removal boundary");
         assertDeprecatedPackage("com/thunder/wildernessodysseyapi/rendering/backend/opengl/package-info.java");
-        assertDeprecatedPackage("com/thunder/wildernessodysseyapi/gpuprofiler/client/package-info.java");
+        assertDeprecatedPackage("com/thunder/wildernessodysseyapi/opc/diagnostics/gpu/client/package-info.java");
         for (String mixin : LEGACY_OPENGL_MIXINS) {
             assertTrue(Files.readString(SOURCE_ROOT.resolve(mixin)).contains("@Deprecated(forRemoval = true)"),
                     () -> mixin + " must remain visibly deprecated until its Vulkan replacement lands");

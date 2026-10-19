@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.ecosystem.distant;
 
 import com.thunder.wildernessodysseyapi.ecosystem.integration.EcosystemPerformanceIntegration;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;

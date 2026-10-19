@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.quest.workshop;
 
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.opc.async.AsyncTaskManager;
 
 import java.util.ArrayDeque;
 import java.util.Objects;

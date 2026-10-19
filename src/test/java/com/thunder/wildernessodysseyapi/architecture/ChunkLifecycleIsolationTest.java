@@ -16,15 +16,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Guards Minecraft's chunk lifecycle from Wilderness Odyssey performance controls.
  *
- * <p>The performance, async, and Data Engine packages may classify coordinates
+ * <p>OPC scheduling, workers and Data Engine packages may classify coordinates
  * and defer their own optional work, but they must never load chunks, control
  * tickets, wrap generation, or decide when chunks are sent or unloaded.</p>
  */
 class ChunkLifecycleIsolationTest {
     private static final List<String> OPTIMIZATION_PACKAGES = List.of(
-            "async",
-            "dataengine",
-            "performance"
+            "opc/async",
+            "opc/dataengine",
+            "opc/core",
+            "opc/coordinator",
+            "opc/background",
+            "opc/tickengine",
+            "opc/ram",
+            "opc/simulation"
     );
     private static final List<String> CHUNK_OWNERS = List.of(
             "mixin",
@@ -40,8 +45,8 @@ class ChunkLifecycleIsolationTest {
                     + "updateChunkForced|setChunkForced|setViewDistance)\\s*\\(")
     );
     private static final Pattern OPTIMIZATION_REFERENCE = Pattern.compile(
-            "com\\.thunder\\.wildernessodysseyapi\\.(?:async|dataengine|performance)\\."
-                    + "|\\b(?:AsyncTaskManager|DataEngine|TickEngine|BackgroundEfficiencyManager)\\b"
+            "com\\.thunder\\.wildernessodysseyapi\\.(?:opc\\.(?:async|dataengine|core|coordinator|background|tickengine|ram)|performance)\\."
+                    + "|\\b(?:AsyncTaskManager|DataEngine|TickEngine|BackgroundEfficiencyManager|OdysseyPerformanceCore|PerformanceCoordinator)\\b"
     );
 
     @Test
@@ -50,6 +55,7 @@ class ChunkLifecycleIsolationTest {
         List<String> violations = new ArrayList<>();
 
         for (String packageName : OPTIMIZATION_PACKAGES) {
+            assertTrue(Files.isDirectory(sourceRoot.resolve(packageName)), "Guarded OPC package is missing: " + packageName);
             inspectTree(
                     sourceRoot.resolve(packageName),
                     source -> FORBIDDEN_CHUNK_CONTROL.stream().anyMatch(pattern -> pattern.matcher(source).find()),

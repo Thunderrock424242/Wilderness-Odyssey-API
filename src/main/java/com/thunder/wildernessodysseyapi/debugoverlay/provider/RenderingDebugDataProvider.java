@@ -5,7 +5,7 @@ import com.thunder.wildernessodysseyapi.debugoverlay.DebugContext;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugPageContributorRegistry;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugSection;
 import com.thunder.wildernessodysseyapi.debugoverlay.DebugValue;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuProfiler;
 import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackends;
 import com.thunder.wildernessodysseyapi.rendering.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.client.ClientDistantWildlifeState;

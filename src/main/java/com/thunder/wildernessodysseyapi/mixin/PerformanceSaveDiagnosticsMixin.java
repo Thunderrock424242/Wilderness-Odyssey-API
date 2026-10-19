@@ -3,7 +3,7 @@ package com.thunder.wildernessodysseyapi.mixin;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.thunder.wildernessodysseyapi.diagnostics.performance.PerformanceDiagnostics;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.PerformanceDiagnostics;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProgressListener;

@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.thunder.wildernessodysseyapi.saving.coordinator.NativeChunkSaveAccess;
-import com.thunder.wildernessodysseyapi.saving.coordinator.SavingCoordinator;
+import com.thunder.wildernessodysseyapi.opc.saving.NativeChunkSaveAccess;
+import com.thunder.wildernessodysseyapi.opc.saving.SavingCoordinator;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;

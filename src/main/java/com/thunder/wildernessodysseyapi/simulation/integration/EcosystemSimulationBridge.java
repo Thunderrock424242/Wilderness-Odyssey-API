@@ -4,8 +4,8 @@ import com.thunder.wildernessodysseyapi.ecosystem.api.WildlifeSimulationLod;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemRegionSnapshot;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationSettings;
-import com.thunder.wildernessodysseyapi.performance.background.ActivityLevel;
-import com.thunder.wildernessodysseyapi.simulation.region.SimulationRegion;
+import com.thunder.wildernessodysseyapi.opc.background.ActivityLevel;
+import com.thunder.wildernessodysseyapi.opc.simulation.region.SimulationRegion;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 

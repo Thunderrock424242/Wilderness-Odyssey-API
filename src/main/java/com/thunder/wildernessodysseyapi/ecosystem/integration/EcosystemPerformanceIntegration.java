@@ -1,16 +1,16 @@
 package com.thunder.wildernessodysseyapi.ecosystem.integration;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
-import com.thunder.wildernessodysseyapi.dataengine.DataSystemRegistration;
-import com.thunder.wildernessodysseyapi.dataengine.queue.UpdatePriority;
-import com.thunder.wildernessodysseyapi.dataengine.scheduler.UpdateFrequency;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataSystemRegistration;
+import com.thunder.wildernessodysseyapi.opc.dataengine.queue.UpdatePriority;
+import com.thunder.wildernessodysseyapi.opc.dataengine.scheduler.UpdateFrequency;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.DistantWildlifeManager;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
-import com.thunder.wildernessodysseyapi.performance.background.ActivityLevel;
-import com.thunder.wildernessodysseyapi.performance.tickengine.AdaptiveThrottle;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickPressure;
+import com.thunder.wildernessodysseyapi.opc.background.ActivityLevel;
+import com.thunder.wildernessodysseyapi.opc.tickengine.AdaptiveThrottle;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickPressure;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;

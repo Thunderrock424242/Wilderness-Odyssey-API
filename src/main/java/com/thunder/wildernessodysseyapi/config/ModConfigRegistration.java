@@ -1,20 +1,22 @@
 package com.thunder.wildernessodysseyapi.config;
 
-import com.thunder.wildernessodysseyapi.async.AsyncTaskManager;
-import com.thunder.wildernessodysseyapi.async.AsyncThreadingConfig;
-import com.thunder.wildernessodysseyapi.dataengine.DataEngine;
-import com.thunder.wildernessodysseyapi.dataengine.config.DataEngineConfig;
+import com.thunder.wildernessodysseyapi.opc.config.PerformanceConfigMigration;
+
+import com.thunder.wildernessodysseyapi.opc.async.AsyncTaskManager;
+import com.thunder.wildernessodysseyapi.opc.async.AsyncThreadingConfig;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataEngine;
+import com.thunder.wildernessodysseyapi.opc.dataengine.config.DataEngineConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.EcosystemEvents;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.data.SpeciesBehaviorProfileManager;
 import com.thunder.wildernessodysseyapi.ecosystem.distant.DistantWildlifeManager;
 import com.thunder.wildernessodysseyapi.ecosystem.simulation.EcosystemSimulationManager;
-import com.thunder.wildernessodysseyapi.performance.background.BackgroundEfficiencyManager;
-import com.thunder.wildernessodysseyapi.performance.background.config.BackgroundEfficiencyConfig;
-import com.thunder.wildernessodysseyapi.performance.tickengine.TickEngine;
-import com.thunder.wildernessodysseyapi.performance.tickengine.config.TickEngineConfig;
+import com.thunder.wildernessodysseyapi.opc.background.BackgroundEfficiencyManager;
+import com.thunder.wildernessodysseyapi.opc.background.config.BackgroundEfficiencyConfig;
+import com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine;
+import com.thunder.wildernessodysseyapi.opc.tickengine.config.TickEngineConfig;
 import com.thunder.wildernessodysseyapi.rendering.config.RendererConfig;
-import com.thunder.wildernessodysseyapi.simulation.core.SimulationEngine;
+import com.thunder.wildernessodysseyapi.opc.simulation.core.SimulationEngine;
 import com.thunder.wildernessodysseyapi.structureblock.StructureBlockSettings;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherConfig;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;

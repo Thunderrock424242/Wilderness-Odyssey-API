@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.mojang.blaze3d.platform.GlStateManager;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuProfiler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

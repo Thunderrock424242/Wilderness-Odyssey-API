@@ -1,6 +1,6 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
-import com.thunder.wildernessodysseyapi.loading.WorldLoadTimeoutException;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.loading.WorldLoadTimeoutException;
 import net.minecraft.CrashReport;
 import net.minecraft.client.server.IntegratedServer;
 import org.spongepowered.asm.mixin.Mixin;

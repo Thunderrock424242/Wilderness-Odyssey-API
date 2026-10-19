@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.vegetation.client;
 
-import com.thunder.wildernessodysseyapi.dataengine.DataEngineIds;
-import com.thunder.wildernessodysseyapi.dataengine.network.DataDeltaHandlerRegistry;
+import com.thunder.wildernessodysseyapi.opc.dataengine.DataEngineIds;
+import com.thunder.wildernessodysseyapi.opc.dataengine.network.DataDeltaHandlerRegistry;
 import com.thunder.wildernessodysseyapi.vegetation.network.ReactiveVegetationDataDeltaCodec;
 import net.minecraft.client.Minecraft;
 

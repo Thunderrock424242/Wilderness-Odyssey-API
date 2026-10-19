@@ -1,8 +1,8 @@
 package com.thunder.wildernessodysseyapi.mixin;
 
 import com.mojang.blaze3d.platform.TextureUtil;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfiler;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuProfilerContext;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuProfiler;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuProfilerContext;
 import net.minecraft.client.renderer.texture.SimpleTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Final;

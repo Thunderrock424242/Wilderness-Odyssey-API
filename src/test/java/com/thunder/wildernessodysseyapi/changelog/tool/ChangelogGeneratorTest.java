@@ -26,7 +26,7 @@ class ChangelogGeneratorTest {
     @Test
     void classifiesCommitsAndAddsAffectedProjectAreas() {
         Map<ChangeCategory, List<String>> changes = ChangelogClassifier.classify(List.of(
-                commit("Add GPU profiler", "src/main/java/com/thunder/wildernessodysseyapi/gpuprofiler/GpuProfiler.java"),
+                commit("Add GPU profiler", "src/main/java/com/thunder/wildernessodysseyapi/opc/diagnostics/gpu/GpuProfiler.java"),
                 commit("fixed cloak issue", "src/main/java/com/thunder/wildernessodysseyapi/cloak/CloakState.java"),
                 commit("performance tweaks", "src/main/java/com/thunder/wildernessodysseyapi/watersystem/SPH.java"),
                 commit("Remove old AI backend", "src/main/java/com/thunder/wildernessodysseyapi/ai/LegacyBackend.java")

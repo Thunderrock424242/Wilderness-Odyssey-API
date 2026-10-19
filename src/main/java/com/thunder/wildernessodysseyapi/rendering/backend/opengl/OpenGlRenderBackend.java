@@ -2,7 +2,7 @@ package com.thunder.wildernessodysseyapi.rendering.backend.opengl;
 
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuHardwareProbe;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuHardwareProbe;
 import com.thunder.wildernessodysseyapi.rendering.GPUCapabilities;
 import com.thunder.wildernessodysseyapi.rendering.backend.RenderBackend;
 import net.minecraft.client.renderer.ShaderInstance;

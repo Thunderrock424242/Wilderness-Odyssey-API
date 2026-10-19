@@ -3,7 +3,7 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.thunder.wildernessodysseyapi.environment.glacial.client.GlacialWaterTintManager;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalSegment;

@@ -2,8 +2,8 @@ package com.thunder.wildernessodysseyapi.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.thunder.wildernessodysseyapi.loading.client.LoadingStallDetector;
-import com.thunder.wildernessodysseyapi.loading.client.WorldLoadFailureHandler;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.loading.client.LoadingStallDetector;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.loading.client.WorldLoadFailureHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.WorldStem;
 import net.minecraft.server.packs.repository.PackRepository;

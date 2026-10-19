@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.config;
 
+import com.thunder.wildernessodysseyapi.opc.config.PerformanceServerConfig;
+
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 
 import java.io.IOException;

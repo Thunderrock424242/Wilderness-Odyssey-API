@@ -1,7 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.core.ModConstants;
-import com.thunder.wildernessodysseyapi.gpuprofiler.client.GpuDiagnostics;
+import com.thunder.wildernessodysseyapi.opc.diagnostics.gpu.client.GpuDiagnostics;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;

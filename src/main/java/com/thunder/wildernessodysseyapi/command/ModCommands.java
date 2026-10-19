@@ -4,7 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.thunder.wildernessodysseyapi.changelog.command.ChangelogCommand;
 import com.thunder.wildernessodysseyapi.cinematic.command.CinematicCommand;
 import com.thunder.wildernessodysseyapi.donations.command.DonateCommand;
-import com.thunder.wildernessodysseyapi.dataengine.debug.DataEngineCommand;
+import com.thunder.wildernessodysseyapi.opc.dataengine.debug.DataEngineCommand;
 import com.thunder.wildernessodysseyapi.ecosystem.debug.EcosystemDebugCommand;
 import com.thunder.wildernessodysseyapi.faq.FaqCommand;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackCommand;
@@ -18,7 +18,7 @@ import com.thunder.wildernessodysseyapi.modlisttracker.commands.ModListVersionCo
 import com.thunder.wildernessodysseyapi.modpack.structure.command.ModpackStructureCommand;
 import com.thunder.wildernessodysseyapi.playtest.verification.MinecraftVerificationCommands;
 import com.thunder.wildernessodysseyapi.playtest.PlaytestStatusCommand;
-import com.thunder.wildernessodysseyapi.simulation.debug.SimulationDebugCommand;
+import com.thunder.wildernessodysseyapi.opc.simulation.debug.SimulationDebugCommand;
 import com.thunder.wildernessodysseyapi.telemetry.TelemetryQueueStatsCommand;
 import com.thunder.wildernessodysseyapi.vegetation.debug.ReactiveVegetationDebugCommand;
 import com.thunder.wildernessodysseyapi.watersystem.water.command.WaterDebugCommand;
@@ -72,7 +72,7 @@ public final class ModCommands {
         ReactiveVegetationDebugCommand.register(dispatcher);
         GlacialDebugCommand.register(dispatcher);
         DataEngineCommand.register(dispatcher);
-        com.thunder.wildernessodysseyapi.diagnostics.performance.PerformanceCommand.register(dispatcher);
+        com.thunder.wildernessodysseyapi.opc.diagnostics.PerformanceCommand.register(dispatcher);
         SimulationDebugCommand.register(dispatcher);
         CinematicCommand.register(dispatcher);
         com.thunder.wildernessodysseyapi.quest.command.QuestCommand.register(dispatcher);
