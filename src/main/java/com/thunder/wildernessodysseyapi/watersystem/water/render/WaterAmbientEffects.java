@@ -7,6 +7,8 @@ import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSna
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverChannelColumn;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverGenerationChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -82,13 +84,16 @@ public final class WaterAmbientEffects {
             }
 
             ClientWaterChunkSnapshot.Column column = snapshot.column(blockX & 15, blockZ & 15);
-            float currentSpeed = column.currentSpeed();
+            var flow = WatershedServices.localFlow(level, new BlockPos(blockX, column.surfaceBlockY(), blockZ));
+            float currentX = column.currentX(flow.currentX());
+            float currentZ = column.currentZ(flow.currentZ());
+            float currentSpeed = (float) Math.hypot(currentX, currentZ);
             float bubbleChance = bubbleProbability(
                     currentSpeed,
                     (float) player.getDeltaMovement().horizontalDistance()
             );
-            double velocityX = column.velocityX() * 0.025 + (random.nextDouble() - 0.5) * 0.006;
-            double velocityZ = column.velocityZ() * 0.025 + (random.nextDouble() - 0.5) * 0.006;
+            double velocityX = currentX * 0.025 + (random.nextDouble() - 0.5) * 0.006;
+            double velocityZ = currentZ * 0.025 + (random.nextDouble() - 0.5) * 0.006;
             if (random.nextFloat() < bubbleChance) {
                 level.addParticle(
                         ParticleTypes.BUBBLE,
@@ -155,14 +160,20 @@ public final class WaterAmbientEffects {
                     level,
                     new BlockPos(blockX, column.surfaceBlockY(), blockZ)
             );
+            float currentX = column.currentX(localFlow.currentX());
+            float currentZ = column.currentZ(localFlow.currentZ());
             float shore = shorelineFactor(level, blockX, blockZ);
+            var reach = snapshot.rivers().reachAt(blockX & 15, blockZ & 15);
+            var activity = reachActivity(reach, (float) Math.hypot(currentX, currentZ), localFlow.confluence());
             float intensity = surfaceSprayIntensity(
                     sea.strength(),
                     sea.breakingStrength(),
                     column.oceanWeight() / 255.0f,
-                    column.currentSpeed() + localFlow.currentStrength(),
+                    (float) Math.hypot(currentX, currentZ),
                     shore
             );
+            if (reach != null) intensity = Math.max(intensity,
+                    Math.max(activity.foam(), WaterRenderingConfig.riverSprayEnabled() ? activity.spray() : 0));
             if (random.nextFloat() >= intensity) {
                 continue;
             }
@@ -172,35 +183,41 @@ public final class WaterAmbientEffects {
             if (!Float.isFinite(surfaceY)) {
                 continue;
             }
+            if (reach != null && reach.kind() == RiverChannelColumn.Kind.WATERFALL) {
+                // Native fluid owns the curtain; impacts stay at its real wet base.
+                if (!snapshot.contains(blockX & 15, reach.waterY(), blockZ & 15)) continue;
+                surfaceY = reach.waterY() + 1f;
+            }
             if (Math.abs(surfaceY - player.getY()) > 12.0) {
                 continue;
             }
             double velocityX = sea.windDirectionX() * intensity * 0.055
-                    + (column.velocityX() + localFlow.currentX()) * 0.035;
+                    + currentX * 0.035;
             double velocityZ = sea.windDirectionZ() * intensity * 0.055
-                    + (column.velocityZ() + localFlow.currentZ()) * 0.035;
-            if (localFlow.confluence() || intensity >= 0.52f) {
+                    + currentZ * 0.035;
+            if (WaterRenderingConfig.riverFoamEnabled() && (localFlow.confluence() || intensity >= 0.52f || activity.foam() > 0)) {
                 WaterEnvironmentalEffectPool.offer(
                         WaterEnvironmentalEffectPool.Kind.FOAM,
                         x, surfaceY, z, velocityX, velocityZ,
-                        Math.max(intensity, localFlow.currentStrength() / 1.4f),
+                        Math.max(intensity, activity.foam()),
                         level.getGameTime()
                 );
             }
-            if (random.nextFloat() < watershed.debris() * 0.28f) {
+            if (WaterRenderingConfig.riverDebrisEnabled() && random.nextFloat() < watershed.debris() * 0.28f) {
                 WaterEnvironmentalEffectPool.offer(
                         WaterEnvironmentalEffectPool.Kind.DEBRIS,
                         x, surfaceY, z, velocityX, velocityZ,
                         watershed.debris(), level.getGameTime()
                 );
             }
-            if (watershed.sediment() >= 0.42f && localFlow.currentStrength() >= 0.22f) {
+            if (WaterRenderingConfig.riverSprayEnabled() && activity.mist() > 0) {
                 WaterEnvironmentalEffectPool.offer(
                         WaterEnvironmentalEffectPool.Kind.MIST,
                         x, surfaceY, z, velocityX, velocityZ,
-                        watershed.sediment() * 0.58f, level.getGameTime()
+                        activity.mist(), level.getGameTime()
                 );
             }
+            if (column.oceanWeight() < 128 && !WaterRenderingConfig.riverSprayEnabled()) continue;
             level.addParticle(
                     ParticleTypes.SPLASH,
                     x,
@@ -213,6 +230,19 @@ public final class WaterAmbientEffects {
             emitted++;
         }
     }
+
+    /** Derived local whitewater energy; this cannot create motion in a still reach. */
+    static ReachActivity reachActivity(RiverGenerationChunk.Reach reach, float physicalSpeed, boolean confluence) {
+        if (reach == null || reach.kind() == RiverChannelColumn.Kind.LAKE
+                || !Float.isFinite(physicalSpeed) || physicalSpeed <= 0) return new ReachActivity(0, 0, 0);
+        float energy = smoothStep(0.3f, 2.5f, physicalSpeed);
+        float foam = clamp(energy + (confluence ? energy * 0.35f : 0), 0, 1);
+        float drop = reach.kind() == RiverChannelColumn.Kind.WATERFALL
+                ? clamp((reach.topY() - reach.waterY()) / 16f, 0, 1) : 0;
+        return new ReachActivity(foam, clamp(energy * drop * 2, 0, 1), energy * drop);
+    }
+
+    record ReachActivity(float foam, float spray, float mist) { }
 
     private static float shorelineFactor(ClientLevel level, int blockX, int blockZ) {
         int known = 0;

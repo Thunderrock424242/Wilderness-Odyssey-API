@@ -4,6 +4,7 @@ import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.core.ModConstants;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverGenerationChunk;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -56,6 +57,16 @@ public final class ClientWaterSnapshotStore {
                 ? new ClientWaterChunkSnapshot(chunkX, chunkZ, generated.snapshot(), 0L, new int[0])
                 : previous.withGenerated(generated.snapshot()));
         WaterBodyClassifier.invalidateChunk(level, chunkX, chunkZ);
+        markDirty(key);
+    }
+
+    /** Publishes late reach metadata without replacing generated spans or sparse overrides. */
+    public static void publishRivers(Level level, int chunkX, int chunkZ,
+            RiverGenerationChunk.Snapshot rivers) {
+        selectLevel(level);
+        long key = ChunkPos.asLong(chunkX, chunkZ);
+        SNAPSHOTS.compute(key, (ignored, previous) -> (previous == null
+                ? new ClientWaterChunkSnapshot(chunkX, chunkZ, null, 0, new int[0]) : previous).withRivers(rivers));
         markDirty(key);
     }
 
@@ -222,6 +233,8 @@ public final class ClientWaterSnapshotStore {
         }
         chunk.getExistingData(ModAttachments.GENERATED_WATER)
                 .ifPresent(generated -> publishGenerated(level, chunk.getPos().x, chunk.getPos().z, generated));
+        chunk.getExistingData(ModAttachments.RIVER_GENERATION)
+                .ifPresent(river -> publishRivers(level, chunk.getPos().x, chunk.getPos().z, river.snapshot()));
     }
 
     /** Atomically makes an unloaded chunk dry before any later render frame consumes it. */

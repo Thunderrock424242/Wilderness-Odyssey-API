@@ -104,8 +104,8 @@ public final class RainwaterBodyManager {
                     target,
                     kind,
                     volumeUnits,
-                    localFlow.currentX() * velocityScale,
-                    localFlow.currentZ() * velocityScale
+                    RiverCurrentField.physicalVelocity(localFlow.currentX()) * velocityScale,
+                    RiverCurrentField.physicalVelocity(localFlow.currentZ()) * velocityScale
             )) {
                 placed++;
                 conditions = state.conditions();

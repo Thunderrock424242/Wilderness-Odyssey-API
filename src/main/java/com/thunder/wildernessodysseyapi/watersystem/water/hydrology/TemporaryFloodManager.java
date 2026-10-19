@@ -97,8 +97,8 @@ public final class TemporaryFloodManager {
                     target,
                     SurfaceWaterKind.FLOOD,
                     WaterVolumeChunk.UNITS_PER_BLOCK,
-                    localFlow.currentX(),
-                    localFlow.currentZ()
+                    RiverCurrentField.physicalVelocity(localFlow.currentX()),
+                    RiverCurrentField.physicalVelocity(localFlow.currentZ())
             )) {
                 continue;
             }

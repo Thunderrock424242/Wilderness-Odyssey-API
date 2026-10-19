@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:stone", "minecraft:deepslate", "minecraft:andesite", "minecraft:diorite",
+    "minecraft:granite", "minecraft:tuff", "minecraft:calcite", "minecraft:dirt",
+    "minecraft:grass_block", "minecraft:coarse_dirt", "minecraft:podzol", "minecraft:rooted_dirt",
+    "minecraft:gravel", "minecraft:sand", "minecraft:red_sand", "minecraft:sandstone",
+    "minecraft:red_sandstone", "minecraft:clay", "minecraft:mud", "minecraft:packed_mud",
+    "minecraft:snow_block", "minecraft:ice", "minecraft:packed_ice", "minecraft:blue_ice"
+  ]
+}

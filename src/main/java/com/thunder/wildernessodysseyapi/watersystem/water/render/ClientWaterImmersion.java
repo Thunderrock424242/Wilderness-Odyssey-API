@@ -148,8 +148,8 @@ public final class ClientWaterImmersion {
         UnderwaterOpticsModel.OpticalProperties optics = UnderwaterOpticsModel.evaluate(
                 depthBelowSurface,
                 columnDepth,
-                Math.min(1.0f, (column.currentSpeed() + localFlow.currentStrength())
-                        / WaterSurfaceVertexData.MAX_RENDER_CURRENT),
+                Math.min(1.0f, (float) Math.hypot(column.currentX(localFlow.currentX()),
+                        column.currentZ(localFlow.currentZ())) / WaterSurfaceVertexData.MAX_RENDER_CURRENT),
                 daylight,
                 tint[0],
                 tint[1],
@@ -272,8 +272,8 @@ public final class ClientWaterImmersion {
                 oceanWeight,
                 riverWeight,
                 lakeWeight,
-                column.velocityX() + localFlow.currentX(),
-                column.velocityZ() + localFlow.currentZ(),
+                column.currentX(localFlow.currentX()),
+                column.currentZ(localFlow.currentZ()),
                 surfaceContinuity,
                 customSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
                 transientHeight,

@@ -42,7 +42,11 @@ public interface WaterAccess {
     /** Returns vertical depth above a point inside custom water. */
     double getDepth(Level level, Vec3 position);
 
-    /** Returns current velocity at a position, or {@link Vec3#ZERO} when dry. */
+    /**
+     * Returns composed current velocity in metres/second, or {@link Vec3#ZERO} when dry.
+     * Canonical motion already takes ownership over regional motion; callers must
+     * not add the watershed vector again. Watershed snapshots themselves use blocks/tick.
+     */
     Vec3 getCurrent(Level level, Vec3 position);
 
     /** Returns read-only metadata for the authority body occupying a position. */

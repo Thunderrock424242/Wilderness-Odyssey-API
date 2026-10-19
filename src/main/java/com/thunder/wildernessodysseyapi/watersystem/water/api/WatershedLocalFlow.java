@@ -6,7 +6,9 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedCondition
  * Read-only four-by-four drainage-cell sample for gameplay and rendering.
  *
  * <p>The sample refines the chunk-scale watershed current without becoming a
- * separate water-volume authority.</p>
+ * separate water-volume authority. Currents retain the persisted watershed
+ * units of blocks per tick; physical water/entity sampling converts to blocks
+ * per second at the composition boundary.</p>
  */
 public record WatershedLocalFlow(
         long basinId,

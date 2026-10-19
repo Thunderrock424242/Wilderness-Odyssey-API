@@ -259,6 +259,12 @@ tasks.named('processResources') {
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_water_safety_tests/structure'
     }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_river_tests/structure'
+    }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_river_acceptance_tests/structure'
+    }
     doLast {
         // The historical test asset is raw NBT, while data-pack structure
         // resources are gzip-compressed. Normalize the copied template in the
@@ -977,8 +983,18 @@ tasks.register('waterSimulationTest', Test) {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.hydrology.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.sph.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.mixinconfig.*'
     }
+}
+
+tasks.register('riverNetworkBenchmark', JavaExec) {
+    group = 'performance'
+    description = 'Measures bounded synthetic river planning cost; does not start Minecraft or predict terrain.'
+    dependsOn tasks.named('compileTestJava')
+    classpath = structureGenOfflineRuntime
+    mainClass.set('com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverNetworkPlannerBenchmark')
+    maxHeapSize = '512m'
 }
 
 // Shares the established offline runtime; optical unit tests do not need a GPU or mod bootstrap.

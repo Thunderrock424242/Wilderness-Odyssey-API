@@ -4,13 +4,21 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.GenerationWaterStateMapper;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverTerrainCapture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.RandomState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Maps the single direct section write used by noise terrain and aquifers.
@@ -22,6 +30,17 @@ import org.spongepowered.asm.mixin.injection.At;
  */
 @Mixin(NoiseBasedChunkGenerator.class)
 public abstract class NoiseBasedChunkGeneratorWaterMixin {
+
+    /** Captures exact post-carver terrain without requesting any neighboring chunk. */
+    @SuppressWarnings("ConstantValue") // Mixin transforms this into the target generator class at runtime.
+    @Inject(method = "applyCarvers", at = @At("RETURN"))
+    private void wildernessOdyssey$captureRiverTerrain(WorldGenRegion region, long seed,
+            RandomState random, BiomeManager biomes, StructureManager structures, ChunkAccess chunk,
+            GenerationStep.Carving step, CallbackInfo ci) {
+        if (((Object) this).getClass() == NoiseBasedChunkGenerator.class) {
+            RiverTerrainCapture.capture(region, chunk);
+        }
+    }
 
     /** Executes the original section write exactly once, then records its final state. */
     @WrapOperation(

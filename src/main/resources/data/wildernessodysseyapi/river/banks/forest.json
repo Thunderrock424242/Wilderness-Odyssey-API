@@ -1,0 +1,31 @@
+{
+  "priority": 10,
+  "biome_tags": [
+    "minecraft:is_forest",
+    "minecraft:is_taiga"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:gravel",
+      "weight": 5
+    },
+    {
+      "block": "minecraft:clay",
+      "weight": 1
+    }
+  ],
+  "plants": [
+    {
+      "block": "minecraft:fern",
+      "weight": 3
+    },
+    {
+      "block": "minecraft:short_grass",
+      "weight": 4
+    },
+    {
+      "block": "minecraft:lily_of_the_valley",
+      "weight": 1
+    }
+  ]
+}

@@ -337,8 +337,8 @@ public final class WaterChunkMeshCache {
                 ocean += column.oceanWeight() / 255.0f;
                 river += column.riverWeight() / 255.0f;
                 lake += column.lakeWeight() / 255.0f;
-                velocityX += column.velocityX() + localFlow.currentX();
-                velocityZ += column.velocityZ() + localFlow.currentZ();
+                velocityX += column.currentX(localFlow.currentX());
+                velocityZ += column.currentZ(localFlow.currentZ());
                 depth += column.depth();
                 int seasonalTint = GlacialWaterTintManager.surfaceTint(
                         level,
@@ -366,8 +366,8 @@ public final class WaterChunkMeshCache {
             ocean = fallback.oceanWeight() / 255.0f;
             river = fallback.riverWeight() / 255.0f;
             lake = fallback.lakeWeight() / 255.0f;
-            velocityX = fallback.velocityX() + localFlow.currentX();
-            velocityZ = fallback.velocityZ() + localFlow.currentZ();
+            velocityX = fallback.currentX(localFlow.currentX());
+            velocityZ = fallback.currentZ(localFlow.currentZ());
             depth = fallback.depth();
             int seasonalTint = GlacialWaterTintManager.surfaceTint(
                     level,
@@ -530,6 +530,7 @@ public final class WaterChunkMeshCache {
         // fluid fallback; exposed oceans, rivers, lakes, and springs use one
         // stable non-overlapping surface mesh.
         return !column.surfaceCovered()
+                && !column.falling()
                 && column.bodyType() != GeneratedWaterChunk.BodyType.AQUIFER
                 && column.oceanWeight() + column.riverWeight() + column.lakeWeight() > 0;
     }

@@ -1,0 +1,30 @@
+{
+  "priority": 20,
+  "biome_tags": [
+    "minecraft:is_jungle"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:mud",
+      "weight": 4
+    },
+    {
+      "block": "minecraft:clay",
+      "weight": 1
+    },
+    {
+      "block": "minecraft:gravel",
+      "weight": 1
+    }
+  ],
+  "plants": [
+    {
+      "block": "minecraft:fern",
+      "weight": 4
+    },
+    {
+      "block": "minecraft:short_grass",
+      "weight": 2
+    }
+  ]
+}

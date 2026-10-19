@@ -1,0 +1,26 @@
+{
+  "priority": 25,
+  "biome_tags": [
+    "minecraft:is_badlands"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:red_sand",
+      "weight": 4
+    },
+    {
+      "block": "minecraft:red_sandstone",
+      "weight": 2
+    },
+    {
+      "block": "minecraft:gravel",
+      "weight": 1
+    }
+  ],
+  "plants": [
+    {
+      "block": "minecraft:dead_bush",
+      "weight": 1
+    }
+  ]
+}

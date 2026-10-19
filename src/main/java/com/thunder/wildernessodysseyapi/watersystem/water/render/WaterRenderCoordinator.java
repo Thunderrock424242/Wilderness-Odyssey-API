@@ -8,6 +8,7 @@ import com.thunder.wildernessodysseyapi.wage.backend.RenderBackend;
 import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
+import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -80,7 +81,7 @@ public final class WaterRenderCoordinator {
                 ? WaterRenderOwnership.Owner.FALLBACK
                 : WaterShaders.externalShaderPackOwnsWater()
                 ? WaterRenderOwnership.Owner.EXTERNAL : WaterRenderOwnership.Owner.NATIVE;
-        WaterRenderOwnership.Transition transition = OWNERSHIP.update(owner);
+        WaterRenderOwnership.Transition transition = OWNERSHIP.update(owner, WaterSimulationConfig.smoothRiverCurrents());
         if (transition.releaseResources()) {
             clear();
             WaterShaders.releaseOpticalResources();

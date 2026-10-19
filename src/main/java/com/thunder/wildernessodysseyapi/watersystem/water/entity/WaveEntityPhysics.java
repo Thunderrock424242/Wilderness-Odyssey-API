@@ -6,7 +6,6 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterPhysicsProfil
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterPhysicsProfileRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
-import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WaterSimulationConfig;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.compat.vanilla.EntityWaterCompat;
@@ -116,7 +115,7 @@ public final class WaveEntityPhysics {
         }
         if (buoyancy.touchingWater()) {
             buoyancy = withLocalCurrents(
-                    level, entity, hydrologyPosition, watershed, buoyancy, mobileWater);
+                    level, entity, buoyancy, mobileWater);
         }
 
         int payloadUnits = entity instanceof ItemEntity item ? item.getItem().getCount() : 0;
@@ -214,20 +213,13 @@ public final class WaveEntityPhysics {
     private static BuoyancySample withLocalCurrents(
             Level level,
             Entity entity,
-            BlockPos position,
-            WatershedConditions watershed,
             BuoyancySample buoyancy,
             SPHSimulationManager.MobileWaterSample mobileWater
     ) {
         Vec3 additionalCurrent = mobileWater.wet() ? mobileCurrent(mobileWater) : Vec3.ZERO;
-        WatershedLocalFlow localFlow = WaterServices.access().getLocalWatershedFlow(level, position);
-        if (localFlow != WatershedLocalFlow.NONE) {
-            additionalCurrent = additionalCurrent.add(
-                    localFlow.currentX() - watershed.currentX(),
-                    0.0,
-                    localFlow.currentZ() - watershed.currentZ()
-            );
-        }
+        // Authority buoyancy samples already include the resolved local current
+        // at every hull point. Adding a center-point watershed correction here
+        // would apply spatial refinement twice and fight the multi-point sample.
         if (level instanceof ServerLevel serverLevel) {
             ShorelineWaterManager.FlowSample shoreline =
                     ShorelineWaterManager.get().sample(serverLevel, entity.getX(), entity.getZ());

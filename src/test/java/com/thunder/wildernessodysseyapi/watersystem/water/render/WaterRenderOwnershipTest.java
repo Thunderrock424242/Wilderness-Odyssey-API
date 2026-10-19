@@ -28,4 +28,25 @@ class WaterRenderOwnershipTest {
         ownership.reset();
         assertEquals(WaterRenderOwnership.Transition.NONE, ownership.update(WaterRenderOwnership.Owner.FALLBACK));
     }
+
+    @Test
+    void changingCurrentSmoothingRebuildsNativeMeshesOnceWithoutReleasingResources() {
+        var ownership = new WaterRenderOwnership();
+        ownership.update(WaterRenderOwnership.Owner.NATIVE, false);
+        var changed = ownership.update(WaterRenderOwnership.Owner.NATIVE, true);
+        assertTrue(changed.rebuildMeshes());
+        assertFalse(changed.rebuildBaked());
+        assertFalse(changed.releaseResources());
+        assertEquals(WaterRenderOwnership.Transition.NONE,
+                ownership.update(WaterRenderOwnership.Owner.NATIVE, true));
+        assertTrue(ownership.update(WaterRenderOwnership.Owner.NATIVE, false).rebuildMeshes());
+    }
+
+    @Test
+    void fallbackSettingsChangesDeferMeshWorkUntilNativeOwnerReturns() {
+        var ownership = new WaterRenderOwnership();
+        assertEquals(WaterRenderOwnership.Transition.NONE,
+                ownership.update(WaterRenderOwnership.Owner.FALLBACK, true));
+        assertTrue(ownership.update(WaterRenderOwnership.Owner.NATIVE, true).rebuildMeshes());
+    }
 }

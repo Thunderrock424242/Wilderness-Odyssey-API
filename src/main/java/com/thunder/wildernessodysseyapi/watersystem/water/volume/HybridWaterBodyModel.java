@@ -1,5 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.volume;
 
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.RiverCurrentField;
+
 import com.thunder.wildernessodysseyapi.core.ModAttachments;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
@@ -110,8 +112,10 @@ final class HybridWaterBodyModel {
         WatershedConditions watershed = WatershedServices.conditions(level, surfacePosition);
         WatershedLocalFlow localFlow = WatershedServices.localFlow(level, surfacePosition);
         WaterVolumeChunk.WaterCell localCell = CanonicalWater.get(level, surfacePosition);
-        float canonicalCurrentX = localCell.velocityX() + localFlow.currentX();
-        float canonicalCurrentZ = localCell.velocityZ() + localFlow.currentZ();
+        float canonicalCurrentX = RiverCurrentField.currentX(
+                localCell.velocityX(), localCell.velocityZ(), localFlow.currentX());
+        float canonicalCurrentZ = RiverCurrentField.currentZ(
+                localCell.velocityX(), localCell.velocityZ(), localFlow.currentZ());
         OceanSeaState.Sample seaState = type == WaterBodyClassifier.WaterType.RIVER
                 ? OceanSeaState.CALM
                 : OceanSeaState.sampleAt(level, x, z, partialTick);
@@ -128,7 +132,7 @@ final class HybridWaterBodyModel {
                 column.shoreline()
         );
         float tideOffset = environment.tideHeight();
-        WaveSurfaceSample wave = sampleWave(
+        WaveSurfaceSample wave = column.falling() ? WaveSurfaceSample.flat() : sampleWave(
                 level,
                 x,
                 z,
@@ -139,7 +143,7 @@ final class HybridWaterBodyModel {
                 environment.waveSpectrum(),
                 column.depth()
         );
-        float localDisturbance = sampleLocalDisturbance(
+        float localDisturbance = column.falling() ? 0 : sampleLocalDisturbance(
                 level,
                 x,
                 column.baseSurfaceHeight(),
@@ -147,7 +151,7 @@ final class HybridWaterBodyModel {
                 localCell
         );
         float surfaceHeight = column.baseSurfaceHeight()
-                + watershed.waterLevelOffset()
+                + (column.falling() ? 0 : watershed.waterLevelOffset())
                 + tideOffset
                 + wave.height()
                 + localDisturbance;
@@ -246,7 +250,8 @@ final class HybridWaterBodyModel {
                 depth,
                 estimatedVolume,
                 shoreline,
-                type
+                type,
+                topSpan.cell().falling()
         );
     }
 
@@ -465,8 +470,16 @@ final class HybridWaterBodyModel {
             float depth,
             long estimatedVolumeUnits,
             boolean shoreline,
-            WaterBodyClassifier.WaterType waterType
+            WaterBodyClassifier.WaterType waterType,
+            boolean falling
     ) {
+        SurfaceColumn(boolean valid, int chunkX, int chunkZ, int minX, int maxX, int minZ, int maxZ,
+                int surfaceBlockY, float baseSurfaceFill, float baseSurfaceHeight, int floorY, float depth,
+                long estimatedVolumeUnits, boolean shoreline, WaterBodyClassifier.WaterType waterType) {
+            this(valid, chunkX, chunkZ, minX, maxX, minZ, maxZ, surfaceBlockY, baseSurfaceFill,
+                    baseSurfaceHeight, floorY, depth, estimatedVolumeUnits, shoreline, waterType, false);
+        }
+
         static final SurfaceColumn INVALID = new SurfaceColumn(
                 false,
                 0,
@@ -482,7 +495,8 @@ final class HybridWaterBodyModel {
                 0.0f,
                 0L,
                 false,
-                WaterBodyClassifier.WaterType.POND
+                WaterBodyClassifier.WaterType.POND,
+                false
         );
     }
 

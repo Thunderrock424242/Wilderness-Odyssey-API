@@ -1,0 +1,31 @@
+{
+  "priority": 30,
+  "biomes": [
+    "minecraft:swamp",
+    "minecraft:mangrove_swamp"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:mud",
+      "weight": 5
+    },
+    {
+      "block": "minecraft:clay",
+      "weight": 2
+    }
+  ],
+  "plants": [
+    {
+      "block": "minecraft:blue_orchid",
+      "weight": 2
+    },
+    {
+      "block": "minecraft:short_grass",
+      "weight": 3
+    },
+    {
+      "block": "minecraft:brown_mushroom",
+      "weight": 1
+    }
+  ]
+}

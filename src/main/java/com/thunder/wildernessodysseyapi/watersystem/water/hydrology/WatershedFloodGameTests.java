@@ -16,6 +16,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * World-backed regression checks for reversible temporary flood ownership.
  * The larger fixture keeps vegetation and displaced parcels inside the test's
  * reserved footprint instead of sharing the legacy one-block template's neighbors.
+ * Each claim reserves one entry beyond the current shared ledger size, so other
+ * fixtures' retained claims do not exhaust an unrelated fixed test allowance.
  */
 @GameTestHolder(ModConstants.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -39,7 +41,7 @@ public final class WatershedFloodGameTests {
         );
         TemporaryFloodSavedData ledger = TemporaryFloodSavedData.get(level);
         helper.assertTrue(
-                ledger.record(position, 91L, level.getGameTime(), 16, original),
+                ledger.record(position, 91L, level.getGameTime(), ledger.size() + 1, original),
                 "Regression fixture could not record the original vegetation"
         );
 
@@ -77,7 +79,7 @@ public final class WatershedFloodGameTests {
         );
         TemporaryFloodSavedData ledger = TemporaryFloodSavedData.get(level);
         helper.assertTrue(
-                ledger.record(position, 92L, level.getGameTime(), 16, original),
+                ledger.record(position, 92L, level.getGameTime(), ledger.size() + 1, original),
                 "Regression fixture could not record the original vegetation"
         );
         level.setBlock(position, Blocks.STONE.defaultBlockState(), 3);
@@ -115,7 +117,7 @@ public final class WatershedFloodGameTests {
                         position,
                         93L,
                         level.getGameTime(),
-                        16,
+                        ledger.size() + 1,
                         original,
                         SurfaceWaterKind.WETLAND
                 ),

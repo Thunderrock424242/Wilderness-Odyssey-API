@@ -6,6 +6,8 @@ import com.thunder.wildernessodysseyapi.vegetation.state.ReactiveVegetationState
 import com.thunder.wildernessodysseyapi.watersystem.water.network.GeneratedWaterAttachmentSyncHandler;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WaterVolumeChunk;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.GeneratedWaterChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverGenerationChunk;
+import com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverReachAttachmentSyncHandler;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -86,6 +88,11 @@ public final class ModAttachments {
 
     private ModAttachments() {
     }
+
+    /** Immutable generation evidence and compact completed river reaches; never physical water volume. */
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<RiverGenerationChunk>> RIVER_GENERATION =
+            ATTACHMENTS.register("river_generation", () -> AttachmentType.serializable(holder ->
+                    new RiverGenerationChunk()).sync(RiverReachAttachmentSyncHandler.INSTANCE).build());
 
     /** Server-only Echo edit protection and bounded remnant evidence, persisted with each chunk. */
     public static final DeferredHolder<AttachmentType<?>, AttachmentType<com.thunder.wildernessodysseyapi.temporalrift.echo.EchoChunkData>> ECHO_CHUNK = ATTACHMENTS.register(

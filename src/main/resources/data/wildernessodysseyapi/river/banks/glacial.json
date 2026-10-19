@@ -1,0 +1,25 @@
+{
+  "priority": 40,
+  "biomes": [
+    "minecraft:frozen_peaks",
+    "minecraft:jagged_peaks",
+    "minecraft:snowy_slopes",
+    "minecraft:grove",
+    "minecraft:frozen_river"
+  ],
+  "bed": [
+    {
+      "block": "minecraft:gravel",
+      "weight": 4
+    },
+    {
+      "block": "minecraft:stone",
+      "weight": 3
+    },
+    {
+      "block": "minecraft:packed_ice",
+      "weight": 1
+    }
+  ],
+  "plants": []
+}

@@ -8,6 +8,9 @@ import com.thunder.wildernessodysseyapi.ecosystem.api.EnvironmentalContext;
 import com.thunder.wildernessodysseyapi.ecosystem.api.SpeciesBehaviorProfile;
 import com.thunder.wildernessodysseyapi.ecosystem.group.AnimalGroupManager;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
+import com.thunder.wildernessodysseyapi.ecosystem.api.RiverHabitat;
+import java.util.Optional;
 import net.minecraft.world.entity.PathfinderMob;
 
 /** Process-wide service registry for the server-authoritative ecosystem runtime. */
@@ -30,6 +33,11 @@ public final class EcosystemServices {
 
     public static WaterSourceLocator water() {
         return WATER;
+    }
+
+    /** Returns actual loaded river habitat without loading chunks, spawning wildlife or changing water. */
+    public static Optional<RiverHabitat> riverHabitat(ServerLevel level, BlockPos position) {
+        return RiverHabitatQuery.sample(level, position);
     }
 
     /** Validates an existing target against live loaded water and the requesting animal's abilities. */

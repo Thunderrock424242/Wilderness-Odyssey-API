@@ -4,14 +4,22 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 final class WaterRenderOwnership {
     enum Owner { FALLBACK, NATIVE, EXTERNAL }
     private Owner owner = Owner.FALLBACK;
+    private boolean smoothRiverCurrents;
 
     Transition update(Owner next) {
-        if (next == owner) return Transition.NONE;
-        owner = next;
-        return new Transition(true, next == Owner.NATIVE, true);
+        return update(next, smoothRiverCurrents);
     }
 
-    void reset() { owner = Owner.FALLBACK; }
+    Transition update(Owner next, boolean nextSmoothRiverCurrents) {
+        boolean ownerChanged = next != owner;
+        boolean currentSettingsChanged = smoothRiverCurrents != nextSmoothRiverCurrents;
+        owner = next;
+        smoothRiverCurrents = nextSmoothRiverCurrents;
+        return new Transition(ownerChanged,
+                (ownerChanged || currentSettingsChanged) && next == Owner.NATIVE, ownerChanged);
+    }
+
+    void reset() { owner = Owner.FALLBACK; smoothRiverCurrents = false; }
 
     record Transition(boolean rebuildBaked, boolean rebuildMeshes, boolean releaseResources) {
         static final Transition NONE = new Transition(false, false, false);
