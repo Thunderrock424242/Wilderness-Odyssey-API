@@ -15,7 +15,9 @@ import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedSer
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
+import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
 import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
@@ -213,7 +215,8 @@ public final class ClientWaterImmersion {
         float oceanWeight = column.oceanWeight() / 255.0f;
         float riverWeight = column.riverWeight() / 255.0f;
         float lakeWeight = column.lakeWeight() / 255.0f;
-        double timeSeconds = (level.getGameTime() + (double) partialTick) / 20.0;
+        double sampleTick = WaterAnimationClock.sampleTick(level.getGameTime(), partialTick);
+        double timeSeconds = sampleTick / 20.0;
         int blockX = (int) Math.floor(worldX);
         int blockZ = (int) Math.floor(worldZ);
         WatershedConditions watershed = WatershedServices.conditions(
@@ -227,12 +230,15 @@ public final class ClientWaterImmersion {
         boolean customSurface = WaterShaders.shouldUseCoreShader()
                 && WaterChunkMeshCache.usesCustomSurface(level, blockX, blockZ, column);
         boolean waveSurface = customSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
+        Vec3 selectionOrigin = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         float transientHeight = customSurface
                 ? WaterSurfaceDisplacement.sampleHeight(
                         level,
                         worldX,
                         worldZ,
-                        level.getGameTime() + partialTick
+                        sampleTick,
+                        selectionOrigin.x,
+                        selectionOrigin.z
                 )
                 : 0.0f;
         float surfaceContinuity = customSurface
@@ -277,7 +283,8 @@ public final class ClientWaterImmersion {
                 surfaceContinuity,
                 customSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
                 transientHeight,
-                depthFactor * WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS
+                depthFactor * WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS,
+                customSurface ? WildernessRenderingFramework.currentFrame().environment().frozenFraction() : 0.0f
         );
     }
 

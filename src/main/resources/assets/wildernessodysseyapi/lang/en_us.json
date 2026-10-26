@@ -1,4 +1,13 @@
 {
+  "screen.wildernessodysseyapi.playtest.open": "Playtest",
+  "screen.wildernessodysseyapi.playtest.title": "Wilderness Odyssey Playtesting",
+  "screen.wildernessodysseyapi.playtest.origin": "API address from your invitation",
+  "screen.wildernessodysseyapi.playtest.invitation": "Private invitation code",
+  "screen.wildernessodysseyapi.playtest.accept": "I agree - enroll this game",
+  "screen.wildernessodysseyapi.playtest.stop": "Stop and leave",
+  "screen.wildernessodysseyapi.playtest.notice": "This playtest can send game logs and Spark profiles to staff. You can stop at any time.",
+  "screen.wildernessodysseyapi.playtest.recording": "Playtest diagnostics are recording. Open Playtest to stop.",
+  "screen.wildernessodysseyapi.playtest.indicator": "Playtest recording",
   "subtitles.wildernessodysseyapi.rain_on_water": "Rain patters on water",
   "itemGroup.wildernessodysseyapi": "Wilderness Odyssey API",
   "message.wildernessodysseyapi.cloak_enabled": "Cloak engaged.",

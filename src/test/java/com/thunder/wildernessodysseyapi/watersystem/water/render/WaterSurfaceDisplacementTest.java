@@ -3,10 +3,21 @@ package com.thunder.wildernessodysseyapi.watersystem.water.render;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies the pure impulse profile mirrored by the active vertex shader. */
 class WaterSurfaceDisplacementTest {
+
+    @Test
+    void distantAndInvalidDisturbancesCannotConsumeNearbyEffectSlots() {
+        assertTrue(WaterSurfaceDisplacement.withinEffectRange(0.0));
+        assertTrue(WaterSurfaceDisplacement.withinEffectRange(96.0 * 96.0));
+        assertFalse(WaterSurfaceDisplacement.withinEffectRange(96.0 * 96.0 + 0.01));
+        assertFalse(WaterSurfaceDisplacement.withinEffectRange(-1.0));
+        assertFalse(WaterSurfaceDisplacement.withinEffectRange(Double.NaN));
+        assertFalse(WaterSurfaceDisplacement.withinEffectRange(Double.POSITIVE_INFINITY));
+    }
 
     @Test
     void impulseDepressesItsCenterAndRaisesItsMovingRing() {

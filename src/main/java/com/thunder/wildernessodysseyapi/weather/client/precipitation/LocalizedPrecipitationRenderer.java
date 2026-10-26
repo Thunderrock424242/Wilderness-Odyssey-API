@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
+import com.thunder.wildernessodysseyapi.environment.client.audio.EnvironmentalSoundOcclusion;
 import com.thunder.wildernessodysseyapi.weather.api.PrecipitationType;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
@@ -306,6 +307,10 @@ public final class LocalizedPrecipitationRenderer {
 
         if (usesRainSound && soundPos != null && random.nextInt(3) < rainSoundTime++) {
             rainSoundTime = 0;
+            // Rain originates above the hit surface, rather than inside the
+            // block whose collision shape would otherwise absorb its own sound.
+            float gain = EnvironmentalSoundOcclusion.gain(level,
+                    soundPos.getX() + 0.5, soundPos.getY() + 1.01, soundPos.getZ() + 0.5);
             boolean covered = soundPos.getY() > cameraPos.getY() + 1
                     && levelReader.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, cameraPos).getY()
                     > Mth.floor(cameraPos.getY());
@@ -314,7 +319,7 @@ public final class LocalizedPrecipitationRenderer {
                         soundPos,
                         ModSoundEvents.RAIN_ON_WATER.get(),
                         SoundSource.WEATHER,
-                        (covered ? 0.07F : 0.14F) * (0.45F + 0.55F * (float) soundIntensity),
+                        (covered ? 0.07F : 0.14F) * (0.45F + 0.55F * (float) soundIntensity) * gain,
                         covered ? 0.8F : 1.0F,
                         false
                 );
@@ -323,7 +328,7 @@ public final class LocalizedPrecipitationRenderer {
                         soundPos,
                         SoundEvents.WEATHER_RAIN_ABOVE,
                         SoundSource.WEATHER,
-                        0.1F,
+                        0.1F * gain,
                         0.5F,
                         false
                 );
@@ -332,7 +337,7 @@ public final class LocalizedPrecipitationRenderer {
                         soundPos,
                         SoundEvents.WEATHER_RAIN,
                         SoundSource.WEATHER,
-                        0.2F,
+                        0.2F * gain,
                         1.0F,
                         false
                 );

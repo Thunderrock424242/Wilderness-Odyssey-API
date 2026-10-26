@@ -28,7 +28,6 @@ import java.util.WeakHashMap;
 @EventBusSubscriber(modid = ModConstants.MOD_ID, value = Dist.CLIENT)
 public final class WaterEntryEventHandler {
 
-    private static final double MAX_EFFECT_DISTANCE_SQUARED = 96.0 * 96.0;
     private static final long IMPACT_CAPTURE_RETENTION_TICKS = 4L;
     private static final Map<Entity, EntryKinematics> ENTRY_KINEMATICS = new WeakHashMap<>();
 
@@ -42,9 +41,7 @@ public final class WaterEntryEventHandler {
         if (!entity.level().isClientSide()) {
             return;
         }
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null
-                || entity.distanceToSqr(minecraft.player) > MAX_EFFECT_DISTANCE_SQUARED
+        if (!nearby(entity)
                 || !WildernessWaterRules.isEnabled(entity.level())) {
             ENTRY_KINEMATICS.remove(entity);
             return;
@@ -75,11 +72,11 @@ public final class WaterEntryEventHandler {
             return;
         }
 
-        var waterState = EntityWaterCompat.stateFor(entity);
-        if (!WildernessWaterRules.isEnabled(entity.level())) {
+        if (!nearby(entity) || !WildernessWaterRules.isEnabled(entity.level())) {
             ENTRY_KINEMATICS.remove(entity);
             return;
         }
+        var waterState = EntityWaterCompat.stateFor(entity);
         if (!waterState.touchingWater()) {
             return;
         }
@@ -117,6 +114,13 @@ public final class WaterEntryEventHandler {
         spawnSplashParticles(entity, kinematics, impact, x, y, z);
         RippleRenderer.spawnRipple(x, y, z, impact.rippleStrength());
         WaterSurfaceDisplacement.spawnImpact(entity, x, z, impact.strength());
+    }
+
+    private static boolean nearby(Entity entity) {
+        Minecraft minecraft = Minecraft.getInstance();
+        return minecraft.level == entity.level()
+                && minecraft.player != null
+                && WaterSurfaceDisplacement.withinEffectRange(entity.distanceToSqr(minecraft.player));
     }
 
     // Visual particles stay in the renderer package and never affect authority.

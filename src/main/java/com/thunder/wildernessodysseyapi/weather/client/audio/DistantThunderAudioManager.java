@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.weather.client.audio;
 
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
+import com.thunder.wildernessodysseyapi.environment.client.audio.EnvironmentalSoundOcclusion;
 import com.thunder.wildernessodysseyapi.weather.api.WeatherSample;
 import com.thunder.wildernessodysseyapi.weather.client.ClientWeatherCoordinator;
 import com.thunder.wildernessodysseyapi.weather.config.WeatherRenderingConfig;
@@ -226,6 +227,11 @@ public final class DistantThunderAudioManager {
         previousVariant = variant;
         lastPlayedVariant = variant;
         float volume = (float) Math.max(0.0, Math.min(1.5, selection.volume() * variant.volumeScale));
+        // Playback uses a nearby directional proxy. Trace toward the sky instead
+        // so that a proxy inside a large bunker cannot bypass its roof/walls.
+        volume *= EnvironmentalSoundOcclusion.gain(level,
+                listener.x + deltaX / length * 48.0, listener.y + 32.0,
+                listener.z + deltaZ / length * 48.0);
         level.playLocalSound(
                 soundX,
                 listener.y + 2.0,

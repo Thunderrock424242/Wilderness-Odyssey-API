@@ -24,6 +24,11 @@ final class WaterAnimationClock {
     private WaterAnimationClock() {
     }
 
+    /** Retains fractional wake age without promoting an absolute tick to float. */
+    static double sampleTick(long gameTime, float partialTick) {
+        return Math.max(0L, gameTime) + (double) clampPartialTick(partialTick);
+    }
+
     /** Returns one immutable surface-material phase. */
     static float surfacePhase(long gameTime, float partialTick, int layer) {
         return stablePhase(gameTime, partialTick, SURFACE_RATES[layer]);

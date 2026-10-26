@@ -334,8 +334,8 @@ void main() {
     // Mirror DepthWaveResponse using the same decoded, cached depth as CPU
     // immersion. Shoaling changes the envelope without relocating carriers.
     float waterDepth = depthFactor * 24.0;
-    float shallowDepthResponse = clamp(waterDepth / 3.0, 0.0, 1.0);
-    float offshoreDepthResponse = clamp((waterDepth - 3.0) / 13.0, 0.0, 1.0);
+    float shallowDepthResponse = smoothstep(0.0, 3.0, waterDepth);
+    float offshoreDepthResponse = smoothstep(3.0, 16.0, waterDepth);
     float depthWaveScale = mix(0.45 + shallowDepthResponse * 0.75, 1.0, offshoreDepthResponse);
     gpuHeight *= depthWaveScale;
     horizontalDisplacement *= depthWaveScale;

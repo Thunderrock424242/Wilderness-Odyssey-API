@@ -86,8 +86,8 @@ public class RippleRenderer {
 
         PoseStack poseStack = event.getPoseStack();
         Vec3 camera = event.getCamera().getPosition();
-        float sampleTick = level.getGameTime()
-                + event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        double sampleTick = WaterAnimationClock.sampleTick(level.getGameTime(),
+                event.getPartialTick().getGameTimeDeltaPartialTick(false));
 
         // Tick-based age keeps expansion stable across different frame rates.
         activeRipples.removeIf(r -> sampleTick - r.startTick >= LIFETIME_TICKS);
@@ -99,8 +99,7 @@ public class RippleRenderer {
         poseStack.pushPose();
 
         for (Ripple ripple : activeRipples) {
-            float life = Math.max(0.0f, Math.min(1.0f,
-                    (sampleTick - ripple.startTick) / LIFETIME_TICKS));
+            float life = lifeFraction(sampleTick, ripple.startTick);
             float radius = 0.1f + (ripple.maximumRadius - 0.1f) * life;
             float alpha = life < FADE_START
                     ? ripple.maximumAlpha
@@ -128,6 +127,10 @@ public class RippleRenderer {
     /** Releases cosmetic rings during a client-level handoff. */
     public static void clear() {
         activeRipples.clear();
+    }
+
+    static float lifeFraction(double sampleTick, long startTick) {
+        return (float) Math.max(0.0, Math.min(1.0, (sampleTick - startTick) / LIFETIME_TICKS));
     }
 
     private static void drawRing(VertexConsumer buffer, PoseStack poseStack,

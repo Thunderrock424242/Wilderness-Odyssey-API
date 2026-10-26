@@ -4,6 +4,28 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DepthWaveResponseTest {
+    @Test void depthBandsMeetWithoutAbruptEnvelopeSlopeChanges() {
+        float step = 0.001f;
+        for (float boundary : new float[] {0.0f, 3.0f, 16.0f}) {
+            float center = DepthWaveResponse.amplitudeScale(boundary);
+            float leftSlope = (center - DepthWaveResponse.amplitudeScale(boundary - step)) / step;
+            float rightSlope = (DepthWaveResponse.amplitudeScale(boundary + step) - center) / step;
+            assertEquals(0.0f, leftSlope, 0.002f, "Left slope at depth " + boundary);
+            assertEquals(0.0f, rightSlope, 0.002f, "Right slope at depth " + boundary);
+        }
+    }
+
+    @Test void depthEnvelopeStaysFiniteAndInsideItsAuthoredBounds() {
+        for (int index = -100; index <= 1000; index++) {
+            float scale = DepthWaveResponse.amplitudeScale(index * 0.05f);
+            assertTrue(Float.isFinite(scale));
+            assertTrue(scale >= 0.45f && scale <= 1.200001f);
+        }
+        assertEquals(0.45f, DepthWaveResponse.amplitudeScale(-Float.MAX_VALUE));
+        assertEquals(1.0f, DepthWaveResponse.amplitudeScale(Float.POSITIVE_INFINITY));
+        assertEquals(1.0f, DepthWaveResponse.amplitudeScale(Float.NEGATIVE_INFINITY));
+    }
+
     @Test void existingGerstnerProfileUsesDepthForHeightAndOrbitalVelocity() {
         var deep = GerstnerWaveProfile.OCEAN.sampleAt(11.0, 17.0, 4.0, 4,
                 WaveSpectrumState.NEUTRAL, 0, 0, 24);

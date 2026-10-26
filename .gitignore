@@ -52,3 +52,4 @@ repo
 **/aether-state/
 /deploy/docker/state/
 **/credentials.env
+/config/wildernessodysseyapi/playtest-diagnostics/

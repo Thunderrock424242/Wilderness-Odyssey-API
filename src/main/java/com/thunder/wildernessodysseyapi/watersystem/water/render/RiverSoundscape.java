@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.environment.client.ClientEnvironmentState;
+import com.thunder.wildernessodysseyapi.environment.client.audio.EnvironmentalSoundOcclusion;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
@@ -79,11 +80,13 @@ public final class RiverSoundscape {
             nextSoundTick = level.getGameTime() + 20L;
             return;
         }
+        float gain = EnvironmentalSoundOcclusion.gain(level,
+                best.position.getX() + 0.5, best.position.getY() + 0.5, best.position.getZ() + 0.5);
         level.playLocalSound(
                 best.position,
                 SoundEvents.WATER_AMBIENT,
                 SoundSource.AMBIENT,
-                0.05f + best.intensity * 0.18f,
+                (0.05f + best.intensity * 0.18f) * gain,
                 0.82f + level.getRandom().nextFloat() * 0.22f,
                 false
         );

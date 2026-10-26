@@ -352,7 +352,7 @@ public final class WaterShaders {
         );
         updateImpulseUniforms(
                 minecraft.level,
-                frameGameTime + (double) framePartialTick,
+                WaterAnimationClock.sampleTick(frameGameTime, framePartialTick),
                 cameraPosition.x,
                 cameraPosition.z
         );

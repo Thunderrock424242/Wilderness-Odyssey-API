@@ -1,5 +1,10 @@
 # Dedicated multiplayer playtesting
 
+For the new invitation-enrolled **client** collector, website-control contract,
+separate per-session artifacts, and single-player support, see
+[Invited client diagnostics](playtest-client-diagnostics.md). The server-owned
+exporters below remain a separate optional system.
+
 Wilderness Odyssey uses the existing server command registrations, asynchronous
 HTTP transport and persistent telemetry queue. The logical server owns player
 snapshots and completion messages; the client does not submit reports.

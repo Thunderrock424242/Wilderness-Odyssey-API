@@ -34,6 +34,7 @@ public final class WaterSurfaceDisplacement {
     private static final int IMPACT_FOAM_LIFETIME_TICKS = 82;
     private static final int WAKE_FOAM_LIFETIME_TICKS = 70;
     private static final int BOW_WAVE_FOAM_LIFETIME_TICKS = 96;
+    private static final double MAX_EFFECT_DISTANCE_SQUARED = 96.0 * 96.0;
     /** Shared CPU/GPU cap for the sum of all active impulse heights. */
     public static final float MAX_COMBINED_HEIGHT_OFFSET = 0.25f;
 
@@ -44,6 +45,17 @@ public final class WaterSurfaceDisplacement {
     private static Level activeLevel;
 
     private WaterSurfaceDisplacement() {
+    }
+
+    /**
+     * Shared admission range for client entry effects and entity wakes. Check
+     * before collecting motion or sampling SPH so distant entities cannot
+     * consume the nearby cosmetic pools. This never gates server water work.
+     */
+    public static boolean withinEffectRange(double distanceSquared) {
+        return Double.isFinite(distanceSquared)
+                && distanceSquared >= 0.0
+                && distanceSquared <= MAX_EFFECT_DISTANCE_SQUARED;
     }
 
     /**

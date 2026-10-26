@@ -63,6 +63,15 @@ public final class ClientWaveEntityEffects {
             return;
         }
 
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level != level || minecraft.player == null
+                || !WaterSurfaceDisplacement.withinEffectRange(entity.distanceToSqr(minecraft.player))) {
+            if (entity instanceof Boat boat) {
+                BoatTiltStore.remove(boat.getId());
+            }
+            return;
+        }
+
         boolean cachedTouchingWater = (entity instanceof Boat boat && boat.isInWater())
                 || EntityWaterCompat.stateFor(entity).touchingWater();
         SPHSimulationManager.MobileWaterSample mobileWater = SPHSimulationManager.get().sampleAt(

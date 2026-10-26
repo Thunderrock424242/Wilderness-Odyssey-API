@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.item.ModSoundEvents;
+import com.thunder.wildernessodysseyapi.environment.client.audio.EnvironmentalSoundOcclusion;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.coast.CoastalBreakAudioModel;
@@ -110,9 +111,11 @@ public final class CoastalBreakEffects {
                 // A quiet retreat fills a gap; it never steals a breaking-wave accent.
                 CoastalSegment segment = retreat.segment();
                 CoastalWaveModel.Sample wave = retreat.wave();
+                float gain = EnvironmentalSoundOcclusion.gain(level,
+                        segment.centerX() + 0.5, segment.surfaceY(), segment.centerZ() + 0.5);
                 level.playLocalSound(segment.centerX() + 0.5, segment.surfaceY(), segment.centerZ() + 0.5,
                         ModSoundEvents.COAST_WASH_SOFT.get(), SoundSource.AMBIENT,
-                        0.08f + wave.energy() * 0.10f, 0.80f + wave.energy() * 0.08f, false);
+                        (0.08f + wave.energy() * 0.10f) * gain, 0.80f + wave.energy() * 0.08f, false);
                 LAST_RETREAT_CYCLE.put(segment.id(), wave.cycleIndex());
                 nextEffectTick = gameTime + MINIMUM_EFFECT_INTERVAL_TICKS;
             }
@@ -224,13 +227,15 @@ public final class CoastalBreakEffects {
         if (WaterRenderingConfig.coastalAudioEnabled(level)) {
             CoastalBreakAudioModel.Mix mix = CoastalBreakAudioModel.mix(
                     segment.profile(), wave, WaterRenderingConfig.coastalSoundVolume(), segment.id());
+            float gain = EnvironmentalSoundOcclusion.gain(
+                    level, breakEvent.x(), breakEvent.y(), breakEvent.z());
             level.playLocalSound(
                     breakEvent.x(),
                     breakEvent.y(),
                     breakEvent.z(),
                     soundFor(segment.profile().shoreType(), wave.energy()),
                     SoundSource.AMBIENT,
-                    mix.impactVolume(),
+                    mix.impactVolume() * gain,
                     mix.pitch(),
                     false
             );
@@ -242,7 +247,7 @@ public final class CoastalBreakEffects {
                     breakEvent.z(),
                     SoundEvents.WATER_AMBIENT,
                     SoundSource.AMBIENT,
-                    mix.washVolume(),
+                    mix.washVolume() * gain,
                     mix.pitch() * 0.90f,
                     false
             );

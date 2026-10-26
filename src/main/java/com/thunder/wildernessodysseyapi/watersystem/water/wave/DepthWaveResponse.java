@@ -12,8 +12,10 @@ public final class DepthWaveResponse {
      */
     public static float amplitudeScale(float waterDepth) {
         float depth = Float.isFinite(waterDepth) ? Math.max(0.0f, waterDepth) : 24.0f;
-        float shallow = Math.min(1.0f, depth / 3.0f);
-        float offshore = Math.min(1.0f, Math.max(0.0f, (depth - 3.0f) / 13.0f));
+        // Zero endpoint slopes keep cached/interpolated depth changes from
+        // abruptly changing the envelope at the shoaling peak or deep band.
+        float shallow = smooth(0.0f, 3.0f, depth);
+        float offshore = smooth(3.0f, 16.0f, depth);
         return (0.45f + shallow * 0.75f) * (1.0f - offshore) + offshore;
     }
 

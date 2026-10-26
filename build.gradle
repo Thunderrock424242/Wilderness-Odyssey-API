@@ -1000,7 +1000,7 @@ tasks.register('riverNetworkBenchmark', JavaExec) {
 // Shares the established offline runtime; optical unit tests do not need a GPU or mod bootstrap.
 tasks.register('renderingTest', Test) {
     group = 'verification'
-    description = 'Runs rendering policy, water optics and client weather regressions without starting Minecraft.'
+    description = 'Runs rendering policy, water optics, environmental audio and client weather regressions without starting Minecraft.'
     dependsOn tasks.named('compileTestJava'), tasks.named('jar')
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = structureGenOfflineRuntime
@@ -1010,8 +1010,10 @@ tasks.register('renderingTest', Test) {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.architecture.WagePackageLayoutTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.opc.core.JvmMetricsTest'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.render.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.wave.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.ocean.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.weather.client.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.environment.audio.*'
     }
 }
 

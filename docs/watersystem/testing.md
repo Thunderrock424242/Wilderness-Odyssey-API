@@ -44,6 +44,14 @@ the water gamerule off and on to reset state; authority mode is persisted.
 
 ## 2. Automated checks
 
+The Hybrid Water Engine 2.0 cinematic checkpoint adds numerical depth/freeze
+regressions and `WaterSurfaceVertexGpuTest` to `renderingTest`. The latter uses
+a hidden OpenGL context and transform feedback from the production vertex
+shader; it skips when the required desktop context is unavailable. Record the
+reported driver and skipped count. GPU arithmetic checks do not replace visual
+acceptance in a running Minecraft client. See the
+[checkpoint report](hybrid-water-engine-2.md) for exact coverage and results.
+
 Use JDK 21 and the checked-in wrapper from the repository root. Run commands one
 at a time. Do not run another Gradle/NeoForm task alongside a development client,
 server or GameTest task controlled by the same validation session.

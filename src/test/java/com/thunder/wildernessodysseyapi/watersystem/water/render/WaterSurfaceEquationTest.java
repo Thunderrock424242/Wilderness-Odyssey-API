@@ -5,9 +5,47 @@ import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies that snapshot camera sampling uses the authored Gerstner spectra. */
 class WaterSurfaceEquationTest {
+
+    @Test
+    void frozenSurfaceDampsWavesAndImpulsesButKeepsBaseAndTide() {
+        for (float frozen : new float[] {0.0f, 0.25f, 0.5f, 1.0f}) {
+            float wave = GerstnerWaveProfile.OCEAN.sampleAt(
+                    11, 17, 4.0, 4, WaveSpectrumState.NEUTRAL, 0, 0, 3).height();
+            float actual = WaterSurfaceEquation.snapshotSurfaceHeight(63, 11, 17, 4,
+                    WaveSpectrumState.NEUTRAL, WaveSpectrumState.NEUTRAL,
+                    4, 0, 0, 1, 0, 0, 0, 0, 1, 0.2f, 0.1f, 3, frozen);
+            assertEquals(63.2f + (wave + 0.1f) * (1.0f - frozen * 0.94f), actual, 0.00001f);
+        }
+    }
+
+    @Test
+    void frozenSurfaceRetainsDryBoundaryAnchorAndBoundsInvalidFractions() {
+        for (float frozen : new float[] {0, 1, -10, 10, Float.NaN, Float.POSITIVE_INFINITY}) {
+            float anchored = WaterSurfaceEquation.snapshotSurfaceHeight(63, 11, 17, 4,
+                    WaveSpectrumState.NEUTRAL, WaveSpectrumState.NEUTRAL,
+                    4, 0, 0, 1, 0, 0, 0, 0, 0, 0.2f, 0.1f, 3, frozen);
+            assertEquals(63.0f, anchored);
+            float moving = WaterSurfaceEquation.snapshotSurfaceHeight(63, 11, 17, 4,
+                    WaveSpectrumState.NEUTRAL, WaveSpectrumState.NEUTRAL,
+                    0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 3, frozen);
+            assertTrue(Float.isFinite(moving));
+            assertTrue(moving >= 63.015f && moving <= 63.25f);
+        }
+    }
+
+    @Test
+    void exactFrameTickRetainsWakeSubstepsInOldWorlds() {
+        long gameTime = 1L << 28;
+        assertEquals(gameTime + 0.25, WaterAnimationClock.sampleTick(gameTime, 0.25f), 0.0);
+        assertEquals(gameTime + 0.75, WaterAnimationClock.sampleTick(gameTime, 0.75f), 0.0);
+        assertEquals(gameTime, WaterAnimationClock.sampleTick(gameTime, Float.NaN), 0.0);
+        assertEquals(gameTime + 1.0, WaterAnimationClock.sampleTick(gameTime, 4.0f), 0.0);
+        assertEquals(0.0, WaterAnimationClock.sampleTick(-1, -1), 0.0);
+    }
 
     @Test
     void immersionMatchesNativeShallowOceanCrest() {

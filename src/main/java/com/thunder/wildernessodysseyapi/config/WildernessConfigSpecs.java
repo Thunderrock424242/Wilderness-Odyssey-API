@@ -10,6 +10,7 @@ import com.thunder.wildernessodysseyapi.donations.config.DonationReminderConfig;
 import com.thunder.wildernessodysseyapi.ecosystem.config.EcosystemConfig;
 import com.thunder.wildernessodysseyapi.feedback.FeedbackConfig;
 import com.thunder.wildernessodysseyapi.environment.glacial.config.GlacialConfig;
+import com.thunder.wildernessodysseyapi.environment.audio.EnvironmentalAudioConfig;
 import com.thunder.wildernessodysseyapi.meteor.config.MeteorConfig;
 import com.thunder.wildernessodysseyapi.ownership.config.OwnershipConfig;
 import com.thunder.wildernessodysseyapi.opc.background.config.BackgroundEfficiencyConfig;
@@ -116,6 +117,7 @@ public final class WildernessConfigSpecs {
         defineCategory(builder, "renderer", RendererConfig::define);
         WaterRenderingConfig.define(builder);
         defineCategory(builder, "weather_rendering", WeatherRenderingConfig::define);
+        defineCategory(builder, "environment_audio", EnvironmentalAudioConfig::define);
         GlacialConfig.defineClient(builder);
         com.thunder.wildernessodysseyapi.anomaly.config.AnomalyClientConfig.define(builder);
         com.thunder.wildernessodysseyapi.temporalrift.hybrid.RiftConfig.defineClient(builder);

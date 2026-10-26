@@ -3,6 +3,10 @@
 For repeatable in-game checks, automated commands and a results checklist, see
 [Water system testing](testing.md).
 
+The [Hybrid Water Engine 2.0 checkpoint report](hybrid-water-engine-2.md) records
+the current ownership audit, cinematic surface changes, actual validation, and
+the remaining physical-region/dam implementation sequence.
+
 Wilderness water is generated as a first-class world fluid. Newly generated
 terrain stores the namespaced Wilderness source or flowing fluid immediately;
 the runtime does not scan completed chunks, import vanilla oceans, or queue

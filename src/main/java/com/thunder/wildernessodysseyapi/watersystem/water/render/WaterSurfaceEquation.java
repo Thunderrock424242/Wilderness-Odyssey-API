@@ -174,6 +174,26 @@ public final class WaterSurfaceEquation {
             float currentX, float currentZ, float surfaceContinuity,
             float tideOffset, float transientHeight, float waterDepth
     ) {
+        return snapshotSurfaceHeight(baseSurfaceY, worldX, worldZ, timeSeconds,
+                oceanSpectrum, enclosedWaterSpectrum, oceanWaveLimit, riverWaveLimit,
+                pondWaveLimit, oceanWeight, riverWeight, lakeWeight, currentX, currentZ,
+                surfaceContinuity, tideOffset, transientHeight, waterDepth, 0.0f);
+    }
+
+    /**
+     * Mirrors the snapshot shader's cosmetic freeze damping. The supplied
+     * fraction comes from the same immutable render frame as its Weather
+     * uniform; it is not an ice inventory or a server physics setting.
+     * Base fill and tide remain outside this motion envelope.
+     */
+    public static float snapshotSurfaceHeight(
+            float baseSurfaceY, double worldX, double worldZ, double timeSeconds,
+            WaveSpectrumState oceanSpectrum, WaveSpectrumState enclosedWaterSpectrum,
+            int oceanWaveLimit, int riverWaveLimit, int pondWaveLimit,
+            float oceanWeight, float riverWeight, float lakeWeight,
+            float currentX, float currentZ, float surfaceContinuity,
+            float tideOffset, float transientHeight, float waterDepth, float frozenFraction
+    ) {
         WaveSpectrumState safeOceanSpectrum = oceanSpectrum == null
                 ? WaveSpectrumState.NEUTRAL
                 : oceanSpectrum;
@@ -212,8 +232,9 @@ public final class WaterSurfaceEquation {
         waveHeight *= com.thunder.wildernessodysseyapi.watersystem.water.wave.DepthWaveResponse.amplitudeScale(waterDepth);
         waveHeight = com.thunder.wildernessodysseyapi.watersystem.water.wave.DepthWaveResponse.shapeCrest(
                 waveHeight, waterDepth, boundedOceanWeight);
+        float waveFreedom = 1.0f - clamp(finiteOrZero(frozenFraction), 0.0f, 1.0f) * 0.94f;
         return finiteOrZero(baseSurfaceY)
-                + (waveHeight + clamp(finiteOrZero(transientHeight), -0.25f, 0.25f)) * continuity
+                + (waveHeight + clamp(finiteOrZero(transientHeight), -0.25f, 0.25f)) * continuity * waveFreedom
                 + finiteOrZero(tideOffset) * boundedOceanWeight * continuity;
     }
 
