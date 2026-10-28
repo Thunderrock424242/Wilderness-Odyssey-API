@@ -33,6 +33,8 @@ public final class WaterSimulationConfig {
     public static ModConfigSpec.IntValue LOCAL_FLOW_CELLS_PER_TICK;
     public static ModConfigSpec.DoubleValue LOCAL_FLOW_BUDGET_MILLIS;
     public static ModConfigSpec.DoubleValue LOCAL_FLOW_SLEEP_SPEED;
+    public static ModConfigSpec.BooleanValue ENABLE_REACTIVE_SHALLOW_POOLS;
+    public static ModConfigSpec.IntValue REACTIVE_SHALLOW_POOL_MAX_REGIONS;
     public static ModConfigSpec.IntValue LARGE_BODY_CACHE_MAX_COLUMNS;
     public static ModConfigSpec.IntValue WATER_BODY_UPDATES_PER_TICK;
     public static ModConfigSpec.IntValue LOCAL_WATER_NETWORK_EVENTS_PER_TICK;
@@ -154,6 +156,12 @@ public final class WaterSimulationConfig {
         LOCAL_FLOW_SLEEP_SPEED = builder
                 .comment("Velocity below this value lets a detailed local water cell sleep when it cannot flow.")
                 .defineInRange("localFlowSleepSpeed", 0.025, 0.001, 0.20);
+        ENABLE_REACTIVE_SHALLOW_POOLS = builder
+                .comment("Experimental canonical surface flux for enclosed, flat shallow pools of at most 16 cells. Unsupported geometry keeps voxel flow. Does not supply ocean or flood inventory.")
+                .define("enableReactiveShallowPools", false);
+        REACTIVE_SHALLOW_POOL_MAX_REGIONS = builder
+                .comment("Maximum cached shallow physical regions per dimension; excess work stays with canonical voxel flow.")
+                .defineInRange("reactiveShallowPoolMaxRegions", 64, 1, 256);
         LARGE_BODY_CACHE_MAX_COLUMNS = builder
                 .comment("Maximum derived large-water-body columns persisted per dimension. This is a safe per-world cache, not a second authority.")
                 .defineInRange("largeBodyCacheMaxColumns", 16384, 1024, 262144);

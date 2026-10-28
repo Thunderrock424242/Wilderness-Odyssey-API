@@ -207,7 +207,7 @@ public final class WildernessFluidRegistry {
             }
             if (evaluated.add(pos.asLong())) {
                 measurements[0]++;
-                tickCell(level, pos);
+                tickCell(level, pos, started + budgetNanos);
             }
             else deferred.add(pos);
         }
@@ -226,6 +226,7 @@ public final class WildernessFluidRegistry {
 
     /** Releases only scheduling clocks and measurements, never persisted water. */
     public static void clearLevel(ServerLevel level) {
+        com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController.clearLevel(level);
         FLOW_EVALUATION_TICKS.remove(level);
         FLOW_MEASUREMENTS.remove(level);
     }
@@ -240,6 +241,8 @@ public final class WildernessFluidRegistry {
     @SubscribeEvent
     public static void onChunkUnload(ChunkEvent.Unload event) {
         if (event.getLevel() instanceof ServerLevel level) {
+            com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController
+                    .onChunkUnload(level, event.getChunk().getPos());
             CanonicalWater.onChunkUnload(level, event.getChunk().getPos());
         }
     }
@@ -279,6 +282,10 @@ public final class WildernessFluidRegistry {
     }
 
     static void tickCell(ServerLevel level, BlockPos pos) {
+        tickCell(level, pos, Long.MAX_VALUE);
+    }
+
+    private static void tickCell(ServerLevel level, BlockPos pos, long deadlineNanos) {
         // Include each possible destination's callback halo before reading
         // collision shapes or starting a multi-cell transfer. A deferral owns
         // no debit, and an awake persisted cell resumes after reload.
@@ -309,6 +316,11 @@ public final class WildernessFluidRegistry {
             return;
         }
 
+        if (com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController
+                .tryTick(level, pos, deadlineNanos)) {
+            forgetFlowTime(level, pos);
+            return;
+        }
         double dtSeconds = elapsedFlowSeconds(level, pos);
         if (dtSeconds <= 0) { CanonicalWater.schedule(level, pos); return; }
         float damping = (float) Math.exp(-MOMENTUM_DRAG_PER_SECOND * dtSeconds);
@@ -642,6 +654,7 @@ public final class WildernessFluidRegistry {
 
     /** Notifies existing water owners after a server environmental terrain edit. */
     public static void notifyTerrainChanged(ServerLevel level, BlockPos pos) {
+        com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController.invalidateTerrain(level, pos);
         com.thunder.wildernessodysseyapi.watersystem.water.surface.WaterDepthSampler.invalidate(level, pos);
         CanonicalWater.materializeGeneratedNeighborhood(level, pos);
         WaterBodyClassifier.invalidate(level, pos);

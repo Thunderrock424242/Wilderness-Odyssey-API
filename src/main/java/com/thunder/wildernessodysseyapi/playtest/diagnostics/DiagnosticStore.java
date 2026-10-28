@@ -3,6 +3,7 @@ package com.thunder.wildernessodysseyapi.playtest.diagnostics;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -72,6 +73,21 @@ public final class DiagnosticStore {
     }
 
     private Path path(String id) { return directory.resolve("artifact-" + UUID.fromString(id) + ".json"); }
+
+    /** Bounded local-state read, including when the file grows after its size check. */
+    public static String read(Path target, int limit) throws IOException {
+        if (Files.isSymbolicLink(target.getParent()) || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)
+                || Files.size(target) > limit) return null;
+        try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {
+            byte[] bytes = input.readNBytes(limit + 1);
+            return bytes.length > limit ? null : new String(bytes, StandardCharsets.UTF_8);
+        }
+    }
+
+    public static void delete(Path target) throws IOException {
+        if (Files.isSymbolicLink(target) || Files.isSymbolicLink(target.getParent())) throw new IOException("Unsafe diagnostic storage path.");
+        Files.deleteIfExists(target);
+    }
 
     public static void write(Path target, String content) throws IOException {
         if (Files.isSymbolicLink(target) || Files.isSymbolicLink(target.getParent())) throw new IOException("Unsafe diagnostic storage path.");

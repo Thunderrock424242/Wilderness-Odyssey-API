@@ -5,7 +5,13 @@ For repeatable in-game checks, automated commands and a results checklist, see
 
 The [Hybrid Water Engine 2.0 checkpoint report](hybrid-water-engine-2.md) records
 the current ownership audit, cinematic surface changes, actual validation, and
-the remaining physical-region/dam implementation sequence.
+the remaining physical-region/dam implementation sequence. The subsequent
+[canonical dam checkpoint](canonical-dam-checkpoint.md) adds accepted automation
+barrier wake handling and a conserved fill/breach/drainage fixture. Physical
+height-field coupling, real restart and multiplayer acceptance remain pending.
+The next [reactive shallow-pool checkpoint](reactive-shallow-pools.md) provides
+the first default-disabled physical patches for small closed flat pools through
+the existing canonical queue. It does not replace the general voxel solver.
 
 Wilderness water is generated as a first-class world fluid. Newly generated
 terrain stores the namespaced Wilderness source or flowing fluid immediately;

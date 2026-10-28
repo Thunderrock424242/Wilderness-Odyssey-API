@@ -12,6 +12,8 @@ The client collector supports single-player and multiplayer installations. It is
 
 The invitation authorizes this installation's diagnostic submissions. A reported player name/UUID is not verified Minecraft account ownership. Staff website authentication remains a separate authority.
 
+If enrollment fails or its response is interrupted, retry with the same API address and invitation. Before sending the request, the client saves the normalized API address, a SHA-256 invitation digest and a random installation ID; it never saves the invitation itself. Matching retries reuse that ID after a game restart. Changing the address or invitation starts a new identity. The retry record is removed after the installation credential is saved or **Stop and leave** cleanup completes.
+
 ## Collection and separation
 
 - Every game connection has a new UUID session, with `singleplayer` or `multiplayer` metadata. The worker sends observed recording/end status and periodic session acknowledgements.

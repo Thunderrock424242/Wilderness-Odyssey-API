@@ -19,8 +19,6 @@ import java.util.Arrays;
  */
 public final class ShallowWaterGrid {
 
-    private static final double GRAVITY = 9.81;
-    private static final double CFL_NUMBER = 0.42;
     private static final double MIN_MOVING_DEPTH = 1.0e-8;
     private static final double BOTTOM_FRICTION = 0.85;
     private static final double MAX_FLOW_SPEED = 8.0;
@@ -275,12 +273,9 @@ public final class ShallowWaterGrid {
                 : Math.max(negativeBed, boundarySurface);
         double positiveSurface = positive >= 0 ? positiveBed + depth[positive]
                 : Math.max(positiveBed, boundarySurface);
-        double faceDepth = Math.max(0.0,
-                Math.max(negativeSurface, positiveSurface) - Math.max(negativeBed, positiveBed));
-        if (faceDepth <= MIN_MOVING_DEPTH) return 0.0;
-        double gradient = (positiveSurface - negativeSurface) / cellSize;
-        double result = (discharge[face] - GRAVITY * faceDepth * gradient * seconds) * drag;
-        return Math.max(-MAX_FLOW_SPEED * faceDepth, Math.min(MAX_FLOW_SPEED * faceDepth, result));
+        return com.thunder.wildernessodysseyapi.watersystem.water.fluid.ShallowWaterFaceMath.discharge(
+                discharge[face], negativeBed, positiveBed, negativeSurface, positiveSurface,
+                seconds, cellSize, drag, MAX_FLOW_SPEED);
     }
 
     private double stableStepSeconds(double boundarySurface) {
@@ -290,7 +285,8 @@ public final class ShallowWaterGrid {
                     Math.max(depth[cell], boundarySurface - bed[cell]));
         }
         // The factor two accounts for simultaneous X/Z gravity-wave transport.
-        return CFL_NUMBER * cellSize / (2.0 * (MAX_FLOW_SPEED + Math.sqrt(GRAVITY * maximumDepth)));
+        return com.thunder.wildernessodysseyapi.watersystem.water.fluid.ShallowWaterFaceMath
+                .stableStepSeconds(maximumDepth, cellSize, MAX_FLOW_SPEED);
     }
 
     private float sampleVelocity(int cell, int firstFace, int secondFace) {

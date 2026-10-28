@@ -30,6 +30,7 @@ public final class DiagnosticCollector {
     private final DiagnosticLogBuffer logs = new DiagnosticLogBuffer(256 * 1024);
     private final SparkCapture spark;
     private volatile DiagnosticProtocol.Enrollment enrollment;
+    private volatile PendingEnrollment pendingEnrollment;
     private volatile String status = "Not enrolled";
     private volatile String sessionId;
     private JsonObject session;
@@ -61,7 +62,13 @@ public final class DiagnosticCollector {
             }
             recovery = read("active-session.json", 128 * 1024);
         } catch (RuntimeException error) { enrollment = null; status = "Enrollment needs attention"; }
-        if (enrollment == null) store.discard();
+        if (enrollment == null) {
+            store.discard();
+            try {
+                String pending = DiagnosticStore.read(root.resolve("pending-enrollment.json"), 4096);
+                if (pending != null) pendingEnrollment = DiagnosticProtocol.JSON.fromJson(pending, PendingEnrollment.class);
+            } catch (RuntimeException error) { /* Invalid retry state never grants enrollment or invalidates credentials. */ }
+        }
     }
 
     public String status() {
@@ -76,14 +83,27 @@ public final class DiagnosticCollector {
 
     public void enroll(String origin, String invitation) throws IOException, InterruptedException {
         long generation = lease.generation();
-        var redeemed = http.enroll(origin, UUID.randomUUID().toString(), invitation);
-        if (lease.generation() != generation) return;
+        String normalizedOrigin = DiagnosticProtocol.origin(origin).toString();
+        String digest = invitationDigest(invitation);
+        var pending = pendingEnrollment;
+        if (pending == null || !pending.origin().equals(normalizedOrigin) || !pending.invitationSha256().equals(digest)) {
+            pending = new PendingEnrollment("1.0", normalizedOrigin, digest, UUID.randomUUID().toString());
+        }
+        // Commit the retry identity before sending a single-use invitation; the response may be lost.
+        DiagnosticStore.write(root.resolve("pending-enrollment.json"), DiagnosticProtocol.JSON.toJson(pending));
+        synchronized (lease) {
+            if (lease.generation() == generation) pendingEnrollment = pending;
+        }
+        if (lease.generation() != generation) { clearPendingEnrollment(); return; }
+        var redeemed = http.enroll(normalizedOrigin, pending.installationId(), invitation);
+        if (lease.generation() != generation) { clearPendingEnrollment(); return; }
         stopCapture();
         store.discard();
         JsonObject saved = new JsonObject();
         saved.addProperty("consentVersion", "1");
         saved.add("enrollment", DiagnosticProtocol.JSON.toJsonTree(redeemed));
         DiagnosticStore.write(root.resolve("enrollment.json"), saved.toString());
+        clearPendingEnrollment();
         // A concurrent local stop must win both in memory and on disk.
         if (lease.generation() != generation) { Files.deleteIfExists(root.resolve("enrollment.json")); return; }
         synchronized (lease) {
@@ -99,6 +119,7 @@ public final class DiagnosticCollector {
         synchronized (lease) {
             lease.stop();
             enrollment = null;
+            pendingEnrollment = null;
             cleanupNeeded = true;
             status = "Stopped locally";
         }
@@ -112,6 +133,7 @@ public final class DiagnosticCollector {
         store.discard();
         Files.deleteIfExists(root.resolve("enrollment.json"));
         Files.deleteIfExists(root.resolve("active-session.json"));
+        clearPendingEnrollment();
         recovery = null;
         cleanupNeeded = false;
     }
@@ -320,6 +342,28 @@ public final class DiagnosticCollector {
     private void stopCapture() { lease.clear(); logs.clear(); spark.cancel(); sessionId = null; session = null; sparkStarted = 0; }
     private void discard() throws IOException { stopCapture(); store.discard(); Files.deleteIfExists(root.resolve("active-session.json")); recovery = null; }
     private void removeKind(String kind) throws IOException { for (var artifact : store.pending()) if (artifact.kind().equals(kind)) store.acknowledge(artifact.artifactId()); }
+
+    private void clearPendingEnrollment() throws IOException {
+        DiagnosticStore.delete(root.resolve("pending-enrollment.json"));
+        pendingEnrollment = null;
+    }
+
+    private static String invitationDigest(String invitation) {
+        if (invitation == null || !invitation.matches("[A-Za-z0-9_-]{16,256}")) throw new IllegalArgumentException("Use the invitation code from your playtest invitation.");
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(invitation.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException error) { throw new IllegalStateException("SHA-256 unavailable.", error); }
+    }
+
+    private record PendingEnrollment(String schemaVersion, String origin, String invitationSha256, String installationId) {
+        private PendingEnrollment {
+            if (!"1.0".equals(schemaVersion) || origin == null || origin.length() > 2048
+                    || invitationSha256 == null || !invitationSha256.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Invalid enrollment retry state.");
+            origin = DiagnosticProtocol.origin(origin).toString();
+            if (!UUID.fromString(installationId).toString().equals(installationId)) throw new IllegalArgumentException("Invalid enrollment retry identity.");
+        }
+    }
 
     private JsonObject read(String name, long limit) throws IOException {
         Path path = root.resolve(name);

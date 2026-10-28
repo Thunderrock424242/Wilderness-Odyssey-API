@@ -50,6 +50,13 @@ public final class WorldFluidMutationReconciler {
         active = true;
     }
 
+    /** Prevents accepted-terrain observation from feeding internal water/generation writes back into flow. */
+    public static boolean suppressesTerrainWake(ServerLevel level, BlockPos position) {
+        StarterTerrainContext generation = STARTER_TERRAIN.get();
+        return RECONCILIATION_DEPTH.get() > 0
+                || (generation != null && generation.level() == level && generation.bounds().isInside(position));
+    }
+
     /**
      * Runs initial starter-island construction using final generation state.
      *

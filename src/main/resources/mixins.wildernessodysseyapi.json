@@ -46,6 +46,7 @@
     "ServerLevelLightningAccessor",
     "ServerLevelLocalizedLightningMixin",
     "ServerLevelLocalizedPrecipitationMixin",
+    "ServerWaterBarrierMixin",
     "SodiumChunkBuildOutputHandoffMixin",
     "SodiumChunkMeshingHandoffMixin",
     "SodiumRenderSectionCoordinatesMixin",

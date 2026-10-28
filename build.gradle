@@ -92,6 +92,7 @@ neoForge {
             // Keep automated tests isolated from the developer's normal run/
             // mods and configs so unrelated local mods cannot block startup.
             def waterSafetyTests = providers.gradleProperty('waterSafetyGameTests').isPresent()
+            def reactiveWaterTests = providers.gradleProperty('reactiveWaterGameTests').isPresent()
             def waterSafetyProfile = providers.gradleProperty('waterSafetyProfile').orElse('baseline').get()
             if (waterSafetyTests && !(waterSafetyProfile in ['baseline', 'sable', 'c2me', 'sable-c2me'])) {
                 throw new GradleException('waterSafetyProfile must be baseline, sable, c2me, or sable-c2me')
@@ -103,6 +104,7 @@ neoForge {
             def testDirectory = auditGameTestRun != null ? "run-audit-${auditGameTestRun}"
                     : providers.gradleProperty('coordinatorGameTests').isPresent() ? 'run-coordinator-gametest'
                     : waterSafetyTests ? "run-water-safety-${waterSafetyProfile}"
+                    : reactiveWaterTests ? 'run-reactive-water-gametest'
                     : providers.gradleProperty('questGameTests').isPresent() ? 'run-quest-gametest'
                     : providers.gradleProperty('riftGameTests').isPresent() ? 'run-rift-gametest' : 'run-gametest'
             gameDirectory = codexBuildDir.isPresent()
@@ -118,6 +120,7 @@ neoForge {
             if (enabledNamespaces == null) {
                 enabledNamespaces = providers.gradleProperty('coordinatorGameTests').isPresent() ? 'wildernessodysseyapi_coordinator_tests'
                         : waterSafetyTests ? 'wildernessodysseyapi_water_safety_tests'
+                        : reactiveWaterTests ? 'wildernessodysseyapi_reactive_water_tests'
                         : providers.gradleProperty('questGameTests').isPresent()
                         ? 'wildernessodysseyapi_quest_tests'
                         : providers.gradleProperty('riftGameTests').isPresent() ? 'wildernessodysseyapi_rift_tests' : project.mod_id
@@ -258,6 +261,9 @@ tasks.named('processResources') {
     }
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_water_safety_tests/structure'
+    }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_reactive_water_tests/structure'
     }
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_river_tests/structure'
@@ -980,6 +986,7 @@ tasks.register('waterSimulationTest', Test) {
     filter {
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.volume.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.fluid.*'
+        includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.reactive.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.compat.neoforge.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.hydrology.*'
         includeTestsMatching 'com.thunder.wildernessodysseyapi.watersystem.water.sph.*'

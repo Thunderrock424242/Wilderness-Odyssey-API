@@ -189,7 +189,8 @@ public final class WaterDebugCommand {
         String flow = "  flow tick=" + level.getGameTime()
                 + ", queuedCells=" + CanonicalWater.diagnostics(level).queuedCells()
                 + ", loadedFootprint=" + loadedFootprint + "; "
-                + WildernessFluidRegistry.diagnostics(level);
+                + WildernessFluidRegistry.diagnostics(level)
+                + "; reactive=" + com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController.regionAt(level, pos);
         StringBuilder outlets = new StringBuilder("  outlets");
         for (Direction direction : new Direction[] {
                 Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST

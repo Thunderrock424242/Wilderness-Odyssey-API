@@ -1,5 +1,18 @@
 # Hybrid Water Engine 2.0: implementation checkpoints
 
+## Latest checkpoint (2026-10-28)
+
+The [reactive shallow-pool report](reactive-shallow-pools.md) records the first
+opt-in physical surface patches: bounded closed flat pools, shared coastal
+discharge math, canonical-only receipts and existing-queue lifecycle integration.
+This is an initial Phase 3 subset; general height-field regions remain pending.
+
+The [canonical barrier and dam lifecycle report](canonical-dam-checkpoint.md)
+records the accepted automation-write wake repair and a finite inlet/basin/
+breach/drainage fixture using the existing voxel authority. Its attachment and
+queue round trips do not establish disk reload or server-restart acceptance.
+The cinematic audit and validation below remain the earlier checkpoint record.
+
 ## Scope and ownership audit (2026-10-25)
 
 Baseline: local `in-dev`, commit `4692c73d`, with existing uncommitted
@@ -84,13 +97,18 @@ high-entity-count stress test remains unrun.
   the existing effect owners, with bounded-input/lifetime regressions.
 - [ ] Phase 2 remaining: audit disturbance routing under high entity/event pressure and
   connect any missing event consumers through the existing bounded pools.
-- [ ] Phase 3: introduce feature-gated physical-region admission only after
-  defining disjoint canonical-cell ownership, exact flux reconciliation,
-  retained work, loaded frontiers, and sleep/persistence contracts. Reuse
-  tested mathematical kernels without spending the derived coastal grid.
-- [ ] Phase 4: add a funded incoming-channel/basin/barrier/downstream fixture
-  covering fill, breach, drainage and actual save/reload conservation. Extend
-  verified opening adapters conservatively; ambiguous collision shapes block.
+- [x] Phase 3 subset: default-disabled, disjoint closed shallow-pool regions,
+  shared local-inertial/CFL arithmetic, exact canonical flux reconciliation,
+  loaded-only admission, retained active-cache time and sleep/lifecycle cleanup.
+- [ ] Phase 3 remaining: generalized deep/stepped/open domains, verified voxel
+  interfaces and actual persistence acceptance. Never spend the derived
+  coastal grid as physical water inventory.
+- [x] Phase 4 subset: repair direct dry-barrier wake admission and add a funded
+  inlet/basin/barrier/downstream fixture covering fill, breach, drainage and
+  attachment/queue round trips through the existing finite voxel authority.
+- [ ] Phase 4 remaining: actual disk unload/reload and restart conservation,
+  physical-region coupling, and verified opening adapters. Ambiguous collision
+  shapes remain blocked.
 - [ ] Phase 5: extend surge only with explicit ocean receipts and existing
   flood protections; validate funded propagation and recession.
 - [ ] Phase 6: improve river/waterfall coupling and SPH local-coordinate
@@ -98,10 +116,10 @@ high-entity-count stress test remains unrun.
 - [ ] Phase 7: dedicated two-client, optional-mod, lifecycle, memory, MSPT/FPS,
   network and long-duration acceptance.
 
-The existing voxel solver can already move finite water past an opening. That
-does not complete the requested connected reservoir/height-field engine or the
-end-to-end dam fixture. Likewise, existing optics are implemented source paths,
-not a claim that cinematic acceptance has passed.
+The controlled finite-voxel dam fixture now exercises an automatic breach and
+checks exact inventory through ordinary ticks. It does not complete the
+requested connected reservoir/height-field engine or real restart acceptance.
+Existing optics likewise remain subject to cinematic acceptance.
 
 ## Validation ledger
 
@@ -215,9 +233,11 @@ resolved the invocation. These are command/workflow errors, not water failures.
 
 ## Remaining acceptance and compatibility limits
 
-1. No physical reactive-region solver, canonical flux bridge, dam/reservoir
-   lifecycle fixture, pressure-driven floodgate adapter, or physical surge was
-   added in this checkpoint. The existing finite voxel solver remains active.
+1. No physical reactive-region solver, canonical flux bridge, pressure-driven
+   floodgate adapter, or physical surge was added in the cinematic checkpoint.
+   The later canonical-voxel dam fixture and initial opt-in physical shallow
+   pools are documented separately above. General physical regions remain
+   incomplete; the existing finite voxel solver remains active.
 2. Real-client calm/storm appearance, immersion during freezing, high-disturbance
    stress, resource reload, external shaders, different graphics presets,
    historical worlds, two clients and long-duration performance remain unrun.
@@ -230,10 +250,11 @@ resolved the invocation. These are command/workflow errors, not water failures.
    dedicated-side separation, public overload compatibility and input bounds.
    It has not received an independent reviewer or full-repository test pass.
 
-Next implementation checkpoint: finish disturbance admission/stress coverage,
-then define disjoint feature-gated physical regions and a canonical-funded dam
-fixture. Continue to use the existing Data/Tick Engine lanes, canonical
-transactions, projection safety halo, flood claims and synchronization.
+Remaining implementation includes disturbance stress coverage, generalizing
+the bounded physical regions and their verified interfaces, plus actual
+disk/restart acceptance of the controlled dam. Continue to use the existing
+Data/Tick Engine lanes, canonical transactions, projection safety halo, flood
+claims and synchronization.
 
 For manual acceptance in a disposable client world:
 

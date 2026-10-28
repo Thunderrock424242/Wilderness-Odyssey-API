@@ -589,6 +589,8 @@ public final class CanonicalWater {
         if (scheduleUpdates) {
             scheduleAround(level, pos);
         }
+        com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController
+                .onCanonicalCellChanged(level, pos);
     }
 
     /**

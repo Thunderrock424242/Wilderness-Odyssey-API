@@ -90,9 +90,28 @@ revision, and queued work unchanged. Run this profile with:
 .\gradlew.bat runGameTestServer -PcodexBuildDir=.codex-build -PwaterSafetyGameTests --no-parallel
 ```
 
+The same profile includes accepted direct dry-barrier edits, generated-water
+materialization, retained displacement release, loaded chunk-edge admission,
+detached-chunk rejection and ignored provisional/generation writes. Its finite
+dam fixture measures inlet funding, closed-wall retention, breach, drainage and
+attachment/queue round trips. See the [canonical dam checkpoint](canonical-dam-checkpoint.md)
+for measured results and the session-only JVM compiler exclusion required by
+that run. Attachment round trips do not replace actual disk/restart tests.
+
 These server checks do not prove client visibility or diagnose a particular
 live-world stall. A finite bucket may spread into several shallow cells; it
 does not supply enough volume to fill an entire multi-block trench to the top.
+
+The opt-in shallow-pool path has its own disposable server profile:
+
+```powershell
+.\gradlew.bat runGameTestServer '-PcodexBuildDir=.codex-build' -PreactiveWaterGameTests --no-parallel
+```
+
+It verifies bounded physical-region admission and canonical flux separately
+from the default-disabled baseline. See [reactive shallow pools](reactive-shallow-pools.md)
+for configuration, exact coverage, the observed JVM limitation and remaining
+unsupported geometry. No client or disk/restart acceptance follows from it.
 
 For wider regression coverage and packaging, run these separately:
 
