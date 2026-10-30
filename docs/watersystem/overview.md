@@ -26,6 +26,10 @@ acceptance remain separate checks.
 The [live client acceptance record](live-client-acceptance.md) documents the
 subsequent diagnostic rain/soil and wet-reload observations, plus native-runtime
 failures that blocked multiplayer and performance certification.
+The [advanced depth checkpoint](advanced-water-depth-checkpoint.md) reviews the
+current rendering/physics owners and restores shallow-water depth detail in the
+existing mesh codec, with production GPU regressions and an ordered adaptive
+mesh follow-up. Live acceptance remains separate.
 
 Wilderness water is generated as a first-class world fluid. Newly generated
 terrain stores the namespaced Wilderness source or flowing fluid immediately;

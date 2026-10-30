@@ -250,11 +250,10 @@ public final class ClientWaterImmersion {
                 worldZ,
                 partialTick
         );
-        float depthFactor = clamp(
-                column.depth() / WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS,
-                0.0f,
-                1.0f
-        );
+        float surfaceDepth = customSurface
+                ? WaterSurfaceVertexData.quantizedDepth(column.depth()) : column.depth();
+        float depthFactor = clamp(surfaceDepth / WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS,
+                0.0f, 1.0f);
         float enclosedFetch = 0.16f + (0.68f - 0.16f) * depthFactor;
         WaveSpectrumState enclosedSpectrum = WaterEnvironmentState.waveSpectrumFor(
                 WaterBodyClassifier.WaterType.LAKE,

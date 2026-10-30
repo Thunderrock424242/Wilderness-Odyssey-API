@@ -170,6 +170,13 @@ float decodeUnitPayload(float channelByte) {
     return mod(channelByte, 8.0) / 7.0;
 }
 
+// Mirrors WaterSurfaceVertexData's shallow-focused mesh palette. The output
+// retains its existing normalized-depth units for optics and enclosed fetch.
+float decodeDepthPayload(float channelByte) {
+    const float depths[8] = float[8](0.0, 0.5, 1.5, 3.0, 6.0, 10.0, 16.0, 24.0);
+    return depths[int(mod(channelByte, 8.0))] / 24.0;
+}
+
 float displayChannel(float channelByte) {
     return min(255.0, floor(channelByte / 8.0) * 8.0 + 4.0) / 255.0;
 }
@@ -270,7 +277,7 @@ void main() {
         decodeSignedPayload(encodedColor.g)
     );
     shoreFactor = decodeUnitPayload(encodedColor.b);
-    depthFactor = decodeUnitPayload(encodedColor.a);
+    depthFactor = decodeDepthPayload(encodedColor.a);
     vertexColor = vec4(
         displayChannel(encodedColor.r),
         displayChannel(encodedColor.g),

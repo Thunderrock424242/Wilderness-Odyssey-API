@@ -2,6 +2,13 @@
 
 ## Architecture
 
+The [2026-10-29 depth checkpoint](watersystem/advanced-water-depth-checkpoint.md)
+reviews the current engine and improves shallow shoaling inputs through the
+existing BLOCK-format mesh. Its nonuniform three-bit depth palette retains
+0.5-, 1.5- and 3-block detail while preserving the shader/fallback interface.
+CPU/GPU fixture results and the remaining live/optional-mod limits are recorded
+there; this does not complete the cinematic-water roadmap.
+
 Wilderness water is generated as a native world resource. It is not imported,
 scanned, or converted after a chunk finishes generation. The complete data flow
 is:

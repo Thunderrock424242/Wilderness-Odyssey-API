@@ -56,7 +56,7 @@ class WaterSurfaceVertexGpuTest {
             assertEquals(GL_TRUE, glGetShaderi(shader, GL_COMPILE_STATUS), glGetShaderInfoLog(shader));
             program = glCreateProgram();
             glAttachShader(program, shader);
-            glTransformFeedbackVaryings(program, new CharSequence[] {"viewPosition", "worldNormal"},
+            glTransformFeedbackVaryings(program, new CharSequence[] {"viewPosition", "worldNormal", "depthFactor"},
                     GL_INTERLEAVED_ATTRIBS);
             glLinkProgram(program);
             assertEquals(GL_TRUE, glGetProgrami(program, GL_LINK_STATUS), glGetProgramInfoLog(program));
@@ -68,7 +68,7 @@ class WaterSurfaceVertexGpuTest {
         glBindVertexArray(vertexArray);
         feedbackBuffer = glGenBuffers();
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, feedbackBuffer);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 6L * Float.BYTES, GL_STREAM_READ);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 7L * Float.BYTES, GL_STREAM_READ);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, feedbackBuffer);
         float[] identity = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
         glUniformMatrix4fv(uniform("ModelViewMat"), false, identity);
@@ -84,11 +84,12 @@ class WaterSurfaceVertexGpuTest {
         for (WaveSpectrumState spectrum : new WaveSpectrumState[] {
                 WaveSpectrumState.NEUTRAL, new WaveSpectrumState(1.6f, 2.1f, 1, 0, 0.75f)}) {
             waves(spectrum, true);
-            for (float depth : new float[] {0, 24.0f / 7, 72.0f / 7, 24}) {
+            for (float depth : new float[] {0, 0.5f, 1.5f, 3, 6, 10, 16, 24}) {
                 for (float frozen : new float[] {0, 0.5f, 1}) {
                     for (float continuity : new float[] {0, 0.5f, 1}) {
                         int color = WaterSurfaceVertexData.encodeColor(0xFFFFFFFF, 0, 0, 0, depth);
                         float[] actual = sample(11.25f, 7.5f, color, frozen, continuity, 0.2f);
+                        assertEquals(depth / 24, actual[6], 0.000001f, "Decoded GPU depth " + depth);
                         float expected = WaterSurfaceEquation.snapshotSurfaceHeight(63, 11.25, 7.5,
                                 WaterAnimationClock.sampleTick(GAME_TIME, PARTIAL_TICK) / 20.0,
                                 spectrum, WaveSpectrumState.NEUTRAL, 4, 0, 0,
@@ -103,8 +104,27 @@ class WaterSurfaceVertexGpuTest {
                 }
             }
         }
-        assertEquals(72, comparisons);
+        assertEquals(144, comparisons);
         System.out.println("Water CPU/GPU height comparisons: " + comparisons);
+    }
+
+    @Test
+    void arbitraryDepthsUseTheSameQuantizedSurfaceOnCpuAndGpu() {
+        waves(WaveSpectrumState.NEUTRAL, true);
+        float[][] cases = {{0.1f, 0}, {0.8f, 0.5f}, {2.2f, 1.5f}, {4.4f, 3},
+                {7.9f, 6}, {12.9f, 10}, {19.9f, 16}, {200, 24}};
+        for (float[] depthCase : cases) {
+            float depth = depthCase[0];
+            int color = WaterSurfaceVertexData.encodeColor(0xFFFFFFFF, 0, 0, 0, depth);
+            float quantizedDepth = depthCase[1];
+            float[] actual = sample(11.25f, 7.5f, color, 0, 1, 0);
+            assertEquals(quantizedDepth / 24, actual[6], 0.000001f);
+            float expected = WaterSurfaceEquation.snapshotSurfaceHeight(63, 11.25, 7.5,
+                    WaterAnimationClock.sampleTick(GAME_TIME, PARTIAL_TICK) / 20.0,
+                    WaveSpectrumState.NEUTRAL, WaveSpectrumState.NEUTRAL, 4, 0, 0,
+                    1, 0, 0, 0, 0, 1, 0, 0, quantizedDepth, 0);
+            assertEquals(expected, actual[1], 0.0001f, "Input depth " + depth);
+        }
     }
 
     @Test
@@ -171,7 +191,7 @@ class WaterSurfaceVertexGpuTest {
         glBeginTransformFeedback(GL_POINTS);
         glDrawArrays(GL_POINTS, 0, 1);
         glEndTransformFeedback();
-        float[] output = new float[6];
+        float[] output = new float[7];
         glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, 0, output);
         assertEquals(GL_NO_ERROR, glGetError(), "Vertex feedback produced an OpenGL error");
         return output;

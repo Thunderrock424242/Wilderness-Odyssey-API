@@ -12,6 +12,10 @@ final class WaterSurfaceVertexData {
 
     static final float MAX_RENDER_CURRENT = 1.5f;
     static final float DEPTH_NORMALIZATION_BLOCKS = 24.0f;
+    // Spend the existing three bits on the shallow shoaling/crest bands rather
+    // than rounding every depth below 24/14 blocks to zero. This is derived
+    // mesh data only; no saved or synchronized water format uses these codes.
+    private static final float[] DEPTH_LEVELS = {0.0f, 0.5f, 1.5f, 3.0f, 6.0f, 10.0f, 16.0f, 24.0f};
     private static final float LOW_RENDER_CURRENT = 0.10f;
     private static final float MEDIUM_RENDER_CURRENT = 0.45f;
     private static final int PAYLOAD_MASK = 0x07;
@@ -27,8 +31,7 @@ final class WaterSurfaceVertexData {
             float shoreFactor,
             float depth
     ) {
-        int alpha = packChannel((argb >>> 24) & 0xFF,
-                quantizeUnit(depth / DEPTH_NORMALIZATION_BLOCKS));
+        int alpha = packChannel((argb >>> 24) & 0xFF, quantizeDepth(depth));
         int red = packChannel((argb >>> 16) & 0xFF, quantizeSigned(velocityX));
         int green = packChannel((argb >>> 8) & 0xFF, quantizeSigned(velocityZ));
         int blue = packChannel(argb & 0xFF, quantizeUnit(shoreFactor));
@@ -52,7 +55,22 @@ final class WaterSurfaceVertexData {
     }
 
     static float decodeDepthFactor(int encodedArgb) {
-        return decodeUnit((encodedArgb >>> 24) & 0xFF);
+        return DEPTH_LEVELS[(encodedArgb >>> 24) & PAYLOAD_MASK] / DEPTH_NORMALIZATION_BLOCKS;
+    }
+
+    /** Depth in blocks actually presented to the GPU for a uniform mesh sample. */
+    static float quantizedDepth(float depth) {
+        return DEPTH_LEVELS[quantizeDepth(depth)];
+    }
+
+    private static int quantizeDepth(float depth) {
+        float bounded = clamp(finiteOrZero(depth), 0.0f, DEPTH_NORMALIZATION_BLOCKS);
+        for (int index = 1; index < DEPTH_LEVELS.length; index++) {
+            if (bounded < (DEPTH_LEVELS[index - 1] + DEPTH_LEVELS[index]) * 0.5f) {
+                return index - 1;
+            }
+        }
+        return DEPTH_LEVELS.length - 1;
     }
 
     private static int packChannel(int display, int payload) {

@@ -51,6 +51,10 @@ shader; it skips when the required desktop context is unavailable. Record the
 reported driver and skipped count. GPU arithmetic checks do not replace visual
 acceptance in a running Minecraft client. See the
 [checkpoint report](hybrid-water-engine-2.md) for exact coverage and results.
+The [shallow-depth follow-up](advanced-water-depth-checkpoint.md) expands that
+feedback fixture to all eight shallow-focused depth levels and arbitrary packed
+depths. It records the 2026-10-29 regression/build results and the remaining
+mixed-column sampling and live compatibility limits.
 
 Use JDK 21 and the checked-in wrapper from the repository root. Run commands one
 at a time. Do not run another Gradle/NeoForm task alongside a development client,
