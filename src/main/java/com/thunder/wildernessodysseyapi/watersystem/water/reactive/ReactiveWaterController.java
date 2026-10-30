@@ -59,29 +59,32 @@ public final class ReactiveWaterController {
             return true;
         }
         Region region = state.byCell.get(seed);
-        List<BlockPos> sampled = ShallowPoolAdmission.sample(level, seed);
-        if (region != null && !region.cells.equals(sampled)) {
+        SurfaceRegionLayout sampled = ShallowPoolAdmission.sampleColumns(level, seed,
+                region == null ? null : region.layout.ceilingY());
+        if (region != null && !region.layout.equals(sampled)) {
             remove(level, state, region);
             region = null;
         }
-        if (sampled.isEmpty()) return false;
+        if (sampled == null) return false;
         if (region == null) {
-            if (state.regions.size() >= WaterSimulationConfig.REACTIVE_SHALLOW_POOL_MAX_REGIONS.get()) return false;
             // Topology can join formerly separate patches. Remove their cache
             // ownership before publishing the one connected replacement.
             Set<Region> previous = new LinkedHashSet<>();
-            for (BlockPos position : sampled) {
+            for (BlockPos position : sampled.cells()) {
                 Region other = state.byCell.get(position);
                 if (other != null) previous.add(other);
             }
+            if (state.regions.size() - previous.size()
+                    >= WaterSimulationConfig.REACTIVE_SHALLOW_POOL_MAX_REGIONS.get()) return false;
             for (Region other : previous) remove(level, state, other);
             region = new Region(sampled, tick);
             state.regions.add(region);
-            for (BlockPos position : sampled) state.byCell.put(position, region);
+            for (BlockPos position : region.cells) state.byCell.put(position, region);
         }
         boolean alreadyAdvanced = region.cells.stream().anyMatch(state.evaluated::contains);
         state.evaluated.addAll(region.cells);
         if (!alreadyAdvanced) advance(level, state, region, tick, deadlineNanos);
+        else region.lastTick = tick;
         if (region.quietTicks >= QUIET_TICKS_TO_SLEEP) {
             for (BlockPos position : region.cells) {
                 var cell = CanonicalWater.get(level, position);
@@ -104,8 +107,9 @@ public final class ReactiveWaterController {
         int substeps = 0;
         for (; substeps < MAX_SUBSTEPS && region.pendingSeconds > 1.0e-10; substeps++) {
             if (System.nanoTime() >= deadline) break;
-            int[] volumes = region.cells.stream().mapToInt(position -> CanonicalWater.get(level, position).volumeUnits()).toArray();
-            var plan = CanonicalSurfaceFlux.plan(volumes, region.negative, region.positive,
+            int[] volumes = region.columns.stream().mapToInt(column -> column.volume(level)).toArray();
+            var plan = CanonicalSurfaceFlux.plan(volumes, region.capacities, region.beds, region.openingTops,
+                    region.negative, region.positive,
                     region.discharge, region.pendingSeconds);
             region.discharge = plan.discharge();
             for (int face = 0; face < region.negative.length; face++) {
@@ -113,11 +117,13 @@ public final class ReactiveWaterController {
                 if (signed == 0) continue;
                 int donor = signed > 0 ? region.negative[face] : region.positive[face];
                 int receiver = signed > 0 ? region.positive[face] : region.negative[face];
-                BlockPos a = region.cells.get(donor);
-                BlockPos b = region.cells.get(receiver);
+                SurfaceColumn from = region.columns.get(donor);
+                SurfaceColumn to = region.columns.get(receiver);
+                BlockPos a = from.bottom();
+                BlockPos b = to.bottom();
                 double speed = Math.min(CanonicalSurfaceFlux.MAXIMUM_SPEED,
                         Math.abs(region.discharge[face]) / Math.max(1.0 / 4096, volumes[donor] / 4096.0));
-                int accepted = CanonicalFluxBridge.transfer(level, a, b, Math.abs(signed),
+                int accepted = CanonicalColumnFluxBridge.transfer(level, from, to, Math.abs(signed),
                         (float) (speed * (b.getX() - a.getX())), (float) (speed * (b.getZ() - a.getZ())));
                 region.discharge[face] *= accepted / (double) Math.abs(signed);
                 moved += accepted;
@@ -163,9 +169,16 @@ public final class ReactiveWaterController {
     /** Retires cache ownership after withdrawals or a transition to unsupported provenance. */
     public static void onCanonicalCellChanged(ServerLevel level, BlockPos position) {
         LevelRegions state = LEVELS.get(level);
-        Region region = state == null ? null : state.byCell.get(position);
-        if (region == null) return;
+        if (state == null) return;
+        Region region = state.byCell.get(position);
         var changed = CanonicalWater.getTracked(level, position);
+        if (region == null) {
+            if (changed != null && changed.volumeUnits() > 0) {
+                Region below = state.byCell.get(position.below());
+                if (below != null) remove(level, state, below);
+            }
+            return;
+        }
         if (!CanonicalFluxBridge.ordinary(changed)) {
             remove(level, state, region);
         } else if ((changed == null || changed.volumeUnits() == 0) && region.cells.stream()
@@ -217,7 +230,12 @@ public final class ReactiveWaterController {
     }
 
     private static final class Region {
+        final SurfaceRegionLayout layout;
+        final List<SurfaceColumn> columns;
         final List<BlockPos> cells;
+        final int[] capacities;
+        final double[] beds;
+        final double[] openingTops;
         final int[] negative;
         final int[] positive;
         double[] discharge;
@@ -225,21 +243,32 @@ public final class ReactiveWaterController {
         double pendingSeconds;
         int quietTicks;
 
-        Region(List<BlockPos> cells, long tick) {
-            this.cells = cells;
+        Region(SurfaceRegionLayout layout, long tick) {
+            this.layout = layout;
+            columns = layout.columns();
+            cells = layout.cells();
+            capacities = columns.stream().mapToInt(SurfaceColumn::capacity).toArray();
+            beds = columns.stream().mapToDouble(column -> column.bottom().getY()).toArray();
             lastTick = tick - 1;
-            Map<BlockPos, Integer> indexes = new HashMap<>();
-            for (int i = 0; i < cells.size(); i++) indexes.put(cells.get(i), i);
+            Map<Long, Integer> indexes = new HashMap<>();
+            for (int i = 0; i < columns.size(); i++) indexes.put(ShallowPoolAdmission.key(columns.get(i).bottom()), i);
             List<Integer> a = new ArrayList<>();
             List<Integer> b = new ArrayList<>();
-            for (int i = 0; i < cells.size(); i++) {
+            for (int i = 0; i < columns.size(); i++) {
                 for (Direction direction : new Direction[]{Direction.EAST, Direction.SOUTH}) {
-                    Integer neighbor = indexes.get(cells.get(i).relative(direction));
-                    if (neighbor != null) { a.add(i); b.add(neighbor); }
+                    SurfaceColumn column = columns.get(i);
+                    Integer neighbor = indexes.get(ShallowPoolAdmission.key(column.bottom().relative(direction)));
+                    if (neighbor != null && Math.min(column.topY(), columns.get(neighbor).topY())
+                            > Math.max(column.bottom().getY(), columns.get(neighbor).bottom().getY())) {
+                        a.add(i); b.add(neighbor);
+                    }
                 }
             }
             negative = a.stream().mapToInt(Integer::intValue).toArray();
             positive = b.stream().mapToInt(Integer::intValue).toArray();
+            openingTops = new double[negative.length];
+            for (int face = 0; face < negative.length; face++) openingTops[face] = Math.min(
+                    columns.get(negative[face]).topY(), columns.get(positive[face]).topY());
             discharge = new double[negative.length];
         }
     }

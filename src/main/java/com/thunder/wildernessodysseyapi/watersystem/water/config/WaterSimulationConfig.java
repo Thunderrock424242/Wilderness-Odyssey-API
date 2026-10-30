@@ -157,7 +157,7 @@ public final class WaterSimulationConfig {
                 .comment("Velocity below this value lets a detailed local water cell sleep when it cannot flow.")
                 .defineInRange("localFlowSleepSpeed", 0.025, 0.001, 0.20);
         ENABLE_REACTIVE_SHALLOW_POOLS = builder
-                .comment("Experimental canonical surface flux for enclosed, flat shallow pools of at most 16 cells. Unsupported geometry keeps voxel flow. Does not supply ocean or flood inventory.")
+                .comment("Experimental canonical surface flux for bounded reservoirs of at most 32 columns, eight cells deep (256 capacity positions). Unsupported geometry keeps voxel flow. Does not supply ocean or flood inventory.")
                 .define("enableReactiveShallowPools", false);
         REACTIVE_SHALLOW_POOL_MAX_REGIONS = builder
                 .comment("Maximum cached shallow physical regions per dimension; excess work stays with canonical voxel flow.")

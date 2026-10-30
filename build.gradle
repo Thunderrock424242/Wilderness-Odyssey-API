@@ -59,6 +59,18 @@ def biolithCompilerWorkaround = providers.gradleProperty('biolithCompilerWorkaro
 // probe. Normal IDE/developer launches retain their existing startup behavior.
 def ciSmokeTest = providers.gradleProperty('ciSmokeTest').map { it.toBoolean() }.orElse(false)
 
+def waterPersistenceStage = providers.gradleProperty('waterPersistenceStage').orNull
+def waterPersistenceRun = providers.gradleProperty('waterPersistenceRun').orNull
+def waterPersistenceScenario = providers.gradleProperty('waterPersistenceScenario').orElse('reservoir').get()
+if (waterPersistenceStage != null && (!(waterPersistenceStage in ['prepare', 'breach', 'verify'])
+        || waterPersistenceRun == null || !(waterPersistenceRun ==~ /[a-z0-9-]{1,64}/)
+        || !(waterPersistenceScenario in ['reservoir', 'storm'])
+        || waterPersistenceScenario == 'storm' && waterPersistenceStage == 'breach')) {
+    throw new GradleException('Persistence requires a lowercase run ID (1-64 letters/digits/hyphens), reservoir prepare/breach/verify or storm prepare/verify')
+}
+def waterPersistenceDirectory = waterPersistenceStage == null ? null
+        : layout.buildDirectory.dir("run-water-persistence-${waterPersistenceRun}")
+
 neoForge {
     // Specify the version of NeoForge to use.
     version = "21.1.262"
@@ -82,6 +94,17 @@ neoForge {
             server()
             programArgument '--nogui'
             // Keep default (all) so both mod and vanilla GameTests register in dev.
+        }
+
+        if (waterPersistenceStage != null) {
+            waterPersistenceServer {
+                server()
+                programArgument '--nogui'
+                gameDirectory = waterPersistenceDirectory.get().asFile
+                systemProperty 'wildernessodysseyapi.waterPersistence.stage', waterPersistenceStage
+                systemProperty 'wildernessodysseyapi.waterPersistence.run', waterPersistenceRun
+                systemProperty 'wildernessodysseyapi.waterPersistence.scenario', waterPersistenceScenario
+            }
         }
 
         // This run config launches GameTestServer and runs all registered gametests, then exits.
@@ -161,10 +184,10 @@ neoForge {
                 gameDirectory = layout.buildDirectory.dir('run-wage-acceptance').get().asFile
                 systemProperty 'wildernessodysseyapi.wageAcceptanceTest', 'true'
             }
-            if (name in ['client', 'server', 'gameTestServer'] && tickEngineCompilerWorkaround.get()) {
+            if (name in ['client', 'server', 'gameTestServer', 'waterPersistenceServer'] && tickEngineCompilerWorkaround.get()) {
                 jvmArgument '-XX:CompileCommand=exclude,com.thunder.wildernessodysseyapi.opc.tickengine.TickEngine::finishTick'
             }
-            if (name in ['client', 'server', 'gameTestServer'] && biolithCompilerWorkaround.get()) {
+            if (name in ['client', 'server', 'gameTestServer', 'waterPersistenceServer'] && biolithCompilerWorkaround.get()) {
                 jvmArgument '-XX:CompileCommand=exclude,net.minecraft.world.level.biome.Climate$RTree::biolith$searchTreeGet'
             }
             // Recommended logging data for a userdev environment
@@ -205,6 +228,78 @@ neoForge {
 tasks.named('runServer', JavaExec).configure {
     if (ciSmokeTest.get()) {
         standardInput = System.in
+    }
+}
+
+if (waterPersistenceStage != null) {
+    tasks.named('runWaterPersistenceServer', JavaExec).configure {
+        workingDir = waterPersistenceDirectory.get().asFile
+        timeout = java.time.Duration.ofMinutes(waterPersistenceScenario == 'storm' ? 8 : 4)
+        doFirst {
+            File directory = waterPersistenceDirectory.get().asFile
+            if (workingDir.canonicalFile != directory.canonicalFile) throw new GradleException('Unexpected persistence server directory')
+            directory.mkdirs()
+            systemProperty 'wildernessodysseyapi.waterPersistence.execution', UUID.randomUUID().toString()
+            Properties serverProperties = new Properties()
+            serverProperties.setProperty('server-ip', '127.0.0.1')
+            serverProperties.setProperty('server-port', '0')
+            serverProperties.setProperty('online-mode', 'false')
+            serverProperties.setProperty('enable-query', 'false')
+            serverProperties.setProperty('enable-rcon', 'false')
+            serverProperties.setProperty('max-players', '1')
+            serverProperties.setProperty('level-name', 'world')
+            serverProperties.setProperty('level-seed', '448188211')
+            serverProperties.setProperty('level-type', 'minecraft:flat')
+            serverProperties.setProperty('generator-settings', '{"layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:dirt","height":2},{"block":"minecraft:grass_block","height":1}],"biome":"minecraft:plains"}')
+            serverProperties.setProperty('generate-structures', 'false')
+            serverProperties.setProperty('difficulty', 'peaceful')
+            serverProperties.setProperty('view-distance', '2')
+            serverProperties.setProperty('simulation-distance', '2')
+            serverProperties.setProperty('spawn-animals', 'false')
+            serverProperties.setProperty('spawn-monsters', 'false')
+            serverProperties.setProperty('spawn-npcs', 'false')
+            new File(directory, 'server.properties').withOutputStream { serverProperties.store(it, 'Disposable local reservoir persistence server') }
+            new File(directory, 'eula.txt').setText('eula=true\n', 'UTF-8')
+            File config = new File(directory, 'config')
+            config.mkdirs()
+            new File(config, 'wildernessodysseyapi-common.toml').setText('[structures.placement]\ndebugDisableStarterBunker = true\n', 'UTF-8')
+            if (waterPersistenceScenario == 'storm') {
+                File settings = new File(config, 'wildernessodysseyapi')
+                settings.mkdirs()
+                new File(settings, 'wildernessodysseyapi-server.toml').setText('[water_simulation.regional_hydrology]\nbankfullDepthMetres = 0.25\nevaporationMillimetresPerGameHour = 0.0\nthermalStorageEnabled = false\nmaximumRegions = 64\n', 'UTF-8')
+            }
+        }
+        doLast {
+            File receipt = new File(waterPersistenceDirectory.get().asFile, "water-persistence/receipt-${waterPersistenceStage}.properties")
+            if (!receipt.isFile()) throw new GradleException('Missing persistence probe receipt; server readiness alone is not acceptance')
+            Properties result = new Properties()
+            receipt.withInputStream { result.load(it) }
+            if (result.getProperty('status') != 'PASS' || result.getProperty('stage') != waterPersistenceStage
+                    || result.getProperty('run') != waterPersistenceRun
+                    || result.getProperty('execution') != systemProperties.get('wildernessodysseyapi.waterPersistence.execution')) {
+                throw new GradleException("Water persistence probe failed or returned stale evidence: ${result.getProperty('failure', 'invalid receipt')}")
+            }
+            if (waterPersistenceScenario == 'storm') {
+                if (result.getProperty('scenario') != 'storm' || result.getProperty('milliUnits') != '134217728'
+                        || result.getProperty('fundedExpansion') != 'true'
+                        || waterPersistenceStage == 'verify' && (result.getProperty('automaticResume') != 'true'
+                        || result.getProperty('receded') != 'true')) {
+                    throw new GradleException('Storm probe lacks exact inventory, funded expansion or resumed recession evidence')
+                }
+            } else if (result.getProperty('units') != '16384') {
+                throw new GradleException('Reservoir probe changed its finite inventory')
+            }
+            if (waterPersistenceScenario == 'reservoir' && waterPersistenceStage in ['prepare', 'verify'] && Integer.parseInt(result.getProperty('unloads', '0')) < 1) {
+                throw new GradleException('Persistence probe did not observe real chunk eviction')
+            }
+            if (waterPersistenceStage == 'verify' && result.getProperty('automaticResume') != 'true') {
+                throw new GradleException('Persistence probe did not observe automatic resumed physical flow')
+            }
+            if (waterPersistenceScenario == 'reservoir' && waterPersistenceStage == 'prepare' && result.getProperty('metadataOnlyDirty') != 'true') {
+                throw new GradleException('Persistence probe did not verify canonical-only chunk dirtying')
+            }
+            logger.lifecycle("Water persistence ${waterPersistenceScenario}/${waterPersistenceStage}: PASS (${result.getProperty(waterPersistenceScenario == 'storm' ? 'milliUnits' : 'units')} ${waterPersistenceScenario == 'storm' ? 'milli-units' : 'units'}, PID ${result.getProperty('pid')})")
+        }
     }
 }
 
@@ -264,6 +359,9 @@ tasks.named('processResources') {
     }
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_reactive_water_tests/structure'
+    }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_storm_runoff_tests/structure'
     }
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_river_tests/structure'

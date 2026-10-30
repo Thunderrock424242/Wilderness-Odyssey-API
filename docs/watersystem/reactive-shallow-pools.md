@@ -1,5 +1,9 @@
 # Reactive shallow pools: initial physical-region checkpoint
 
+This records the initial flat-pool checkpoint. The subsequent
+[reservoir-column implementation](reactive-reservoir-columns.md) expands its
+supported geometry and bounds; historical measurements below describe this stage.
+
 Date: 2026-10-28. This extends the cinematic and canonical-dam checkpoints.
 It is a deliberately limited Phase 3 implementation, not the complete Hybrid
 Water Engine 2.0 or a general deep-reservoir height-field solver.

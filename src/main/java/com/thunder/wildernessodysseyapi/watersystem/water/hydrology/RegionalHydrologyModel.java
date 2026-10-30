@@ -106,9 +106,12 @@ public final class RegionalHydrologyModel {
                     state.spillElevation - state.elevation) * RegionalHydrologyState.AREA * UNITS);
             state.storage.transfer(LAKE, FLOODPLAIN, Math.max(0, state.stored(LAKE) - lakeBanks));
         }
+        // Recession requires an empty floodplain. Rounding this outward parcel
+        // down strands a positive tail forever; round up by at most one milli-
+        // unit and let the exact transfer retain anything the channel rejects.
         state.storage.transfer(FLOODPLAIN, RIVER,
                 Math.min(Math.max(0, bankfull - state.stored(RIVER)),
-                        units(state.stored(FLOODPLAIN) * -Math.expm1(-dt / 120.0))));
+                        (long) Math.ceil(state.stored(FLOODPLAIN) * -Math.expm1(-dt / 120.0))));
         if (parameters.thermalEnabled) advanceTemperature(state, dt);
         state.lastFlux = new HydrologicFlux(rain, snowfall ? rain : 0, melt, soil.infiltrationMilliUnits(),
                 runoff, et, recharge, baseflow, lake ? 0 : runoff, released,

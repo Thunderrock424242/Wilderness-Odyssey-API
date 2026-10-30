@@ -11,8 +11,17 @@ public final class ShallowWaterFaceMath {
     public static double discharge(double previous, double negativeBed, double positiveBed,
                                    double negativeSurface, double positiveSurface,
                                    double seconds, double cellSize, double drag, double maximumSpeed) {
-        double faceDepth = Math.max(0.0,
-                Math.max(negativeSurface, positiveSurface) - Math.max(negativeBed, positiveBed));
+        return discharge(previous, negativeBed, positiveBed, negativeSurface, positiveSurface,
+                seconds, cellSize, drag, maximumSpeed, Double.POSITIVE_INFINITY);
+    }
+
+    /** Adds an explicit vertical opening limit without changing the pressure heads. */
+    public static double discharge(double previous, double negativeBed, double positiveBed,
+                                   double negativeSurface, double positiveSurface,
+                                   double seconds, double cellSize, double drag, double maximumSpeed,
+                                   double maximumFaceDepth) {
+        double faceDepth = Math.min(maximumFaceDepth, Math.max(0.0,
+                Math.max(negativeSurface, positiveSurface) - Math.max(negativeBed, positiveBed)));
         if (faceDepth <= 1.0e-8) return 0.0;
         double gradient = (positiveSurface - negativeSurface) / cellSize;
         double finitePrevious = Double.isFinite(previous) ? previous : 0.0;

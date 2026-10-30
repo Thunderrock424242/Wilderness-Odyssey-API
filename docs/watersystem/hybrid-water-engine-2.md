@@ -1,6 +1,38 @@
 # Hybrid Water Engine 2.0: implementation checkpoints
 
-## Latest checkpoint (2026-10-28)
+## Latest checkpoint (2026-10-29)
+
+The [storm runoff checkpoint](storm-runoff-checkpoint.md) follows one measured
+finite rainfall pulse through regional runoff, river discharge, a receiving
+lake, funded detailed flood expansion and complete recession. Separate normal
+dedicated-server JVMs save and resume active flooding with exact inventory and
+zero regional residual. It also reproduces and repairs the final fractional
+floodplain tail and the occupied-heightmap expansion target. This controlled
+catchment does not establish natural storm formation, open-world river
+geometry, multiplayer or performance acceptance.
+
+The subsequent [live acceptance record](live-client-acceptance.md) observed
+weather-to-soil accounting, resource reload and sampled integrated wet reload
+in an interpreter-only diagnostic setup. Native JVM/windowing failures blocked
+the two-client and performance checks; those acceptance items remain open.
+
+## Reservoir disk checkpoint (2026-10-29)
+
+The [disk persistence report](reservoir-disk-persistence.md) verifies the bounded
+physical reservoir through real chunk eviction/reload and two normal dedicated-
+server restarts in three fresh JVMs. Exact canonical fields survive; saved awake
+work resumes drainage automatically, with all 16,384 funded units conserved.
+This establishes orderly-save acceptance for that fixture. Client Save & Quit,
+crash recovery and broader open-world acceptance remain separate work.
+
+## Reservoir-column checkpoint (2026-10-28)
+
+The [reservoir-column report](reactive-reservoir-columns.md) extends physical
+regions to bounded multi-depth basins and stepped channels. It verifies fill,
+breach, drainage, overtopping and exact column receipts through the opt-in path.
+The limit is 32 columns, eight slots per column. The subsequent persistence
+report covers the bounded disk/restart case; general open-world/pressure
+acceptance remains pending.
 
 The [reactive shallow-pool report](reactive-shallow-pools.md) records the first
 opt-in physical surface patches: bounded closed flat pools, shared coastal
@@ -100,26 +132,35 @@ high-entity-count stress test remains unrun.
 - [x] Phase 3 subset: default-disabled, disjoint closed shallow-pool regions,
   shared local-inertial/CFL arithmetic, exact canonical flux reconciliation,
   loaded-only admission, retained active-cache time and sleep/lifecycle cleanup.
-- [ ] Phase 3 remaining: generalized deep/stepped/open domains, verified voxel
-  interfaces and actual persistence acceptance. Never spend the derived
+- [ ] Phase 3 remaining: larger/open domains, general pressure flow,
+  voxel interfaces and broader lifecycle acceptance. Never spend the derived
   coastal grid as physical water inventory.
+- [x] Phase 3/4 bounded reservoir follow-up: packed multi-depth columns, stepped
+  face sills/ceilings, exact accepted parcel transfers, physical participation
+  in the controlled dam and loaded-boundary/overtopping/depth-limit regressions.
 - [x] Phase 4 subset: repair direct dry-barrier wake admission and add a funded
   inlet/basin/barrier/downstream fixture covering fill, breach, drainage and
   attachment/queue round trips through the existing finite voxel authority.
-- [ ] Phase 4 remaining: actual disk unload/reload and restart conservation,
-  physical-region coupling, and verified opening adapters. Ambiguous collision
+- [x] Phase 4 bounded persistence: exact cell fields through actual disk
+  eviction/reload, canonical-only dirtying and two normal dedicated-server
+  restarts with automatic physical drainage and zero conservation residual.
+- [ ] Phase 4 remaining: general physical-region coupling, integrated-client
+  save/reload and verified opening adapters. Ambiguous collision
   shapes remain blocked.
 - [ ] Phase 5: extend surge only with explicit ocean receipts and existing
   flood protections; validate funded propagation and recession.
-- [ ] Phase 6: improve river/waterfall coupling and SPH local-coordinate
+- [x] Phase 6 controlled hydrology subset: measured rain receipt, routed river
+  and finite lake, funded flood expansion/recession and an active-flood
+  dedicated-server restart with exact combined accounting.
+- [ ] Phase 6 remaining: improve general river/waterfall coupling and SPH local-coordinate
   precision without duplicating canonical/mobile ownership or entity forces.
 - [ ] Phase 7: dedicated two-client, optional-mod, lifecycle, memory, MSPT/FPS,
   network and long-duration acceptance.
 
-The controlled finite-voxel dam fixture now exercises an automatic breach and
-checks exact inventory through ordinary ticks. It does not complete the
-requested connected reservoir/height-field engine or real restart acceptance.
-Existing optics likewise remain subject to cinematic acceptance.
+The controlled dam now has bounded physical-region and actual disk/restart
+evidence alongside its original finite-voxel coverage. The connected engine
+still requires the open-domain, pressure, natural-storm/general-river and client/performance
+work above. Existing optics remain subject to cinematic acceptance.
 
 ## Validation ledger
 
@@ -251,8 +292,9 @@ resolved the invocation. These are command/workflow errors, not water failures.
    It has not received an independent reviewer or full-repository test pass.
 
 Remaining implementation includes disturbance stress coverage, generalizing
-the bounded physical regions and their verified interfaces, plus actual
-disk/restart acceptance of the controlled dam. Continue to use the existing
+the bounded physical regions and their verified interfaces, plus integrated-
+client and broader open-world persistence acceptance. The controlled dam and
+storm catchment now have dedicated disk/restart evidence above. Continue to use the existing
 Data/Tick Engine lanes, canonical transactions, projection safety halo, flood
 claims and synchronization.
 

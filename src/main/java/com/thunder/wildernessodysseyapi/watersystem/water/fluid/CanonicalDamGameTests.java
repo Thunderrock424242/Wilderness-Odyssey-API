@@ -27,7 +27,11 @@ public final class CanonicalDamGameTests {
 
     @GameTest(template = "water_flow", batch = "canonical_dam", timeoutTicks = 600)
     public static void finiteBasinFillsBreachesAndRetainsItsSerializedInventory(GameTestHelper helper) {
-        new DamFixture(helper).start();
+        new DamFixture(helper, false).start();
+    }
+
+    static void runPhysicalFixture(GameTestHelper helper) {
+        new DamFixture(helper, true).start();
     }
 
     private static final class DamFixture {
@@ -36,15 +40,19 @@ public final class CanonicalDamGameTests {
         private final GameTestHelper helper;
         private final ServerLevel level;
         private final BlockPos origin;
+        private final boolean requirePhysical;
         private int fundedUnits;
         private int upstreamBeforeBreach;
         private int steps;
         private int stableTicks;
         private boolean breached;
+        private boolean physicalBeforeBreach;
+        private boolean physicalAfterBreach;
         private int[] previousLevels;
 
-        private DamFixture(GameTestHelper helper) {
+        private DamFixture(GameTestHelper helper, boolean requirePhysical) {
             this.helper = helper;
+            this.requirePhysical = requirePhysical;
             level = helper.getLevel();
             origin = helper.absolutePos(new BlockPos(1, 3, 4));
         }
@@ -72,6 +80,19 @@ public final class CanonicalDamGameTests {
                     + ", upstream=" + upstreamUnits() + ", downstream=" + downstreamUnits()
                     + ", breached=" + breached + "; " + WildernessFluidRegistry.diagnostics(level));
             assertBalance();
+            if (requirePhysical) {
+                boolean active = com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController
+                        .regionAt(level, origin).cells() > 0;
+                if (!breached) physicalBeforeBreach |= active && fundedUnits == FUNDING_LIMIT
+                        && upperBasinUnits() > WaterVolumeChunk.UNITS_PER_BLOCK / 2
+                        && com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController
+                        .regionAt(level, origin.above()).cells() > 0;
+                else physicalAfterBreach |= active
+                        && com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController
+                        .regionAt(level, origin.east(4)).cells() > 0;
+                if (steps == 160 && !breached) helper.assertTrue(physicalBeforeBreach,
+                        "Multi-depth filled basin never entered the physical region solver");
+            }
             if (!breached) {
                 int requested = Math.min(FULL / 4, FUNDING_LIMIT - fundedUnits);
                 // This is the fixture's explicit finite inflow boundary. Only
@@ -79,7 +100,8 @@ public final class CanonicalDamGameTests {
                 fundedUnits += CanonicalWater.addVolume(level, origin.above(), requested, 0, 0, 0);
                 assertBalance();
                 helper.assertTrue(downstreamUnits() == 0, "The closed dam leaked into disconnected terrain");
-                if (fundedUnits == FUNDING_LIMIT && upperBasinUnits() > FULL / 2) {
+                if (fundedUnits == FUNDING_LIMIT && upperBasinUnits() > FULL / 2
+                        && (!requirePhysical || physicalBeforeBreach)) {
                     roundTripCanonicalAttachments();
                     upstreamBeforeBreach = upstreamUnits();
                     helper.assertTrue(level.setBlock(origin.east(3), Blocks.AIR.defaultBlockState(), 2),
@@ -95,6 +117,8 @@ public final class CanonicalDamGameTests {
                 stableTicks = receded && Arrays.equals(previousLevels, currentLevels) ? stableTicks + 1 : 0;
                 previousLevels = currentLevels;
                 if (stableTicks >= 20) {
+                    helper.assertTrue(!requirePhysical || physicalAfterBreach,
+                            "Stepped breach drained without physical-region participation");
                     roundTripCanonicalAttachments();
                     ModConstants.LOGGER.info("[Canonical dam fixture] fundedUnits={}, upstreamUnits={}, downstreamUnits={}, stableTicks={}, steps={}",
                             fundedUnits, upstreamUnits(), downstreamUnits(), stableTicks, steps);
@@ -159,6 +183,8 @@ public final class CanonicalDamGameTests {
             }
             int[] before = levels();
             for (var entry : saved.entrySet()) {
+                if (requirePhysical) com.thunder.wildernessodysseyapi.watersystem.water.reactive.ReactiveWaterController
+                        .onChunkUnload(level, entry.getKey().getPos());
                 CanonicalWater.onChunkUnload(level, entry.getKey().getPos());
                 entry.getKey().getData(ModAttachments.WATER_VOLUME).deserializeNBT(level.registryAccess(), entry.getValue());
                 CanonicalWater.onChunkLoad(level, entry.getKey());

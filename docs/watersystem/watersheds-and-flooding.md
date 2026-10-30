@@ -131,3 +131,10 @@ In a disposable world:
 
 Gameplay, multiplayer and long-running performance proof remains distinct from
 source, compilation and JUnit evidence.
+
+The [storm runoff checkpoint](storm-runoff-checkpoint.md) adds a controlled
+finite rain/river/lake experiment with funded expansion, active-flood disk
+restart and complete recession. Its regressions cover the final milli-unit
+drainage tail and placement above the occupied heightmap surface. It uses a
+known closed fixture; the open-world and multiplayer checks above remain
+separate acceptance work.

@@ -102,7 +102,7 @@ These server checks do not prove client visibility or diagnose a particular
 live-world stall. A finite bucket may spread into several shallow cells; it
 does not supply enough volume to fill an entire multi-block trench to the top.
 
-The opt-in shallow-pool path has its own disposable server profile:
+The opt-in physical-region path has its own disposable server profile:
 
 ```powershell
 .\gradlew.bat runGameTestServer '-PcodexBuildDir=.codex-build' -PreactiveWaterGameTests --no-parallel
@@ -112,6 +112,55 @@ It verifies bounded physical-region admission and canonical flux separately
 from the default-disabled baseline. See [reactive shallow pools](reactive-shallow-pools.md)
 for configuration, exact coverage, the observed JVM limitation and remaining
 unsupported geometry. No client or disk/restart acceptance follows from it.
+The [reservoir-column report](reactive-reservoir-columns.md) records the newer
+multi-depth dam, stepped-channel, overtopping, packed-receipt and depth-limit
+coverage in this same profile. The default option remains disabled.
+
+Actual disk and dedicated-server persistence use a separate three-stage profile:
+
+```powershell
+.\gradlew.bat runWaterPersistenceServer '-PcodexBuildDir=.codex-build' -PwaterPersistenceRun=reservoir-example-1 -PwaterPersistenceStage=prepare --no-parallel
+.\gradlew.bat runWaterPersistenceServer '-PcodexBuildDir=.codex-build' -PwaterPersistenceRun=reservoir-example-1 -PwaterPersistenceStage=breach --no-parallel
+.\gradlew.bat runWaterPersistenceServer '-PcodexBuildDir=.codex-build' -PwaterPersistenceRun=reservoir-example-1 -PwaterPersistenceStage=verify --no-parallel
+```
+
+Choose a fresh run ID and execute serially. These use one disposable world under
+`.codex-build/run-water-persistence-<id>/`, with normal dedicated-server level
+metadata and three fresh JVMs. Gradle requires matching post-stop PASS receipts,
+exact finite units, observed eviction/reload and automatic resumed physical
+flow. An out-of-order verify stage with a different fresh ID must fail. See the
+[disk persistence report](reservoir-disk-persistence.md) for the successful
+2026-10-29 cohort, exact coverage, session-only JVM workaround and limits.
+This does not certify integrated-client Save & Quit or the whole W10 checklist.
+
+The measured storm scenario uses the same dedicated profile with two stages:
+
+```powershell
+.\gradlew.bat runWaterPersistenceServer '-PcodexBuildDir=.codex-build' -PwaterPersistenceScenario=storm -PwaterPersistenceRun=storm-example-1 -PwaterPersistenceStage=prepare --no-parallel
+.\gradlew.bat runWaterPersistenceServer '-PcodexBuildDir=.codex-build' -PwaterPersistenceScenario=storm -PwaterPersistenceRun=storm-example-1 -PwaterPersistenceStage=verify --no-parallel
+```
+
+Prepare publishes one finite 128 mm precipitation receipt and saves active
+funded flooding. Verify compares persisted owners, raw disk and decoded
+canonical fields, then requires automatic downstream progress and complete
+funded recession. Gradle rejects missing/stale receipts. A separate heightmap
+regression runs with the focused GameTest namespace:
+
+```powershell
+.\gradlew.bat runGameTestServer '-PcodexBuildDir=.codex-build' -PauditGameTestRun=storm-heightmap-example '-Dforge.enabledGameTestNamespaces=wildernessodysseyapi_storm_runoff_tests' --no-parallel
+```
+
+See the [storm runoff report](storm-runoff-checkpoint.md) for the actual results,
+controlled terrain/configuration, session-only JVM diagnostic setting and
+acceptance limits. These experiments do not prove natural storm formation or
+representative open-world performance.
+
+The [2026-10-29 live acceptance attempt](live-client-acceptance.md) records actual
+client rain-to-soil accounting, resource reload and sampled wet Save & Quit/reload
+under an explicitly documented interpreter/budget configuration. Native JVM and
+GLFW failures blocked completed multiplayer joins and representative performance.
+Its server/client process exits are not a multiplayer pass; the general manual
+checklist below remains to be completed on a stable native runtime.
 
 For wider regression coverage and packaging, run these separately:
 

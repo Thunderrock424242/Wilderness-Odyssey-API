@@ -99,8 +99,9 @@ public final class ReactivePoolGameTests {
         WaterSimulationConfig.ENABLE_REACTIVE_SHALLOW_POOLS.set(false);
         helper.assertTrue(!ReactiveWaterController.tryTick(level, source), "Disabled solver claimed water");
         WaterSimulationConfig.ENABLE_REACTIVE_SHALLOW_POOLS.set(true);
-        level.setBlock(source.east().below(), Blocks.AIR.defaultBlockState(), 2);
-        helper.assertTrue(!ReactiveWaterController.tryTick(level, source), "Falling-water geometry was admitted");
+        level.setBlock(source.east(), Blocks.OAK_SLAB.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED, true), 2);
+        helper.assertTrue(!ReactiveWaterController.tryTick(level, source), "Unsupported waterlogged geometry was admitted");
         helper.assertTrue(sum(level, source, 3) == FULL, "Rejected admission changed inventory");
         helper.succeed();
     }
@@ -157,11 +158,21 @@ public final class ReactivePoolGameTests {
     public static void oversizedConnectedPoolRejectsAdmissionWithoutChangingWater(GameTestHelper helper) {
         WaterSimulationConfig.ENABLE_REACTIVE_SHALLOW_POOLS.set(true);
         ServerLevel level = helper.getLevel();
-        BlockPos source = channel(helper, 17);
+        BlockPos source = helper.absolutePos(new BlockPos(1, 3, 1));
+        for (BlockPos position : BlockPos.betweenClosed(source.offset(-1, -1, -1), source.offset(6, 2, 6))) {
+            helper.assertTrue(level.getChunkSource().getChunkNow(position.getX() >> 4, position.getZ() >> 4) != null,
+                    "Oversized fixture needs naturally loaded terrain");
+            level.setBlock(position, Blocks.STONE.defaultBlockState(), 2);
+        }
+        for (int x = 0; x < 6; x++) for (int z = 0; z < 6; z++) {
+            level.setBlock(source.offset(x, 0, z), Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(source.offset(x, 1, z), Blocks.AIR.defaultBlockState(), 2);
+        }
         seed(level, source, FULL);
         helper.assertTrue(!ReactiveWaterController.tryTick(level, source), "Oversized pool bypassed admission cap");
         helper.assertTrue(ReactiveWaterController.regionAt(level, source).cells() == 0
-                && sum(level, source, 17) == FULL, "Rejected pool retained physical ownership or changed inventory");
+                && CanonicalWater.get(level, source).volumeUnits() == FULL,
+                "Rejected pool retained physical ownership or changed inventory");
         helper.succeed();
     }
 

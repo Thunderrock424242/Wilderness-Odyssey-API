@@ -75,7 +75,9 @@ public final class TemporaryFloodManager {
             int localZ = cursor >>> 4;
             int worldX = chunk.getPos().getMinBlockX() + localX;
             int worldZ = chunk.getPos().getMinBlockZ() + localZ;
-            int targetY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ);
+            // ChunkAccess returns the occupied surface voxel; floodwater belongs
+            // in the first air/replaceable voxel above that surface.
+            int targetY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ) + 1;
             BlockPos target = new BlockPos(worldX, targetY, worldZ);
             if (targetY > representative.getY() + 1
                     || !safeTemporaryWaterTarget(level, chunk, target)

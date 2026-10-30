@@ -7,11 +7,25 @@ The [Hybrid Water Engine 2.0 checkpoint report](hybrid-water-engine-2.md) record
 the current ownership audit, cinematic surface changes, actual validation, and
 the remaining physical-region/dam implementation sequence. The subsequent
 [canonical dam checkpoint](canonical-dam-checkpoint.md) adds accepted automation
-barrier wake handling and a conserved fill/breach/drainage fixture. Physical
-height-field coupling, real restart and multiplayer acceptance remain pending.
+barrier wake handling and a conserved fill/breach/drainage fixture. General
+physical-region coverage and multiplayer acceptance remain pending.
 The next [reactive shallow-pool checkpoint](reactive-shallow-pools.md) provides
 the first default-disabled physical patches for small closed flat pools through
 the existing canonical queue. It does not replace the general voxel solver.
+The [reservoir-column follow-up](reactive-reservoir-columns.md) extends that
+opt-in path to bounded multi-depth basins, stepped breaches and overflow, with
+exact canonical transaction and loaded-boundary tests.
+The [disk persistence checkpoint](reservoir-disk-persistence.md) then verifies
+actual chunk eviction/reload, two normal dedicated-server restarts and automatic
+resumed physical drainage in a finite reservoir, with zero conservation residual.
+The [storm runoff checkpoint](storm-runoff-checkpoint.md) follows a measured
+finite rain pulse through a controlled river/lake catchment, funded canonical
+flood expansion and complete recession across an active-flood server restart.
+Natural storm formation, general open-world geometry and client/performance
+acceptance remain separate checks.
+The [live client acceptance record](live-client-acceptance.md) documents the
+subsequent diagnostic rain/soil and wet-reload observations, plus native-runtime
+failures that blocked multiplayer and performance certification.
 
 Wilderness water is generated as a first-class world fluid. Newly generated
 terrain stores the namespaced Wilderness source or flowing fluid immediately;
