@@ -151,6 +151,11 @@ part of the source change. Final diff/whitespace review is recorded in the
 
 ## Next implementation phase and acceptance
 
+The subsequent [shared mesh-sampling checkpoint](shared-mesh-sampling.md)
+implements the packed-input/parametric-triangle portion below using copies of
+the existing uploaded mesh. Exact horizontal Gerstner inversion remains open;
+see that report for actual tests and limits.
+
 First share bounded mesh-input sampling between CPU presentation and cached
 surface generation. Cover adjacent unequal-depth/body columns, frozen state,
 currents, ownership edges and the actual subdivided triangle interpolation in

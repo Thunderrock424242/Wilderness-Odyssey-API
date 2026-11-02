@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.lwjgl.opengl.GL;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -166,6 +168,148 @@ class WaterSurfaceVertexGpuTest {
         }
     }
 
+    @Test
+    void mixedPackedTrianglesMatchShaderAtBothMeshResolutions() {
+        WaveSpectrumState[] corners = {
+                new WaveSpectrumState(0.6f, 0.8f, 1, 0, 0.2f),
+                new WaveSpectrumState(1.4f, 1.1f, -1, 0, 0.5f),
+                new WaveSpectrumState(2.1f, 2.6f, 0, -1, 1),
+                new WaveSpectrumState(1.8f, 2, 0, 1, 0.8f)
+        };
+        float[] sea = new float[16];
+        float[] spectra = new float[16];
+        for (int index = 0; index < 4; index++) {
+            WaveSpectrumState state = corners[index];
+            sea[index * 4 + 1] = state.windDirectionX();
+            sea[index * 4 + 2] = state.windDirectionZ();
+            spectra[index * 4] = state.swellScale();
+            spectra[index * 4 + 1] = state.chopScale();
+            spectra[index * 4 + 2] = state.directionBlend();
+        }
+        glUniform1f(uniform("RegionalSeaStateEnabled"), 1);
+        glUniformMatrix4fv(uniform("RegionalSeaStateCorners"), false, sea);
+        glUniformMatrix4fv(uniform("RegionalSpectrumCorners"), false, spectra);
+        profile("Ocean", GerstnerWaveProfile.OCEAN, true);
+        profile("River", GerstnerWaveProfile.RIVER, true);
+        profile("Pond", GerstnerWaveProfile.LAKE, true);
+        try {
+            for (int subdivisions : new int[] {1, 2}) {
+                float step = 1.0f / subdivisions;
+                ByteBuffer bytes = WaterSurfaceMeshSamplesTest.quad(7, 8, step,
+                        new float[] {63, 63.125f, 62.875f, 63.25f});
+                int[][] body = {{100, 20, 7}, {13, 100, 14}, {0, 15, 112}, {42, 42, 42}};
+                float[] depths = {0.5f, 3, 6, 16};
+                int[] colors = new int[4];
+                for (int index = 0; index < 4; index++) {
+                    colors[index] = WaterSurfaceVertexData.encodeColor(0xFFFFFFFF,
+                            index % 2 == 0 ? 0.45f : -0.1f, index == 1 ? 1.5f : 0, 0, depths[index]);
+                    WaterSurfaceMeshSamplesTest.putPayload(bytes, index * 32, colors[index],
+                            body[index][0], body[index][1], body[index][2]);
+                }
+                var mesh = WaterSurfaceMeshSamplesTest.capture(subdivisions, bytes);
+                for (float frozen : new float[] {0, 0.5f, 1}) {
+                    float[] gpuHeights = new float[4];
+                    for (int index = 0; index < 4; index++) {
+                        var vertex = new WaterSurfaceMeshSamples.Vertex(
+                                7 + (index >= 2 ? step : 0),
+                                8 + (index == 1 || index == 2 ? step : 0),
+                                bytes.getFloat(index * 32 + 4), colors[index],
+                                body[index][0] | body[index][1] << 8 | body[index][2] << 16);
+                        gpuHeights[index] = samplePacked(vertex, frozen, 0.2f)[1];
+                        assertEquals(gpuHeights[index], packedHeight(vertex, corners, frozen), 0.0001f,
+                                "Packed vertex " + index + ", subdivision " + subdivisions);
+                    }
+                    float west = mesh.sample(7 + step * 0.25, 8 + step * 0.75,
+                            vertex -> packedHeight(vertex, corners, frozen));
+                    float east = mesh.sample(7 + step * 0.75, 8 + step * 0.25,
+                            vertex -> packedHeight(vertex, corners, frozen));
+                    assertEquals(gpuHeights[0] * 0.25f + gpuHeights[1] * 0.5f + gpuHeights[2] * 0.25f,
+                            west, 0.0001f);
+                    assertEquals(gpuHeights[0] * 0.25f + gpuHeights[2] * 0.25f + gpuHeights[3] * 0.5f,
+                            east, 0.0001f);
+                }
+            }
+        } finally {
+            glUniform1f(uniform("RegionalSeaStateEnabled"), 0);
+            profile("River", GerstnerWaveProfile.RIVER, false);
+            profile("Pond", GerstnerWaveProfile.LAKE, false);
+        }
+    }
+
+    @Test
+    void fineTransitionEdgesMatchCoarseNeighborsOnTheActualGpu() {
+        waves(new WaveSpectrumState(1.6f, 2.1f, 1, 0, 0.75f), true);
+        TreeSet<Float> edge = new TreeSet<>();
+        for (float[] quad : WaterMeshTopologyTest.quads(15, 7, 2)) {
+            for (int corner = 0; corner < 4; corner++) {
+                if (quad[corner * 2] == 1) edge.add(7 + quad[corner * 2 + 1]);
+            }
+        }
+        assertEquals(2, edge.size());
+        int color = WaterSurfaceVertexData.encodeColor(0xFFFFFFFF, 0, 0, 0, 6);
+        try {
+            for (float origin : new float[] {0, 16_368, -16_384, 29_999_984, -30_000_000}) {
+                for (float z : edge) {
+                    glUniform2f(uniform("ChunkOrigin"), origin, origin);
+                    float[] west = sample(16, z, color, 0.5f, 1, 0.2f);
+                    glUniform2f(uniform("ChunkOrigin"), origin + 16, origin);
+                    float[] east = sample(0, z, color, 0.5f, 1, 0.2f);
+                    assertEquals(west[0] - 16, east[0], 0.00001f);
+                    for (int axis = 1; axis < 6; axis++) assertEquals(west[axis], east[axis], 0.0001f);
+                }
+            }
+        } finally {
+            glUniform2f(uniform("ChunkOrigin"), 0, 0);
+        }
+    }
+
+    @Test
+    void capturedTransitionTrianglesFollowProductionShaderHeights() {
+        WaveSpectrumState spectrum = new WaveSpectrumState(1.6f, 2.1f, 1, 0, 0.75f);
+        WaveSpectrumState[] corners = {spectrum, spectrum, spectrum, spectrum};
+        waves(spectrum, true);
+        var mesh = WaterSurfaceMeshSamplesTest.capture(2, WaterSurfaceMeshSamplesTest.transitionBytes(0, 7, 2));
+        for (float frozen : new float[] {0, 0.5f, 1}) {
+            for (double[] point : new double[][] {{0.1, 7.2}, {0.2, 7.8}, {0.8, 7.2}, {0.8, 7.8}}) {
+                float actual = mesh.sample(point[0], point[1], vertex -> samplePacked(vertex, frozen, 0.2f)[1]);
+                float expected = mesh.sample(point[0], point[1], vertex -> packedHeight(vertex, corners, frozen));
+                assertEquals(expected, actual, 0.0001f, "Transition height at " + point[0] + "," + point[1]);
+            }
+        }
+    }
+
+    private static float packedHeight(WaterSurfaceMeshSamples.Vertex vertex, WaveSpectrumState[] corners, float frozen) {
+        WaveSpectrumState spectrum = WaterSurfaceEquation.meshSpectrumAt(
+                corners[0], corners[1], corners[2], corners[3], vertex.x(), vertex.z());
+        return WaterSurfaceEquation.meshVertexHeight(vertex, vertex.x(), vertex.z(),
+                WaterAnimationClock.sampleTick(GAME_TIME, PARTIAL_TICK) / 20.0,
+                spectrum, true, 0.2f, 0, frozen);
+    }
+
+    private static void profile(String name, GerstnerWaveProfile profile, boolean enabled) {
+        for (int index = 0; index < 4; index++) {
+            int component = Math.min(index, profile.waveCount - 1);
+            glUniform4f(uniform(name + "WaveParam" + index), profile.dirX[component], profile.dirZ[component],
+                    profile.waveNumber[component], profile.angularFrequency[component]);
+            glUniform4f(uniform(name + "WaveShape" + index), enabled && index < profile.waveCount ? profile.amplitude[component] : 0,
+                    profile.phaseOffset[component] - WaterAnimationClock.stablePhase(
+                            GAME_TIME, PARTIAL_TICK, profile.angularFrequency[component]),
+                    profile.steepness[component], index / (float) Math.max(1, profile.waveCount - 1));
+        }
+    }
+
+    private static float[] samplePacked(WaterSurfaceMeshSamples.Vertex vertex, float frozen, float tide) {
+        glVertexAttrib3f(glGetAttribLocation(program, "Position"), vertex.x(), vertex.height(), vertex.z());
+        glVertexAttrib3f(glGetAttribLocation(program, "Normal"),
+                (byte) vertex.bodyNormal() / 127.0f, (byte) (vertex.bodyNormal() >>> 8) / 127.0f,
+                (byte) (vertex.bodyNormal() >>> 16) / 127.0f);
+        int color = vertex.color();
+        glVertexAttrib4f(glGetAttribLocation(program, "Color"),
+                ((color >>> 16) & 255) / 255.0f, ((color >>> 8) & 255) / 255.0f,
+                (color & 255) / 255.0f, ((color >>> 24) & 255) / 255.0f);
+        return feedback(frozen, tide);
+    }
+
     private static void waves(WaveSpectrumState spectrum, boolean enabled) {
         glUniform4f(uniform("SpectrumState"), spectrum.swellScale(), spectrum.chopScale(),
                 spectrum.directionBlend(), 0);
@@ -186,6 +330,10 @@ class WaterSurfaceVertexGpuTest {
         glVertexAttrib4f(glGetAttribLocation(program, "Color"),
                 ((color >>> 16) & 255) / 255.0f, ((color >>> 8) & 255) / 255.0f,
                 (color & 255) / 255.0f, ((color >>> 24) & 255) / 255.0f);
+        return feedback(frozen, tide);
+    }
+
+    private static float[] feedback(float frozen, float tide) {
         glUniform4f(uniform("Weather"), 0, 0, 1, frozen);
         glUniform1f(uniform("TideOffset"), tide);
         glBeginTransformFeedback(GL_POINTS);

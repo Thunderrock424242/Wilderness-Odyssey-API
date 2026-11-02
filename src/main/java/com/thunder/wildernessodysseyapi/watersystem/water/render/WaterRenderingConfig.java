@@ -47,6 +47,8 @@ public final class WaterRenderingConfig {
     public static ModConfigSpec.BooleanValue ENABLE_COASTAL_SEASON_INFLUENCE;
     public static ModConfigSpec.BooleanValue AUTO_OPTIMIZE_WITH_RENDERER_MODS;
     public static ModConfigSpec.BooleanValue AUTO_DETECT_WATER_QUALITY;
+    public static ModConfigSpec.BooleanValue ENABLE_ADAPTIVE_SURFACE_MESH_DETAIL;
+    public static ModConfigSpec.IntValue SURFACE_MESH_NEAR_DETAIL_DISTANCE_BLOCKS;
     public static ModConfigSpec.BooleanValue MATCH_OCEAN_SURFACE_TO_VIEW_DISTANCE;
     public static ModConfigSpec.BooleanValue SHOW_CLOCK_TIDE_TOOLTIP;
     public static ModConfigSpec.BooleanValue SHOW_CONTEXTUAL_CLOCK_TIDE_DISPLAY;
@@ -198,6 +200,12 @@ public final class WaterRenderingConfig {
         WATER_QUALITY = builder
                 .comment("Manual/fallback water quality. Used when autoDetectWaterQuality is disabled. LOW is cheap waves/no SPH, MEDIUM adds basic foam/ripples, HIGH enables capped local SPH, and CINEMATIC raises client visuals while still keeping hard safety caps.")
                 .defineEnum("waterQuality", WaterQuality.CINEMATIC);
+        ENABLE_ADAPTIVE_SURFACE_MESH_DETAIL = builder
+                .comment("Reduce distant calm snapshot water meshes to one-block faces. High/Cinematic retain half-block interiors nearby and in sensitive shoreline chunks. Disabling restores the quality ceiling through existing rebuild budgets.")
+                .define("enableAdaptiveSurfaceMeshDetail", true);
+        SURFACE_MESH_NEAR_DETAIL_DISTANCE_BLOCKS = builder
+                .comment("Horizontal distance in blocks that retains fine High/Cinematic water detail. Storm energy can extend it to twice this distance; shorelines retain their quality ceiling.")
+                .defineInRange("surfaceMeshNearDetailDistanceBlocks", 64, 16, 256);
         SPH_LOCAL_EFFECT_QUALITY = builder
                 .comment("Quality for local SPH-only water effects. The overall waterQuality can still clamp this down; SPH never owns oceans, lakes, rivers, or permanent storage.")
                 .defineEnum("sphLocalEffectQuality", SphLocalEffectQuality.HIGH);

@@ -30,6 +30,14 @@ The [advanced depth checkpoint](advanced-water-depth-checkpoint.md) reviews the
 current rendering/physics owners and restores shallow-water depth detail in the
 existing mesh codec, with production GPU regressions and an ordered adaptive
 mesh follow-up. Live acceptance remains separate.
+The [shared mesh-sampling follow-up](shared-mesh-sampling.md) now lets immersion
+and surface effects reuse the acknowledged upload's actual packed inputs and
+subdivided triangles. Horizontal wave inversion and adaptive mesh detail remain
+separate extensions.
+The [distance-based detail checkpoint](distance-based-mesh-detail.md) adds
+bounded calm-water detail reduction, fixed shared borders and transition-face
+sampling through the same cache and rebuild queue. Synthetic geometry savings
+and GPU checks are recorded separately from pending live performance acceptance.
 
 Wilderness water is generated as a first-class world fluid. Newly generated
 terrain stores the namespaced Wilderness source or flowing fluid immediately;

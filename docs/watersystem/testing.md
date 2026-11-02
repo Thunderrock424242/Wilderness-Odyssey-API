@@ -55,6 +55,15 @@ The [shallow-depth follow-up](advanced-water-depth-checkpoint.md) expands that
 feedback fixture to all eight shallow-focused depth levels and arbitrary packed
 depths. It records the 2026-10-29 regression/build results and the remaining
 mixed-column sampling and live compatibility limits.
+The [shared mesh-sampling checkpoint](shared-mesh-sampling.md) adds packed-buffer
+and mixed ocean/river/lake triangle regressions at both topology resolutions,
+including a real Minecraft BLOCK-buffer fixture. Its GPU comparisons are in the
+undisturbed parameter plane and do not certify exact world-space horizontal
+wave intersections or live acceptance.
+The [distance-based detail checkpoint](distance-based-mesh-detail.md) adds
+selection/dwell, transition coverage/winding, detail-queue and production-GPU
+edge regressions. Compare all four tiers and near/far camera movement in the
+remaining live pass; submitted triangle reduction alone is not an FPS result.
 
 Use JDK 21 and the checked-in wrapper from the repository root. Run commands one
 at a time. Do not run another Gradle/NeoForm task alongside a development client,

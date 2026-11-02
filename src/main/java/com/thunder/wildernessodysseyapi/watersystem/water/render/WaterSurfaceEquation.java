@@ -18,6 +18,44 @@ public final class WaterSurfaceEquation {
     private WaterSurfaceEquation() {
     }
 
+    /** Mirrors the shader's linear chunk-corner field, including wind normalization. */
+    static WaveSpectrumState meshSpectrumAt(WaveSpectrumState northWest, WaveSpectrumState southWest,
+                                            WaveSpectrumState southEast, WaveSpectrumState northEast,
+                                            float localX, float localZ) {
+        float x = clamp(localX / 16.0f, 0, 1);
+        float z = clamp(localZ / 16.0f, 0, 1);
+        return new WaveSpectrumState(
+                bilinear(northWest.swellScale(), southWest.swellScale(), southEast.swellScale(), northEast.swellScale(), x, z),
+                bilinear(northWest.chopScale(), southWest.chopScale(), southEast.chopScale(), northEast.chopScale(), x, z),
+                bilinear(northWest.windDirectionX(), southWest.windDirectionX(), southEast.windDirectionX(), northEast.windDirectionX(), x, z),
+                bilinear(northWest.windDirectionZ(), southWest.windDirectionZ(), southEast.windDirectionZ(), northEast.windDirectionZ(), x, z),
+                bilinear(northWest.directionBlend(), southWest.directionBlend(), southEast.directionBlend(), northEast.directionBlend(), x, z));
+    }
+
+    /** Evaluates one real packed mesh vertex before triangle interpolation. */
+    static float meshVertexHeight(WaterSurfaceMeshSamples.Vertex vertex, double worldX, double worldZ,
+                                  double timeSeconds, WaveSpectrumState spectrum, boolean waves,
+                                  float tideOffset, float transientHeight, float frozenFraction) {
+        float fetch = 0.16f + (0.68f - 0.16f) * vertex.depth() / 24.0f;
+        WaveSpectrumState enclosed = new WaveSpectrumState(
+                0.58f + (spectrum.swellScale() - 0.58f) * fetch * 0.62f,
+                0.62f + (spectrum.chopScale() - 0.62f) * fetch * 0.82f,
+                spectrum.windDirectionX(), spectrum.windDirectionZ(), spectrum.directionBlend() * fetch);
+        return snapshotSurfaceHeight(vertex.height(), worldX, worldZ, timeSeconds, spectrum, enclosed,
+                waves ? GerstnerWaveProfile.OCEAN.waveCount : 0,
+                waves ? GerstnerWaveProfile.RIVER.waveCount : 0,
+                waves ? GerstnerWaveProfile.LAKE.waveCount : 0,
+                vertex.oceanWeight(), vertex.riverWeight(), vertex.lakeWeight(),
+                vertex.currentX(), vertex.currentZ(), vertex.continuity(),
+                tideOffset, transientHeight, vertex.depth(), frozenFraction);
+    }
+
+    private static float bilinear(float nw, float sw, float se, float ne, float x, float z) {
+        float north = nw + (ne - nw) * x;
+        float south = sw + (se - sw) * x;
+        return north + (south - north) * z;
+    }
+
     /** Evaluates one bounded visible surface height. */
     public static float surfaceHeight(
             float baseSurfaceY,

@@ -6,14 +6,12 @@ import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.OceanSeaState;
 import com.thunder.wildernessodysseyapi.watersystem.ocean.tide.TideSystem;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
-import com.thunder.wildernessodysseyapi.watersystem.water.environment.WaterEnvironmentState;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
 import com.thunder.wildernessodysseyapi.watersystem.water.sph.SPHSimulationManager;
-import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaterBodyClassifier;
 import com.thunder.wildernessodysseyapi.watersystem.water.wave.WaveSpectrumState;
 import com.thunder.wildernessodysseyapi.wage.client.WildernessRenderingFramework;
 import net.minecraft.client.Camera;
@@ -42,6 +40,7 @@ public final class ClientWaterImmersion {
     private static long cachedGameTime = Long.MIN_VALUE;
     private static float cachedPartialTick = Float.NaN;
     private static Vec3 cachedCameraPosition = new Vec3(Double.NaN, Double.NaN, Double.NaN);
+    private static WaterSurfaceMeshSamples cachedMesh;
     private static ImmersionState cachedState = ImmersionState.DRY;
 
     private ClientWaterImmersion() {
@@ -56,7 +55,8 @@ public final class ClientWaterImmersion {
             return ImmersionState.DRY;
         }
         Vec3 cameraPosition = camera.getPosition();
-        if (isCached(level, cameraPosition, partialTick)) {
+        WaterSurfaceMeshSamples currentMesh = WaterRenderCoordinator.surfaceSamples(level, cameraPosition.x, cameraPosition.z);
+        if (cachedMesh == currentMesh && isCached(level, cameraPosition, partialTick)) {
             return cachedState;
         }
 
@@ -65,6 +65,7 @@ public final class ClientWaterImmersion {
         cachedGameTime = level.getGameTime();
         cachedPartialTick = partialTick;
         cachedCameraPosition = cameraPosition;
+        cachedMesh = currentMesh;
         cachedState = resolve(level, cameraPosition, partialTick, previous);
         return cachedState;
     }
@@ -76,6 +77,7 @@ public final class ClientWaterImmersion {
             cachedGameTime = Long.MIN_VALUE;
             cachedPartialTick = Float.NaN;
             cachedCameraPosition = new Vec3(Double.NaN, Double.NaN, Double.NaN);
+            cachedMesh = null;
             cachedState = ImmersionState.DRY;
         }
     }
@@ -168,9 +170,6 @@ public final class ClientWaterImmersion {
                 sea.strength() * oceanWeight, optics);
     }
 
-    // Snapshot mesh vertices average the four touching custom columns. Sampling
-    // the same triangle interpolation here prevents camera entry from crossing
-    // a full-amplitude CPU crest after the GPU has tapered that shoreline flat.
     /**
      * Samples the snapshot mesh's interpolated loaded-surface continuity.
      *
@@ -183,27 +182,20 @@ public final class ClientWaterImmersion {
             double worldX,
             double worldZ
     ) {
-        int minimumX = (int) Math.floor(worldX);
-        int minimumZ = (int) Math.floor(worldZ);
-        float localX = (float) (worldX - minimumX);
-        float localZ = (float) (worldZ - minimumZ);
-        return interpolateQuadContinuity(
-                vertexContinuity(level, minimumX, minimumZ),
-                vertexContinuity(level, minimumX, minimumZ + 1),
-                vertexContinuity(level, minimumX + 1, minimumZ + 1),
-                vertexContinuity(level, minimumX + 1, minimumZ),
-                localX,
-                localZ
-        );
+        WaterSurfaceMeshSamples mesh = WaterRenderCoordinator.surfaceSamples(level, worldX, worldZ);
+        if (mesh == null) return 0;
+        int originX = ((int) Math.floor(worldX) >> 4) << 4;
+        int originZ = ((int) Math.floor(worldZ) >> 4) << 4;
+        float continuity = mesh.sample(worldX - originX, worldZ - originZ, WaterSurfaceMeshSamples.Vertex::continuity);
+        return Float.isFinite(continuity) ? continuity : 0;
     }
 
     /**
-     * Samples the same body-blended, shoreline-tapered surface used by immersion.
+     * Samples the published packed mesh in its undisturbed parameter plane.
      *
-     * <p>Ambient spray uses this path so tides and transient wakes cannot leave
-     * particles floating above or clipping below the built-in mesh. An external
-     * shader pack has no inspectable displacement equation, so its safe fallback
-     * is the synchronized flat fluid height.</p>
+     * <p>Ambient spray and immersion share its per-vertex inputs and triangle
+     * interpolation. Horizontal Gerstner inversion remains separate work. An
+     * external shader pack or unpublished mesh uses the flat fluid fallback.</p>
      */
     static float visibleSurfaceHeight(
             ClientLevel level,
@@ -212,109 +204,37 @@ public final class ClientWaterImmersion {
             double worldZ,
             float partialTick
     ) {
-        float oceanWeight = column.oceanWeight() / 255.0f;
-        float riverWeight = column.riverWeight() / 255.0f;
-        float lakeWeight = column.lakeWeight() / 255.0f;
-        double sampleTick = WaterAnimationClock.sampleTick(level.getGameTime(), partialTick);
-        double timeSeconds = sampleTick / 20.0;
         int blockX = (int) Math.floor(worldX);
         int blockZ = (int) Math.floor(worldZ);
         WatershedConditions watershed = WatershedServices.conditions(
                 level,
                 new BlockPos(blockX, column.surfaceBlockY(), blockZ)
         );
-        WatershedLocalFlow localFlow = WatershedServices.localFlow(
-                level,
-                new BlockPos(blockX, column.surfaceBlockY(), blockZ)
-        );
-        boolean customSurface = WaterShaders.shouldUseCoreShader()
-                && WaterChunkMeshCache.usesCustomSurface(level, blockX, blockZ, column);
-        boolean waveSurface = customSurface && WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
+        WaterSurfaceMeshSamples mesh = WaterRenderCoordinator.surfaceSamples(level, worldX, worldZ);
+        float fallbackHeight = column.baseSurfaceY() + watershed.waterLevelOffset();
+        if (mesh == null) return fallbackHeight;
+        int originX = (blockX >> 4) << 4;
+        int originZ = (blockZ >> 4) << 4;
+        double sampleTick = WaterAnimationClock.sampleTick(level.getGameTime(), partialTick);
+        WaveSpectrumState northWest = ClientOceanSeaState.sampleAt(level, originX, originZ, partialTick).spectrum();
+        WaveSpectrumState southWest = ClientOceanSeaState.sampleAt(level, originX, originZ + 16, partialTick).spectrum();
+        WaveSpectrumState southEast = ClientOceanSeaState.sampleAt(level, originX + 16, originZ + 16, partialTick).spectrum();
+        WaveSpectrumState northEast = ClientOceanSeaState.sampleAt(level, originX + 16, originZ, partialTick).spectrum();
+        boolean waves = WaterRenderingConfig.ENABLE_GERSTNER_WAVES.get();
+        float tide = TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE;
+        float frozen = WildernessRenderingFramework.currentFrame().environment().frozenFraction();
         Vec3 selectionOrigin = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-        float transientHeight = customSurface
-                ? WaterSurfaceDisplacement.sampleHeight(
-                        level,
-                        worldX,
-                        worldZ,
-                        sampleTick,
-                        selectionOrigin.x,
-                        selectionOrigin.z
-                )
-                : 0.0f;
-        float surfaceContinuity = customSurface
-                ? sampleSurfaceContinuity(level, worldX, worldZ)
-                : 1.0f;
-        OceanSeaState.Sample seaState = ClientOceanSeaState.sampleAt(
-                level,
-                worldX,
-                worldZ,
-                partialTick
-        );
-        float surfaceDepth = customSurface
-                ? WaterSurfaceVertexData.quantizedDepth(column.depth()) : column.depth();
-        float depthFactor = clamp(surfaceDepth / WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS,
-                0.0f, 1.0f);
-        float enclosedFetch = 0.16f + (0.68f - 0.16f) * depthFactor;
-        WaveSpectrumState enclosedSpectrum = WaterEnvironmentState.waveSpectrumFor(
-                WaterBodyClassifier.WaterType.LAKE,
-                seaState,
-                level.getRainLevel(partialTick),
-                enclosedFetch
-        );
-        return WaterSurfaceEquation.snapshotSurfaceHeight(
-                column.baseSurfaceY() + watershed.waterLevelOffset(),
-                worldX,
-                worldZ,
-                timeSeconds,
-                seaState.spectrum(),
-                enclosedSpectrum,
-                waveSurface
-                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.OCEAN) : 0,
-                waveSurface
-                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.RIVER) : 0,
-                waveSurface
-                        ? WaterRenderingConfig.waveTrainLimit(WaterBodyClassifier.WaterType.LAKE) : 0,
-                oceanWeight,
-                riverWeight,
-                lakeWeight,
-                column.currentX(localFlow.currentX()),
-                column.currentZ(localFlow.currentZ()),
-                surfaceContinuity,
-                customSurface ? TideSystem.getTideOffset(level) * VISUAL_TIDE_SCALE : 0.0f,
-                transientHeight,
-                depthFactor * WaterSurfaceVertexData.DEPTH_NORMALIZATION_BLOCKS,
-                customSurface ? WildernessRenderingFramework.currentFrame().environment().frozenFraction() : 0.0f
-        );
-    }
-
-    private static float vertexContinuity(ClientLevel level, int vertexX, int vertexZ) {
-        // Mirror the mesh's exact boundary anchor and one-row inland ramp so
-        // camera immersion and surface effects cannot follow a crest that the
-        // GPU deliberately flattened against land or an unloaded frontier.
-        return WaterChunkMeshCache.displacementContinuityAt(
-                vertexX,
-                vertexZ,
-                (columnX, columnZ) -> {
-                    ClientWaterChunkSnapshot snapshot = ClientWaterSnapshotStore.getAtBlock(
-                            level,
-                            columnX,
-                            columnZ
-                    );
-                    if (snapshot == null) {
-                        return false;
-                    }
-                    ClientWaterChunkSnapshot.Column column = snapshot.column(
-                            columnX & 15,
-                            columnZ & 15
-                    );
-                    return column.wet() && WaterChunkMeshCache.usesCustomSurface(
-                            level,
-                            columnX,
-                            columnZ,
-                            column
-                    );
-                }
-        );
+        float height = mesh.sample(worldX - originX, worldZ - originZ, vertex -> {
+            double vertexX = originX + (double) vertex.x();
+            double vertexZ = originZ + (double) vertex.z();
+            float transientHeight = WaterSurfaceDisplacement.sampleHeight(level, vertexX, vertexZ,
+                    sampleTick, selectionOrigin.x, selectionOrigin.z);
+            WaveSpectrumState spectrum = WaterSurfaceEquation.meshSpectrumAt(
+                    northWest, southWest, southEast, northEast, vertex.x(), vertex.z());
+            return WaterSurfaceEquation.meshVertexHeight(vertex, vertexX, vertexZ, sampleTick / 20.0,
+                    spectrum, waves, tide, transientHeight, frozen);
+        });
+        return Float.isFinite(height) ? height : fallbackHeight;
     }
 
     static float interpolateQuadContinuity(
@@ -327,15 +247,8 @@ public final class ClientWaterImmersion {
     ) {
         float boundedX = clamp(x, 0.0f, 1.0f);
         float boundedZ = clamp(z, 0.0f, 1.0f);
-        // QUADS uses the north-west to south-east diagonal.
-        if (boundedX <= boundedZ) {
-            return northWest * (1.0f - boundedZ)
-                    + southWest * (boundedZ - boundedX)
-                    + southEast * boundedX;
-        }
-        return northWest * (1.0f - boundedX)
-                + southEast * boundedZ
-                + northEast * (boundedX - boundedZ);
+        return WaterSurfaceMeshSamples.interpolateTriangle(
+                northWest, southWest, southEast, northEast, boundedX, boundedZ);
     }
 
     private static ImmersionState resolveMobileWater(ClientLevel level, Vec3 cameraPosition) {

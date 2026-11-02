@@ -1,6 +1,7 @@
 package com.thunder.wildernessodysseyapi.watersystem.water.render;
 
 import com.thunder.wildernessodysseyapi.environment.glacial.client.GlacialWaterTintManager;
+import com.thunder.wildernessodysseyapi.watersystem.ocean.ClientOceanSeaState;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
@@ -8,6 +9,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
 import com.thunder.wildernessodysseyapi.watersystem.water.fluid.WildernessFluidRegistry;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterChunkSnapshot;
 import com.thunder.wildernessodysseyapi.watersystem.water.network.ClientWaterSnapshotStore;
@@ -30,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -44,6 +47,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class WaterChunkMeshCache {
 
     private static final int BYTES_PER_VERTEX = DefaultVertexFormat.BLOCK.getVertexSize();
+    private static final WaterSurfaceMeshSamples.Layout SAMPLE_LAYOUT = new WaterSurfaceMeshSamples.Layout(
+            BYTES_PER_VERTEX, DefaultVertexFormat.BLOCK.getOffset(VertexFormatElement.POSITION),
+            DefaultVertexFormat.BLOCK.getOffset(VertexFormatElement.COLOR),
+            DefaultVertexFormat.BLOCK.getOffset(VertexFormatElement.NORMAL));
     private static final int FULL_BRIGHT = LightTexture.pack(15, 15);
     // The shader maps this value through smoothstep(0.18, 0.92), so the
     // boundary payload produces exactly zero displacement while retaining a
@@ -54,24 +61,33 @@ public final class WaterChunkMeshCache {
 
     private static final TopologyColumn DRY_TOPOLOGY_COLUMN = new TopologyColumn(null);
 
-    private final Map<Long, MeshGroup> groups = new ConcurrentHashMap<>();
+    private final Map<Long, CachedMesh> groups = new ConcurrentHashMap<>();
+    private ClientLevel samplingLevel;
+    private Iterator<CachedMesh> detailCursor;
 
     /** Rebuilds one dirty chunk and atomically replaces its previous GPU group. */
     public MeshGroup rebuild(ClientLevel level, ClientWaterChunkSnapshot snapshot) {
+        return rebuild(level, snapshot, Double.NaN, Double.NaN);
+    }
+
+    /** Selects detail in the existing bounded rebuild, without inspecting neighboring chunks. */
+    MeshGroup rebuild(ClientLevel level, ClientWaterChunkSnapshot snapshot, double cameraX, double cameraZ) {
+        if (samplingLevel != null && samplingLevel != level) clear();
+        samplingLevel = level;
         long key = chunkKey(snapshot.chunkX(), snapshot.chunkZ());
-        MeshGroup replacement = build(level, snapshot);
-        MeshGroup previous = replacement.empty() ? groups.remove(key) : groups.put(key, replacement);
+        CachedMesh replacement = build(level, snapshot, groups.get(key), cameraX, cameraZ);
+        CachedMesh previous = replacement.group().empty() ? groups.remove(key) : groups.put(key, replacement);
         if (previous != null) {
-            previous.close();
+            previous.group().close();
         }
-        return replacement;
+        return replacement.group();
     }
 
     /** Removes one unloaded chunk mesh. */
     public void remove(long chunkKey) {
-        MeshGroup previous = groups.remove(chunkKey);
+        CachedMesh previous = groups.remove(chunkKey);
         if (previous != null) {
-            previous.close();
+            previous.group().close();
         }
     }
 
@@ -83,7 +99,8 @@ public final class WaterChunkMeshCache {
             double cameraZ
     ) {
         List<MeshGroup> visible = new ArrayList<>();
-        for (MeshGroup group : groups.values()) {
+        for (CachedMesh cached : groups.values()) {
+            MeshGroup group = cached.group();
             if (frustum.isVisible(group.bounds())) {
                 visible.add(group);
             }
@@ -105,19 +122,59 @@ public final class WaterChunkMeshCache {
 
     /** Returns whether the uploaded mesh physically verified and emitted one column. */
     public boolean ownsSurface(long chunkKey, int localX, int localZ) {
-        MeshGroup group = groups.get(chunkKey);
-        return group != null && group.ownsSurface(localX, localZ);
+        CachedMesh cached = groups.get(chunkKey);
+        return cached != null && cached.group().ownsSurface(localX, localZ);
+    }
+
+    /** Returns sampling data from the same upload, never a fresh world scan. */
+    WaterSurfaceMeshSamples surfaceSamples(ClientLevel level, long chunkKey) {
+        CachedMesh cached = level == samplingLevel ? groups.get(chunkKey) : null;
+        return cached == null ? null : cached.samples();
+    }
+
+    /** Checks at most eight existing uploads per frame; the normal queue owns all rebuilding. */
+    void queueDetailUpdates(ClientLevel level, double cameraX, double cameraZ) {
+        if (level != samplingLevel || groups.isEmpty()) return;
+        if (detailCursor == null || !detailCursor.hasNext()) detailCursor = groups.values().iterator();
+        int ceiling = surfaceSubdivisions();
+        boolean enabled = WaterRenderingConfig.ENABLE_ADAPTIVE_SURFACE_MESH_DETAIL.get() && WaterShaders.shouldUseCoreShader();
+        int nearDistance = WaterRenderingConfig.SURFACE_MESH_NEAR_DETAIL_DISTANCE_BLOCKS.get();
+        long tick = level.getGameTime();
+        for (int checked = 0; checked < 8 && detailCursor.hasNext(); checked++) {
+            CachedMesh cached = detailCursor.next();
+            long key = cached.group().chunkKey();
+            if (groups.get(key) != cached) continue;
+            if (enabled && ceiling == 2 && !cached.sensitive && (tick - cached.seaTick >= 10 || tick < cached.seaTick)) {
+                cached.seaStrength = ClientOceanSeaState.sampleAt(level,
+                        cached.group().originX() + 8, cached.group().originZ() + 8).strength();
+                cached.seaTick = tick;
+            }
+            double distance = WaterMeshLodPolicy.distanceSquaredToChunk(cameraX, cameraZ,
+                    cached.group().originX(), cached.group().originZ());
+            int desired = WaterMeshLodPolicy.select(ceiling, enabled, cached.sensitive, distance,
+                    cached.seaStrength, cached.detail, nearDistance);
+            if (desired == cached.detail) {
+                cached.requestedDetail = cached.detail;
+            } else if (WaterMeshLodPolicy.shouldQueue(cached.detail, cached.requestedDetail, desired,
+                    ceiling == 1 ? 40 : tick - cached.detailChangedTick)) {
+                cached.requestedDetail = desired;
+                ClientWaterSnapshotStore.queueMeshDetailRefresh(level, cached.group().originX() >> 4, cached.group().originZ() >> 4);
+            }
+        }
     }
 
     /** Releases all GPU objects during dimension/resource teardown. */
     public void clear() {
-        for (MeshGroup group : groups.values()) {
-            group.close();
+        for (CachedMesh cached : groups.values()) {
+            cached.group().close();
         }
         groups.clear();
+        samplingLevel = null;
+        detailCursor = null;
     }
 
-    private MeshGroup build(ClientLevel level, ClientWaterChunkSnapshot snapshot) {
+    private CachedMesh build(ClientLevel level, ClientWaterChunkSnapshot snapshot, CachedMesh previous,
+                             double cameraX, double cameraZ) {
         int chunkMinX = snapshot.chunkX() << 4;
         int chunkMinZ = snapshot.chunkZ() << 4;
         Map<Long, Boolean> liveSurfaceEligibility = new HashMap<>(324);
@@ -126,6 +183,9 @@ public final class WaterChunkMeshCache {
         long[] ownedSurfaceMask = new long[4];
         int wetColumns = 0;
         int firstSurfaceY = 0;
+        boolean sensitive = false;
+        float minimumBase = Float.POSITIVE_INFINITY;
+        float maximumBase = Float.NEGATIVE_INFINITY;
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
                 ClientWaterChunkSnapshot.Column column = snapshot.column(localX, localZ);
@@ -145,6 +205,9 @@ public final class WaterChunkMeshCache {
                         ? new TopologyColumn(column)
                         : DRY_TOPOLOGY_COLUMN);
                 if (eligible) {
+                    sensitive |= WaterMeshLodPolicy.sensitiveColumn(column.depth(), column.currentX(0), column.currentZ(0), column.riverWeight());
+                    minimumBase = Math.min(minimumBase, column.baseSurfaceY());
+                    maximumBase = Math.max(maximumBase, column.baseSurfaceY());
                     int columnIndex = localX | (localZ << 4);
                     ownedSurfaceMask[columnIndex >>> 6] |= 1L << (columnIndex & 63);
                     if (wetColumns++ == 0) {
@@ -154,7 +217,7 @@ public final class WaterChunkMeshCache {
             }
         }
         if (wetColumns == 0) {
-            return MeshGroup.EMPTY;
+            return CachedMesh.EMPTY;
         }
 
         TextureAtlasSprite sprite = FluidSpriteCache.getFluidSprites(
@@ -163,12 +226,24 @@ public final class WaterChunkMeshCache {
                 WildernessFluidRegistry.WILDERNESS_WATER.get().defaultFluidState()
         )[0];
 
-        int subdivisions = surfaceSubdivisions();
+        sensitive |= wetColumns < 256 || maximumBase - minimumBase > 0.125f;
+        int ceiling = surfaceSubdivisions();
+        boolean adaptive = WaterRenderingConfig.ENABLE_ADAPTIVE_SURFACE_MESH_DETAIL.get() && WaterShaders.shouldUseCoreShader();
+        float sea = adaptive && ceiling == 2 && !sensitive
+                ? ClientOceanSeaState.sampleAt(level, chunkMinX + 8, chunkMinZ + 8).strength() : 0;
+        long tick = level.getGameTime();
+        int subdivisions = WaterMeshLodPolicy.select(ceiling, adaptive, sensitive,
+                WaterMeshLodPolicy.distanceSquaredToChunk(cameraX, cameraZ, chunkMinX, chunkMinZ),
+                sea, previous == null ? 0 : previous.detail,
+                WaterRenderingConfig.SURFACE_MESH_NEAR_DETAIL_DISTANCE_BLOCKS.get());
+        if (previous != null && adaptive && ceiling == 2 && subdivisions < previous.detail
+                && tick - previous.detailChangedTick < 40) subdivisions = previous.detail;
+        long detailChangedTick = previous == null || subdivisions != previous.detail ? tick : previous.detailChangedTick;
         int quadsPerColumn = subdivisions * subdivisions;
-        int vertexCount = wetColumns * quadsPerColumn * 4;
+        int maximumVertices = wetColumns * quadsPerColumn * 4;
         int minimumY = Integer.MAX_VALUE;
         int maximumY = Integer.MIN_VALUE;
-        try (ByteBufferBuilder bytes = new ByteBufferBuilder(Math.max(256, vertexCount * BYTES_PER_VERTEX))) {
+        try (ByteBufferBuilder bytes = new ByteBufferBuilder(Math.max(256, maximumVertices * BYTES_PER_VERTEX))) {
             BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
             for (int localZ = 0; localZ < 16; localZ++) {
                 for (int localX = 0; localX < 16; localX++) {
@@ -187,6 +262,14 @@ public final class WaterChunkMeshCache {
                 }
             }
             MeshData mesh = builder.buildOrThrow();
+            int vertexCount = mesh.drawState().vertexCount();
+            WaterSurfaceMeshSamples samples;
+            try {
+                samples = WaterSurfaceMeshSamples.capture(mesh.vertexBuffer(), vertexCount, subdivisions, SAMPLE_LAYOUT);
+            } catch (RuntimeException failure) {
+                mesh.close();
+                throw failure;
+            }
             VertexBuffer buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
             buffer.bind();
             buffer.upload(mesh);
@@ -199,7 +282,7 @@ public final class WaterChunkMeshCache {
                     maximumY + 3.0,
                     chunkMinZ + 16.0
             );
-            return new MeshGroup(
+            return new CachedMesh(new MeshGroup(
                     chunkKey(snapshot.chunkX(), snapshot.chunkZ()),
                     snapshot.generatedRevision(),
                     snapshot.sparseRevision(),
@@ -208,12 +291,12 @@ public final class WaterChunkMeshCache {
                     buffer,
                     bounds,
                     vertexCount,
-                    wetColumns * quadsPerColumn * 2,
+                    vertexCount / 2,
                     ownedSurfaceMask[0],
                     ownedSurfaceMask[1],
                     ownedSurfaceMask[2],
                     ownedSurfaceMask[3]
-            );
+            ), samples, sensitive, subdivisions, detailChangedTick, sea, tick);
         }
     }
 
@@ -247,38 +330,23 @@ public final class WaterChunkMeshCache {
         float u1 = sprite.getU1();
         float v0 = sprite.getV0();
         float v1 = sprite.getV1();
-        float step = 1.0f / subdivisions;
-        for (int subZ = 0; subZ < subdivisions; subZ++) {
-            float z0 = subZ * step;
-            float z1 = (subZ + 1) * step;
-            for (int subX = 0; subX < subdivisions; subX++) {
-                float x0 = subX * step;
-                float x1 = (subX + 1) * step;
-                VertexSample subNorthWest = interpolate(
-                        northWest, southWest, southEast, northEast, x0, z0);
-                VertexSample subSouthWest = interpolate(
-                        northWest, southWest, southEast, northEast, x0, z1);
-                VertexSample subSouthEast = interpolate(
-                        northWest, southWest, southEast, northEast, x1, z1);
-                VertexSample subNorthEast = interpolate(
-                        northWest, southWest, southEast, northEast, x1, z0);
-                float subU0 = mix(u0, u1, x0);
-                float subU1 = mix(u0, u1, x1);
-                float subV0 = mix(v0, v1, z0);
-                float subV1 = mix(v0, v1, z1);
-                // Keep GPU positions chunk-local so half-block subdivisions remain
-                // precise millions of blocks from spawn. The render coordinator
-                // supplies the exact integer chunk origin for projection and phase.
-                emit(builder, localCoordinate(worldX, chunkMinX, x0), subNorthWest,
-                        localCoordinate(worldZ, chunkMinZ, z0), subU0, subV0);
-                emit(builder, localCoordinate(worldX, chunkMinX, x0), subSouthWest,
-                        localCoordinate(worldZ, chunkMinZ, z1), subU0, subV1);
-                emit(builder, localCoordinate(worldX, chunkMinX, x1), subSouthEast,
-                        localCoordinate(worldZ, chunkMinZ, z1), subU1, subV1);
-                emit(builder, localCoordinate(worldX, chunkMinX, x1), subNorthEast,
-                        localCoordinate(worldZ, chunkMinZ, z0), subU1, subV0);
-            }
-        }
+        // Outer edges keep one-block spacing at both detail levels. Transition
+        // fans preserve half-block interior vertices without neighbor rebuilds.
+        WaterMeshTopology.emitColumn(worldX - chunkMinX, worldZ - chunkMinZ, subdivisions,
+                (ax, az, bx, bz, cx, cz, dx, dz) -> {
+                    emit(builder, localCoordinate(worldX, chunkMinX, ax),
+                            interpolate(northWest, southWest, southEast, northEast, ax, az),
+                            localCoordinate(worldZ, chunkMinZ, az), mix(u0, u1, ax), mix(v0, v1, az));
+                    emit(builder, localCoordinate(worldX, chunkMinX, bx),
+                            interpolate(northWest, southWest, southEast, northEast, bx, bz),
+                            localCoordinate(worldZ, chunkMinZ, bz), mix(u0, u1, bx), mix(v0, v1, bz));
+                    emit(builder, localCoordinate(worldX, chunkMinX, cx),
+                            interpolate(northWest, southWest, southEast, northEast, cx, cz),
+                            localCoordinate(worldZ, chunkMinZ, cz), mix(u0, u1, cx), mix(v0, v1, cz));
+                    emit(builder, localCoordinate(worldX, chunkMinX, dx),
+                            interpolate(northWest, southWest, southEast, northEast, dx, dz),
+                            localCoordinate(worldZ, chunkMinZ, dz), mix(u0, u1, dx), mix(v0, v1, dz));
+                });
     }
 
     // Every surface vertex samples the four touching columns. Adjacent chunks
@@ -617,9 +685,7 @@ public final class WaterChunkMeshCache {
         return (alpha << 24) | (channel(red) << 16) | (channel(green) << 8) | channel(blue);
     }
 
-    // High quality uses a half-block topology so GPU-displaced silhouettes and
-    // specular gradients no longer reveal Minecraft's one-block quad grid.
-    // Lower tiers retain one quad per column to bound distant-ocean cost.
+    // Detail selection never exceeds the existing quality ceiling.
     private static int surfaceSubdivisions() {
         return switch (WaterRenderingConfig.waterQuality()) {
             case LOW, MEDIUM -> 1;
@@ -635,6 +701,12 @@ public final class WaterChunkMeshCache {
             float x,
             float z
     ) {
+        // Return exact shared corners instead of introducing endpoint rounding
+        // differences between independently rebuilt neighboring chunks.
+        if (x == 0 && z == 0) return northWest;
+        if (x == 0 && z == 1) return southWest;
+        if (x == 1 && z == 1) return southEast;
+        if (x == 1 && z == 0) return northEast;
         return new VertexSample(
                 bilinear(northWest.height, southWest.height, southEast.height, northEast.height, x, z),
                 bilinear(northWest.oceanWeight, southWest.oceanWeight,
@@ -751,6 +823,33 @@ public final class WaterChunkMeshCache {
             float shoreFactor,
             float depth
     ) {
+    }
+
+    private static final class CachedMesh {
+        private static final CachedMesh EMPTY = new CachedMesh(MeshGroup.EMPTY, null, true, 1, 0, 0, 0);
+        private final MeshGroup group;
+        private final WaterSurfaceMeshSamples samples;
+        private final boolean sensitive;
+        private final int detail;
+        private final long detailChangedTick;
+        private int requestedDetail;
+        private float seaStrength;
+        private long seaTick;
+
+        private CachedMesh(MeshGroup group, WaterSurfaceMeshSamples samples, boolean sensitive, int detail,
+                           long detailChangedTick, float seaStrength, long seaTick) {
+            this.group = group;
+            this.samples = samples;
+            this.sensitive = sensitive;
+            this.detail = detail;
+            this.requestedDetail = detail;
+            this.detailChangedTick = detailChangedTick;
+            this.seaStrength = seaStrength;
+            this.seaTick = seaTick;
+        }
+
+        private MeshGroup group() { return group; }
+        private WaterSurfaceMeshSamples samples() { return samples; }
     }
 
     /** One immutable uploaded chunk group and its culling/diagnostic metadata. */

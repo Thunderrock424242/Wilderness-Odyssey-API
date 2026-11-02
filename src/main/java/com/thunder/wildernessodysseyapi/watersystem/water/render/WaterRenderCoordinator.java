@@ -59,6 +59,19 @@ public final class WaterRenderCoordinator {
         WaterRenderDiagnostics.recordExternalRendererBridgeUse();
     }
 
+    /** Shares only the current level's acknowledged custom upload with client presentation. */
+    static WaterSurfaceMeshSamples surfaceSamples(ClientLevel level, double worldX, double worldZ) {
+        if (level == null || Minecraft.getInstance().level != level || !WaterShaders.shouldUseCoreShader()
+                || !WaterRenderingConfig.replacementWaterRenderingEnabled(level)
+                || !Double.isFinite(worldX) || !Double.isFinite(worldZ)) return null;
+        int blockX = (int) Math.floor(worldX);
+        int blockZ = (int) Math.floor(worldZ);
+        long key = ChunkPos.asLong(blockX >> 4, blockZ >> 4);
+        if (ClientWaterSnapshotStore.getAtBlock(level, blockX, blockZ) == null
+                || !HANDOFFS.customVisible(key) || !MESHES.ownsSurface(key, blockX & 15, blockZ & 15)) return null;
+        return MESHES.surfaceSamples(level, key);
+    }
+
     /** Coordinates all custom water rendering at Minecraft's translucent stage. */
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
@@ -116,8 +129,9 @@ public final class WaterRenderCoordinator {
                 : WaterRenderDiagnostics.RenderPath.VANILLA_FALLBACK);
 
         long started = System.nanoTime();
-        rebuildDirtyGroups(level, event);
         var camera = event.getCamera().getPosition();
+        MESHES.queueDetailUpdates(level, camera.x, camera.z);
+        rebuildDirtyGroups(level, event);
         List<WaterChunkMeshCache.MeshGroup> visible = MESHES.visibleGroups(
                         event.getFrustum(), camera.x, camera.y, camera.z)
                 .stream()
@@ -285,7 +299,8 @@ public final class WaterRenderCoordinator {
                 HANDOFFS.remove(key);
                 continue;
             }
-            WaterChunkMeshCache.MeshGroup group = MESHES.rebuild(level, snapshot);
+            var camera = event.getCamera().getPosition();
+            WaterChunkMeshCache.MeshGroup group = MESHES.rebuild(level, snapshot, camera.x, camera.z);
             WaterRenderDiagnostics.recordMeshRebuild();
             if (group.empty()) {
                 HANDOFFS.remove(key);

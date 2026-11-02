@@ -167,6 +167,13 @@ public final class ClientWaterSnapshotStore {
         }
     }
 
+    /** Queues only one upload when detail changes without changing shared corner metadata. */
+    public static void queueMeshDetailRefresh(Level level, int chunkX, int chunkZ) {
+        if (activeLevel != level) return;
+        long key = ChunkPos.asLong(chunkX, chunkZ);
+        if (SNAPSHOTS.containsKey(key)) offerDirty(key);
+    }
+
     /** Queues surface topology after a relevant physical client block changes. */
     public static void notifyBlockChange(Level level, BlockPos position) {
         if (activeLevel != level || position == null) {
