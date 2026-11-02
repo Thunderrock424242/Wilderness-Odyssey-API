@@ -23,6 +23,15 @@ Treat this repository as production Minecraft mod code.
 
 Prefer supported NeoForge APIs and existing project architecture over invasive or speculative solutions.
 
+Lore references
+
+Read [Core Lore v1.0](docs/lore/WILDERNESS_ODYSSEY_CORE_LORE.md) and
+[Expanded Lore v1.0](docs/lore/WILDERNESS_ODYSSEY_EXPANDED_LORE.md) for story-facing work.
+Core takes precedence; only Established material is canon. Concept and Open material
+does not authorize implementation. Propose conflicts for review rather than changing canon.
+The single lore-level space-time rift does not ban vanilla portals or unrelated gameplay travel.
+See [API alignment findings](docs/lore/README.md) for existing hooks and unresolved conflicts.
+
 ⸻
 
 Priority Rules

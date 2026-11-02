@@ -1,4 +1,13 @@
 
+Wilderness Odyssey lore
+======================
+
+Story references: [Core Lore v1.0](docs/lore/WILDERNESS_ODYSSEY_CORE_LORE.md)
+and [Expanded Lore v1.0](docs/lore/WILDERNESS_ODYSSEY_EXPANDED_LORE.md).
+Core Lore takes precedence; only Established material is canon, while Concept
+and Open material remains undecided. See the [API alignment report](docs/lore/README.md)
+for existing interfaces, conflicts awaiting review, and future integration opportunities.
+
 Installation information
 =======
 
