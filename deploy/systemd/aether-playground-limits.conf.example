@@ -1,0 +1,9 @@
+# Optional reviewed drop-in for the EXISTING gateway unit, not an installer.
+# These limits cover the JVM and inherited trainer together; size for both services.
+[Service]
+UMask=0077
+MemoryMax=16G
+CPUQuota=200%
+TasksMax=256
+KillMode=control-group
+# Finite logs/backup retention must also be configured by the host operator.

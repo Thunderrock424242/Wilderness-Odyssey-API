@@ -86,6 +86,15 @@ public final class JsonHttp {
     /** Writes one bounded application response and closes the exchange. */
     public static void send(HttpExchange exchange, int code, Object body) {
         byte[] bytes = JSON.toJson(body).getBytes(StandardCharsets.UTF_8);
+        sendBytes(exchange,code,bytes);
+    }
+
+    /** Peer schemas require explicit null fields; keep legacy native serialization unchanged. */
+    public static void sendExplicitNulls(HttpExchange exchange,int code,Object body) {
+        sendBytes(exchange,code,new com.google.gson.GsonBuilder().serializeNulls().create().toJson(body).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void sendBytes(HttpExchange exchange,int code,byte[] bytes) {
         try {
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
             exchange.getResponseHeaders().set("Cache-Control", "no-store");

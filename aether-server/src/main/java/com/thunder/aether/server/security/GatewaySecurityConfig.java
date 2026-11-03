@@ -8,7 +8,8 @@ import java.util.Map;
 public record GatewaySecurityConfig(String minecraftServerId, ServiceCredential inference,
         ServiceCredential monitoring, ServiceCredential administration, boolean administrationEnabled,
         String accessIssuer, String accessAudience, String monitoringClientId, String administrationClientId,
-        Path stateDirectory) {
+        Path stateDirectory, ServiceCredential serviceRead, ServiceCredential serviceWrite,
+        String serviceReadClientId, String serviceWriteClientId, boolean serviceWriteEnabled) {
     public GatewaySecurityConfig {
         if (minecraftServerId == null || !minecraftServerId.matches("[A-Za-z0-9._-]{1,64}")
                 || inference == null || monitoring == null || administration == null || stateDirectory == null
@@ -26,6 +27,16 @@ public record GatewaySecurityConfig(String minecraftServerId, ServiceCredential 
         if (accessAudience.length() > 256 || monitoringClientId.length() > 256 || administrationClientId.length() > 256) {
             throw new IllegalArgumentException("INVALID_ACCESS_CONFIGURATION");
         }
+        if(serviceRead==null || serviceWrite==null || serviceReadClientId.length()>256 || serviceWriteClientId.length()>256) {
+            throw new IllegalArgumentException("INVALID_SERVICE_SECURITY");
+        }
+        var credentials=java.util.List.of(inference,monitoring,administration,serviceRead,serviceWrite);
+        for(int i=0;i<credentials.size();i++)for(int j=i+1;j<credentials.size();j++) {
+            if(credentials.get(i).sameSecret(credentials.get(j)))throw new IllegalArgumentException("REUSED_SERVICE_SECRET");
+        }
+        if(serviceWriteEnabled && (accessIssuer.isEmpty() || accessAudience.isBlank() || serviceWriteClientId.isBlank())) {
+            throw new IllegalArgumentException("SERVICE_WRITE_REQUIRES_ACCESS");
+        }
     }
 
     /** Absent settings never restore the former anonymous gateway. */
@@ -37,7 +48,11 @@ public record GatewaySecurityConfig(String minecraftServerId, ServiceCredential 
                 flag(values, "administration_enabled"), text(values, "access_issuer", ""),
                 text(values, "access_audience", ""), text(values, "monitoring_client_id", ""),
                 text(values, "administration_client_id", ""),
-                Path.of(text(values, "state_directory", directory.toString())).toAbsolutePath().normalize());
+                Path.of(text(values, "state_directory", directory.toString())).toAbsolutePath().normalize(),
+                credential(values,environment,"service_read","MAIN_SERVER_READ_TOKEN"),
+                credential(values,environment,"service_write","MAIN_SERVER_WRITE_TOKEN"),
+                text(values,"service_read_client_id",""),text(values,"service_write_client_id",""),
+                flag(values,"service_write_enabled"));
     }
 
     public static GatewaySecurityConfig locked() { return load(Map.of(), Map.of(), Path.of("aether-state")); }

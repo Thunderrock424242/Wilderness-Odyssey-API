@@ -36,6 +36,7 @@ public final class AetherServer implements AutoCloseable {
     private final ServiceAuthenticator authentication;
     private final AdmissionJournal admission;
     private final RequestAudit audit;
+    private final com.thunder.aether.server.playground.PlaygroundService playground;
     private final Map<HttpExchange, Scope> callers = new ConcurrentHashMap<>();
     private final ThreadPoolExecutor handlers;
     private final ThreadPoolExecutor generations;
@@ -43,6 +44,8 @@ public final class AetherServer implements AutoCloseable {
     private final Set<HttpExchange> exchanges=ConcurrentHashMap.newKeySet();
     private final AtomicBoolean closed=new AtomicBoolean();
     private volatile Map<String,Object> dependency;
+    private volatile Instant dependencyCheckedAt;
+    private volatile Long dependencyLatencyMs;
 
     public AetherServer(ServerConfig config) throws Exception {
         this(config, new ServiceAuthenticator(config.security()));
@@ -58,6 +61,8 @@ public final class AetherServer implements AutoCloseable {
         catch (Exception failure) { authentication.close(); ollama.close(); throw failure; }
         try { audit = new RequestAudit(config.security().stateDirectory()); }
         catch (Exception failure) { admission.close(); authentication.close(); ollama.close(); throw failure; }
+        try { playground=new com.thunder.aether.server.playground.PlaygroundService(config,ollama,admission); }
+        catch(Exception failure) { audit.close(); admission.close(); authentication.close(); ollama.close(); throw failure; }
         dependency=Map.of("ollama","UNKNOWN","ready",false,"model",config.model());
         handlers=new ThreadPoolExecutor(config.httpWorkers(),config.httpWorkers(),0,TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(64),new ThreadPoolExecutor.AbortPolicy());
@@ -68,6 +73,7 @@ public final class AetherServer implements AutoCloseable {
         timers.setRemoveOnCancelPolicy(true);
         try { http=HttpServer.create(new InetSocketAddress(config.bind(),config.port()),64); }
         catch (Exception failure) {
+            playground.close();
             audit.close(); admission.close(); authentication.close(); ollama.close();
             handlers.shutdownNow(); generations.shutdownNow(); timers.shutdownNow(); throw failure;
         }
@@ -78,6 +84,7 @@ public final class AetherServer implements AutoCloseable {
     /** Starts listening independently of Minecraft; model checks are bounded background work. */
     public void start() {
         http.start();
+        playground.start();
         timers.scheduleWithFixedDelay(this::refreshHealth,0,10,TimeUnit.SECONDS);
     }
 
@@ -85,12 +92,17 @@ public final class AetherServer implements AutoCloseable {
 
     /** Observes the configured model without taking any generation queue slot. */
     public void refreshHealth() {
-        if (!closed.get()) { dependency=ollama.health(); }
+        if (!closed.get()) {
+            long started=System.nanoTime(); dependency=ollama.health();
+            dependencyLatencyMs=TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started);
+            dependencyCheckedAt=Instant.now(); playground.refreshModels();
+        }
     }
 
     private void handle(HttpExchange exchange) {
         exchanges.add(exchange);
-        ScheduledFuture<?> watchdog=timers.schedule(exchange::close,config.requestTimeoutSeconds(),TimeUnit.SECONDS);
+        ScheduledFuture<?> watchdog=timers.schedule(exchange::close,
+                exchange.getRequestURI().getPath().equals("/v1/admin/playground/sandbox")?25:config.requestTimeoutSeconds(),TimeUnit.SECONDS);
         boolean handedOff=false;
         try {
             String path=exchange.getRequestURI().getPath();
@@ -99,7 +111,9 @@ public final class AetherServer implements AutoCloseable {
                 case "/health", "/ready", "/v1/admin/admission" -> path.equals("/v1/admin/admission")
                         && exchange.getRequestMethod().equals("POST") ? Scope.ADMINISTRATION : Scope.MONITORING;
                 case "/v1/aether/generate", "/v1/aether/status" -> Scope.INFERENCE;
-                default -> null;
+                default -> path.startsWith("/v1/admin/playground/")
+                        ? path.equals("/v1/admin/playground/capabilities") && exchange.getRequestMethod().equals("GET") ? Scope.MONITORING : Scope.ADMINISTRATION
+                        : path.startsWith("/v1/service/") ? exchange.getRequestMethod().equals("GET") ? Scope.SERVICE_READ : Scope.SERVICE_WRITE : null;
             };
             if (required == null) { error(exchange,404,"","NOT_FOUND"); return; }
             Scope caller = authentication.authenticate(exchange.getRequestHeaders(), Instant.now());
@@ -109,6 +123,10 @@ public final class AetherServer implements AutoCloseable {
             }
             callers.put(exchange, caller);
             if (caller != required) { error(exchange,403,"","FORBIDDEN"); return; }
+            if(path.startsWith("/v1/admin/playground/") || path.startsWith("/v1/service/")) {
+                if(!authentication.permitsPeerAccess(caller,exchange.getRequestHeaders(),Instant.now())) { error(exchange,401,"","UNAUTHORIZED");return; }
+                playground.handle(exchange,this::send,dependency,dependencyCheckedAt,dependencyLatencyMs);return;
+            }
             if (path.equals("/v1/admin/admission")) { administer(exchange); return; }
             if (path.equals("/v1/aether/status")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
@@ -241,12 +259,13 @@ public final class AetherServer implements AutoCloseable {
     private void send(HttpExchange exchange, int status, Object body) {
         String path = exchange.getRequestURI().getPath();
         String operation = Set.of("/health", "/ready", "/v1/aether/status", "/v1/aether/generate", "/v1/admin/admission")
-                .contains(path) ? path : "UNKNOWN";
+                .contains(path) ? path : path.startsWith("/v1/admin/playground/")?"PLAYGROUND":path.startsWith("/v1/service/")?"MAIN_SERVICE":"UNKNOWN";
         Scope caller = callers.get(exchange);
         if (!audit.record(operation, caller == null ? "UNAUTHENTICATED" : caller.name(), status)) {
             JsonHttp.send(exchange,503,Map.of("success",false,"error","AUDIT_UNAVAILABLE")); return;
         }
-        JsonHttp.send(exchange,status,body);
+        if(path.startsWith("/v1/admin/playground/") || path.startsWith("/v1/service/"))JsonHttp.sendExplicitNulls(exchange,status,body);
+        else JsonHttp.send(exchange,status,body);
     }
 
     private void error(HttpExchange exchange,int status,String id,String code) {
@@ -257,6 +276,7 @@ public final class AetherServer implements AutoCloseable {
     @Override public void close() {
         if (!closed.compareAndSet(false,true)) { return; }
         http.stop(0); exchanges.forEach(HttpExchange::close); exchanges.clear();
+        try { playground.close(); } catch(Exception failure) { LOG.log(System.Logger.Level.ERROR,"Playground could not close cleanly."); }
         generations.shutdownNow(); handlers.shutdownNow(); timers.shutdownNow(); ollama.close(); authentication.close();
         callers.clear();
         try { try { audit.close(); } finally { admission.close(); } }

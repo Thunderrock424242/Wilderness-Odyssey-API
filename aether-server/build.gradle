@@ -15,6 +15,8 @@ dependencies {
     implementation 'org.yaml:snakeyaml:2.7'
     // Access JWT signatures/claims use the maintained Nimbus implementation, isolated from the mod runtime.
     implementation 'com.nimbusds:nimbus-jose-jwt:10.10'
+    // Transactions and uniqueness are required across lost acknowledgements and cancellation races.
+    implementation 'org.xerial:sqlite-jdbc:3.53.4.0'
     testImplementation platform('org.junit:junit-bom:5.14.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -22,6 +24,7 @@ dependencies {
 application { mainClass = 'com.thunder.aether.server.bootstrap.AetherLauncher' }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 tasks.withType(Test).configureEach { useJUnitPlatform() }
+tasks.named('processResources') { exclude '**/__pycache__/**', '**/*.pyc' }
 tasks.named('jar') {
     archiveFileName = 'Aether-Gateway.jar'
     manifest { attributes 'Main-Class': application.mainClass.get() }

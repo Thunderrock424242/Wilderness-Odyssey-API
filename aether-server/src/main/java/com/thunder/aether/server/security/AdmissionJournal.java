@@ -12,6 +12,10 @@ import java.util.*;
 
 /** Durable admission state and mutation audit. No player messages or model controls are stored here. */
 public final class AdmissionJournal implements AutoCloseable {
+    /** Definitive pre-write rejection, safe for callers to report as a failed operation. */
+    public static final class Capacity extends IOException {
+        public Capacity() { super("ADMISSION_JOURNAL_FULL"); }
+    }
     private static final int MAX_BYTES = 2 * 1024 * 1024;
     private static final int MAX_RECORDS = 4096;
     private final DataDirectory directory;
@@ -59,6 +63,16 @@ public final class AdmissionJournal implements AutoCloseable {
         return Map.of("paused", paused || !healthy, "revision", revision, "healthy", healthy);
     }
 
+    /** Reconciles a previously committed exact command even after its dispatch window expired. */
+    public synchronized Map<String,Object> reconcile(JsonObject command) throws IOException {
+        if(!healthy)throw new IOException("ADMISSION_JOURNAL_UNAVAILABLE");
+        JsonObject previous=applied.get(command.get("requestId").getAsString());
+        if(previous==null)return null;
+        if(!previous.getAsJsonObject("command").equals(command))throw new Conflict();
+        return Map.of("revision",previous.get("revision").getAsLong(),"paused",
+                previous.getAsJsonObject("command").get("paused").getAsBoolean(),"replayed",true);
+    }
+
     /** Validates replay, revision and expiry before fsync; state changes only after the audit is durable. */
     public synchronized Map<String, Object> apply(JsonObject command) throws IOException {
         // Evaluate expiry after acquiring the writer lock, including time spent waiting for another fsync.
@@ -83,7 +97,7 @@ public final class AdmissionJournal implements AutoCloseable {
         entry.addProperty("revision", revision + 1);
         byte[] bytes = (entry + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
         if (applied.size() >= MAX_RECORDS || file.size() + bytes.length > MAX_BYTES) {
-            throw new IOException("ADMISSION_JOURNAL_FULL");
+            throw new Capacity();
         }
         try {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);

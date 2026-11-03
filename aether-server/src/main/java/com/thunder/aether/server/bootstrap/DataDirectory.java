@@ -40,7 +40,7 @@ public final class DataDirectory implements AutoCloseable {
     }
 
     /** Rejects redirection through existing symbolic links or other filesystem reparse objects. */
-    static void rejectLinks(Path path) throws IOException {
+    public static void rejectLinks(Path path) throws IOException {
         Path absolute = path.toAbsolutePath().normalize();
         Path part = absolute.getRoot();
         for (Path segment : absolute) {

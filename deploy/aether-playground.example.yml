@@ -1,0 +1,40 @@
+# Merge these sections into the EXISTING private gateway configuration.
+# Keep its bind/port, Ollama destination, activation approvals and prompt files.
+ollama:
+  # Explicitly establishes the native setting reported by the main-service adapter.
+  # Omit/zero to preserve the old runtime default; main capabilities then returns 503.
+  context_tokens: 8192
+security:
+  minecraft_server_id: wilderness-server
+  inference_token_env: AETHER_INFERENCE_TOKEN
+  monitoring_token_env: AETHER_MONITORING_TOKEN
+  administration_token_env: AETHER_ADMINISTRATION_TOKEN
+  administration_enabled: true
+  service_read_token_env: MAIN_SERVER_READ_TOKEN
+  service_write_token_env: MAIN_SERVER_WRITE_TOKEN
+  service_write_enabled: true
+  access_issuer: https://YOUR-TEAM.cloudflareaccess.com
+  access_audience: YOUR-PRODUCTION-APPLICATION-AUD
+  monitoring_client_id: YOUR-PLAYGROUND-SERVICE-COMMON-NAME
+  administration_client_id: YOUR-PLAYGROUND-SERVICE-COMMON-NAME
+  service_read_client_id: YOUR-MAIN-SERVICE-COMMON-NAME
+  service_write_client_id: YOUR-MAIN-SERVICE-COMMON-NAME
+  state_directory: /var/lib/aether/native
+playground:
+  sandbox_enabled: true
+  training_enabled: false # Enable only after installing/verifying the actual runtime and reviewed base.
+  state_directory: /var/lib/aether/playground
+  python: /opt/aether/trainer-venv/bin/python
+  models: [] # No production model is approved implicitly. See the deployment guide for the exact entry.
+  presets: [lora-smoke, lora-small]
+  queue_limit: 8
+  training_timeout_seconds: 600
+  cpu_threads: 2
+  memory_mib: 16384
+  min_free_memory_mib: 2048
+  # Both required free VRAM and the per-process PyTorch allocation budget.
+  min_free_gpu_mib: 8192
+  artifact_mib: 256
+  storage_mib: 2048
+  retention_days: 7
+  device: cuda

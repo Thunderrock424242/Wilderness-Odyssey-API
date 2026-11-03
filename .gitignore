@@ -43,6 +43,7 @@ repo
 /logs/
 
 /aether-server/.codex-build/
+/aether-server/**/__pycache__/
 /aether-server/aether-server.yml
 /deploy/aether-server.yml
 /deploy/operator/aether-connection.local.json

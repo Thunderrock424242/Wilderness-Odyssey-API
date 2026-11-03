@@ -1,0 +1,8 @@
+# Exact CPU smoke versions; install a host-compatible CUDA PyTorch wheel separately
+# when using device: cuda. This project does not install or download runtime models.
+torch==2.13.0
+transformers==5.16.1
+peft==0.18.1
+accelerate==1.12.0
+safetensors==0.8.0
+tokenizers==0.23.1

@@ -15,7 +15,8 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
         String model, int timeoutSeconds, int maxOutputTokens,
         int concurrency, int queueSize, int requestsPerMinute, int maxRequestBytes, int httpWorkers,
         boolean logRequests, boolean logPlayerMessages, boolean logResponses, String promptsFile,
-        GatewaySecurityConfig security, ActivationConfig activation) {
+        GatewaySecurityConfig security, ActivationConfig activation,
+        com.thunder.aether.server.playground.PlaygroundConfig playground, int contextTokens) {
     public ServerConfig {
         require(bind != null && !bind.isBlank() && bind.length() <= 255);
         range(port, 0, 65535); range(requestTimeoutSeconds, 1, 60);
@@ -26,9 +27,31 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
         require(model != null && model.matches("[A-Za-z0-9._/:@-]{1,128}"));
         require(privateOllamaHost(com.thunder.aether.server.api.JsonHttp.baseUri(ollamaUrl).getHost()));
         promptsFile = promptsFile == null ? "" : promptsFile;
-        require(security != null && activation != null);
+        require(security != null && activation != null && playground != null);
+        require(contextTokens==0 || contextTokens>=512 && contextTokens<=131072);
         // HTTPS terminates at the trusted local connector; the cleartext origin cannot listen publicly.
         require(bind.equals("127.0.0.1") || bind.equals("::1") || bind.equals("localhost"));
+    }
+
+    public ServerConfig(String bind, int port, int requestTimeoutSeconds, String ollamaUrl,
+            String model, int timeoutSeconds, int maxOutputTokens, int concurrency, int queueSize,
+            int requestsPerMinute, int maxRequestBytes, int httpWorkers, boolean logRequests,
+            boolean logPlayerMessages, boolean logResponses, String promptsFile,
+            GatewaySecurityConfig security, ActivationConfig activation,
+            com.thunder.aether.server.playground.PlaygroundConfig playground) {
+        this(bind,port,requestTimeoutSeconds,ollamaUrl,model,timeoutSeconds,maxOutputTokens,concurrency,
+                queueSize,requestsPerMinute,maxRequestBytes,httpWorkers,logRequests,logPlayerMessages,
+                logResponses,promptsFile,security,activation,playground,0);
+    }
+
+    public ServerConfig(String bind, int port, int requestTimeoutSeconds, String ollamaUrl,
+            String model, int timeoutSeconds, int maxOutputTokens, int concurrency, int queueSize,
+            int requestsPerMinute, int maxRequestBytes, int httpWorkers, boolean logRequests,
+            boolean logPlayerMessages, boolean logResponses, String promptsFile,
+            GatewaySecurityConfig security, ActivationConfig activation) {
+        this(bind,port,requestTimeoutSeconds,ollamaUrl,model,timeoutSeconds,maxOutputTokens,concurrency,
+                queueSize,requestsPerMinute,maxRequestBytes,httpWorkers,logRequests,logPlayerMessages,
+                logResponses,promptsFile,security,activation,com.thunder.aether.server.playground.PlaygroundConfig.disabled());
     }
 
     /** Source-compatible construction stays locked until credentials and commissioning are explicit. */
@@ -65,7 +88,9 @@ public record ServerConfig(String bind, int port, int requestTimeoutSeconds, Str
                 prompts,
                 GatewaySecurityConfig.load(section(root,"security"), environment,
                         (file == null ? Path.of(".") : file.toAbsolutePath().getParent()).resolve("aether-state")),
-                ActivationConfig.load(section(root,"activation")));
+                ActivationConfig.load(section(root,"activation")),
+                com.thunder.aether.server.playground.PlaygroundConfig.load(section(root,"playground"),configDirectory),
+                number(ollama,"context_tokens",0));
     }
 
     /** Safe YAML data loader shared by configuration and the server-owned prompt catalog. */

@@ -34,6 +34,43 @@ public final class OllamaAdapter implements AutoCloseable {
 
     /** Successful output carries no executable actions, only validated dialogue. */
     public record Dialogue(String speaker, String response, String speech, String emotion, float radioEffect) {}
+    public record SandboxReply(String answer, String finishReason) {}
+
+    /** Ephemeral staff context: no production prompts, history, memory, tools or retention. */
+    public SandboxReply sandbox(String model, JsonArray messages, int tokens, double temperature, long deadline) throws Failure {
+        JsonObject request=new JsonObject();
+        request.addProperty("model",model); request.addProperty("stream",false); request.addProperty("keep_alive",0);
+        request.add("messages",messages.deepCopy());
+        JsonObject options=new JsonObject(); options.addProperty("num_predict",tokens);
+        options.addProperty("temperature",temperature); options.addProperty("num_ctx",8192); request.add("options",options);
+        JsonObject response=exchange("/api/chat",request,deadline);
+        try {
+            if(!model.equals(string(response,"model")) || !response.get("done").getAsBoolean())throw new Failure("INVALID_MODEL_RESPONSE");
+            String answer=string(response.getAsJsonObject("message"),"content");
+            String reason=string(response,"done_reason");
+            if(answer.length()>16000 || !Set.of("stop","length").contains(reason))throw new Failure("INVALID_MODEL_RESPONSE");
+            return new SandboxReply(answer,reason);
+        } catch(RuntimeException invalid) { throw new Failure("INVALID_MODEL_RESPONSE"); }
+    }
+
+    /** Observes a sandbox allowlist model without changing the production model. */
+    public boolean installed(String model) {
+        return installedModels(Set.of(model)).contains(model);
+    }
+
+    /** Batches allowlist discovery into one bounded runtime request. */
+    public Set<String> installedModels(Set<String> approved) {
+        Set<String> installed=new java.util.HashSet<>();
+        try {
+            JsonObject tags=exchange("/api/tags",null,System.nanoTime()+TimeUnit.SECONDS.toNanos(2));
+            for(var e:tags.getAsJsonArray("models")) {
+                for(String key:java.util.List.of("name","model")) {
+                    String id=string(e.getAsJsonObject(),key); if(approved.contains(id))installed.add(id);
+                }
+            }
+        } catch(Exception unavailable) { /* Readiness remains false. */ }
+        return Set.copyOf(installed);
+    }
     /** Stable non-sensitive failure category suitable for an HTTP error response. */
     public static final class Failure extends Exception {
         private final String code;
@@ -108,6 +145,7 @@ public final class OllamaAdapter implements AutoCloseable {
         request.add("messages",messages);
         JsonObject options=new JsonObject();
         options.addProperty("num_predict",tokens); options.addProperty("temperature",temperature); request.add("options",options);
+        if(config.contextTokens()>0)options.addProperty("num_ctx",config.contextTokens());
         JsonObject outer=exchange("/api/chat",request,deadline);
         try {
             String content=outer.getAsJsonObject("message").get("content").getAsString();

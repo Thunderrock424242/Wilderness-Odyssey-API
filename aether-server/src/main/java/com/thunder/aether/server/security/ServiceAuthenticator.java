@@ -6,7 +6,7 @@ import java.util.List;
 
 /** Non-inheriting service scopes: an administrator credential never permits inference. */
 public final class ServiceAuthenticator implements AutoCloseable {
-    public enum Scope { INFERENCE, MONITORING, ADMINISTRATION }
+    public enum Scope { INFERENCE, MONITORING, ADMINISTRATION, SERVICE_READ, SERVICE_WRITE }
     private final GatewaySecurityConfig config;
     private final AccessTokenVerifier access;
 
@@ -41,12 +41,22 @@ public final class ServiceAuthenticator implements AutoCloseable {
                 && (!config.administrationEnabled() || accessAllows(headers, config.administrationClientId(), now))) {
             return Scope.ADMINISTRATION;
         }
+        if(config.serviceRead().matches(token,now) && (config.accessIssuer().isEmpty()
+                || accessAllows(headers,config.serviceReadClientId(),now)))return Scope.SERVICE_READ;
+        if(config.serviceWriteEnabled() && config.serviceWrite().matches(token,now)
+                && accessAllows(headers,config.serviceWriteClientId(),now))return Scope.SERVICE_WRITE;
         return null;
     }
 
     private boolean accessAllows(Headers headers, String service, Instant now) {
         List<String> values = headers.get("Cf-Access-Jwt-Assertion");
         return access != null && values != null && values.size() == 1 && access.accepts(values.getFirst(), service, now);
+    }
+
+    /** New peer monitoring paths require the configured Access identity whenever Access protects this origin. */
+    public boolean permitsPeerAccess(Scope scope,Headers headers,Instant now) {
+        return config.accessIssuer().isEmpty() || scope!=Scope.MONITORING
+                || accessAllows(headers,config.monitoringClientId(),now);
     }
 
     @Override public void close() { if (access != null) { access.close(); } }
