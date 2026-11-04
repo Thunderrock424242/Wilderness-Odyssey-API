@@ -132,7 +132,11 @@ generation command or new GameTest was needed for this client topology change.
 
 ## Remaining acceptance
 
-No full Minecraft client/server was launched. Existing native JVM/GLFW failures
+No full Minecraft client/server was launched during this implementation phase.
+The subsequent [2026-11-02 single-client pass](mesh-detail-live-acceptance.md)
+records normal-JIT startup, camera/resource checks and the remaining measurement
+and visual acceptance limits separately.
+Existing native JVM/GLFW failures
 remain separate and unresolved; no system Java, driver, permission or security
 settings were changed. Normal performance, multiplayer, Sodium/Iris/shader-pack,
 Distant Horizons and modded-terrain visuals are not certified by these checks.

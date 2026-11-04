@@ -259,6 +259,8 @@ Run this small test again to compare cold and warm behavior. The default gateway
 
 Install the current regular mod JAR on the appropriate Minecraft installation. Merge the following section into the server's existing `config/ai_config.yaml`; **do not replace its lore, personality, memory or other settings**:
 
+Dedicated and LAN servers leave Aether conversations off by default, independently of whether the service is deployed. Keep `settings.multiplayer_enabled: false` for the multiplayer gameplay server. For an intentionally AI-enabled dedicated/LAN test server, explicitly set it to `true` in the existing `settings` section before restarting. Omitted settings also mean multiplayer off. Private single-player needs no multiplayer opt-in. The checks below that expect Minecraft replies apply only where conversations are enabled.
+
 ```yaml
 ai_backend:
   enabled: true

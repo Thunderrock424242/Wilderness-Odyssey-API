@@ -39,6 +39,21 @@ class AIClientBackendTest {
     }
 
     @Test
+    void aetherMasterSwitchDisablesRepliesBeforeBackendAccess() throws Exception {
+        List<JsonObject> requests = startGateway();
+        AIConfig config = AIConfigLoader.parse("settings:\n  aether_enabled: false\n");
+        config.setBackend(configured().getBackend());
+        client = new AIClient(config, state, () -> true);
+
+        var reply = client.sendMessageWithVoice("minecraft:overworld", "save-player", UUID.randomUUID(),
+                "Tester", "Aether, hello", AIFallbackResponder.ResponseContext.empty());
+
+        assertFalse(client.isAetherEnabled());
+        assertTrue(reply.text().isBlank());
+        assertTrue(requests.isEmpty());
+    }
+
+    @Test
     void preservesAuthoredFallbackAfterBackendOutageAndKeepsItDeterministic() throws Exception {
         AIConfig config = bundled();
         config.setBackend(new AIBackendConfig(true, AIBackendConfig.Mode.REMOTE,

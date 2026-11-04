@@ -7,6 +7,8 @@ import com.thunder.wildernessodysseyapi.watersystem.water.api.WaterSample;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedConditions;
 import com.thunder.wildernessodysseyapi.watersystem.water.api.WatershedLocalFlow;
 import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WatershedServices;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WaterfallCurrent;
+import com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WaterfallHydraulics;
 import com.thunder.wildernessodysseyapi.watersystem.water.config.WildernessWaterRules;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.WildernessWaterAuthority;
 import com.thunder.wildernessodysseyapi.watersystem.water.volume.LoadedWaterReadAccess;
@@ -169,13 +171,15 @@ public final class AuthorityWaterAccess implements WaterAccess {
         );
         if (surface.valid()) {
             boolean water = cell.water() && cell.authorityOwned() && y <= surface.surfaceHeight();
+            var waterfall = water ? WaterfallCurrent.sample(level, x, y, z)
+                    : WaterfallHydraulics.Motion.STILL;
             result.set(
                     water,
                     surface.surfaceHeight(),
                     water ? Math.max(0.0, surface.surfaceHeight() - y) : 0.0,
-                    surface.currentX(),
-                    surface.currentY(),
-                    surface.currentZ(),
+                    surface.currentX() + waterfall.x(),
+                    waterfall.y() < 0 ? Math.min(surface.currentY(), waterfall.y()) : surface.currentY(),
+                    surface.currentZ() + waterfall.z(),
                     surface.normalX(),
                     surface.normalY(),
                     surface.normalZ()
@@ -184,13 +188,15 @@ public final class AuthorityWaterAccess implements WaterAccess {
         }
         if (cell.water() && cell.authorityOwned()) {
             double surfaceHeight = pos.getY() + cell.surfaceFillHeight();
+            var waterfall = y <= surfaceHeight ? WaterfallCurrent.sample(level, x, y, z)
+                    : WaterfallHydraulics.Motion.STILL;
             result.set(
                     y <= surfaceHeight,
                     surfaceHeight,
                     Math.max(0.0, surfaceHeight - y),
-                    cell.velocityX(),
-                    cell.velocityY(),
-                    cell.velocityZ(),
+                    cell.velocityX() + waterfall.x(),
+                    waterfall.y() < 0 ? Math.min(cell.velocityY(), waterfall.y()) : cell.velocityY(),
+                    cell.velocityZ() + waterfall.z(),
                     0.0,
                     1.0,
                     0.0

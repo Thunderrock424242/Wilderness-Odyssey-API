@@ -401,7 +401,8 @@ public final class WaterChunkMeshCache {
                         level,
                         new BlockPos(columnX, column.surfaceBlockY(), columnZ)
                 );
-                height += column.baseSurfaceY() + conditions.waterLevelOffset();
+                height += WatershedServices.surfaceHeight(level,
+                        new BlockPos(columnX, column.surfaceBlockY(), columnZ), column.baseSurfaceY(), conditions);
                 ocean += column.oceanWeight() / 255.0f;
                 river += column.riverWeight() / 255.0f;
                 lake += column.lakeWeight() / 255.0f;
@@ -430,7 +431,8 @@ public final class WaterChunkMeshCache {
                     level,
                     new BlockPos(worldVertexX, fallback.surfaceBlockY(), worldVertexZ)
             );
-            height = fallback.baseSurfaceY() + conditions.waterLevelOffset();
+            height = WatershedServices.surfaceHeight(level,
+                    new BlockPos(worldVertexX, fallback.surfaceBlockY(), worldVertexZ), fallback.baseSurfaceY(), conditions);
             ocean = fallback.oceanWeight() / 255.0f;
             river = fallback.riverWeight() / 255.0f;
             lake = fallback.lakeWeight() / 255.0f;

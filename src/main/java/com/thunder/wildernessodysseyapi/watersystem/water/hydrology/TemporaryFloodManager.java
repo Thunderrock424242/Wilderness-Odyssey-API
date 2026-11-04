@@ -79,9 +79,10 @@ public final class TemporaryFloodManager {
             // in the first air/replaceable voxel above that surface.
             int targetY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ) + 1;
             BlockPos target = new BlockPos(worldX, targetY, worldZ);
-            if (targetY > representative.getY() + 1
+            if (!withinFundedStage(region.ocean, region.stageMetres(), representative.getY(), targetY)
                     || !safeTemporaryWaterTarget(level, chunk, target)
-                    || !adjacentWater(level, water, target)) {
+                    || !(adjacentWater(level, water, target)
+                    || region.ocean && water.isWaterAt(level, target.below()))) {
                 continue;
             }
             lowConnectedTargets.add(target);
@@ -303,6 +304,14 @@ public final class TemporaryFloodManager {
             }
         }
         return false;
+    }
+
+    static boolean withinFundedStage(boolean ocean, double stage, int representativeY, int targetY) {
+        if (!ocean) return targetY <= representativeY + 1;
+        // Projection places a full canonical voxel, so its top must fit below
+        // the funded mean sea level. Wave displacement cannot open this gate.
+        return Double.isFinite(stage) && stage >= 0
+                && targetY + 1.0 <= representativeY + 1.0 + stage + 1.0e-9;
     }
 
     public static void restoreOriginalState(

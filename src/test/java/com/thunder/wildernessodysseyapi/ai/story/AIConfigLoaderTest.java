@@ -28,10 +28,47 @@ class AIConfigLoaderTest {
             assertEquals(true, config.getPlayerMemory().getEnabled());
             assertEquals(false, config.getPlayerMemory().getNaturalLearningEnabled());
             assertEquals(12, config.getPlayerMemory().getMaxMemoriesPerPlayer());
+            assertEquals(false, config.getSettings().isMultiplayerEnabled());
             assertEquals(null, config.getSettings().getOllamaAutostart());
             assertEquals(null, config.getSettings().getOllamaStartupTimeoutSeconds());
             assertEquals(null, config.getSettings().getOllamaExecutable());
         }
+    }
+
+    @Test
+    void aetherEnabledControlsTheMasterSwitch() {
+        assertEquals(true, AIConfigLoader.parse("settings:\n  aether_enabled: true\n")
+                .getSettings().getAetherEnabled());
+        assertEquals(false, AIConfigLoader.parse("settings:\n  aether_enabled: false\n")
+                .getSettings().getAetherEnabled());
+    }
+
+    @Test
+    void aetherEnabledTakesPrecedenceOverLegacyAtlasKey() {
+        assertEquals(false, AIConfigLoader.parse("settings:\n  aether_enabled: false\n  atlas_enabled: true\n")
+                .getSettings().getAetherEnabled());
+        assertEquals(true, AIConfigLoader.parse("settings:\n  aether_enabled: true\n  atlas_enabled: false\n")
+                .getSettings().getAetherEnabled());
+    }
+
+    @Test
+    void legacyAtlasKeyPreservesExistingMasterSwitchBehavior() {
+        assertEquals(false, AIConfigLoader.parse("settings:\n  atlas_enabled: false\n")
+                .getSettings().getAetherEnabled());
+        assertEquals(true, AIConfigLoader.parse("settings:\n  atlas_enabled: true\n")
+                .getSettings().getAetherEnabled());
+    }
+
+    @Test
+    void multiplayerRequiresExplicitOptInIncludingForOlderConfigs() {
+        assertEquals(false, AIConfigLoader.parse("settings:\n  atlas_enabled: true\n")
+                .getSettings().isMultiplayerEnabled());
+        assertEquals(false, AIConfigLoader.parse("settings:\n  multiplayer_enabled: false\n")
+                .getSettings().isMultiplayerEnabled());
+        assertEquals(true, AIConfigLoader.parse("settings:\n  multiplayer_enabled: true\n")
+                .getSettings().isMultiplayerEnabled());
+        assertEquals(false, AIConfigLoader.parse("settings:\n  multiplayer_enabled: invalid\n")
+                .getSettings().isMultiplayerEnabled());
     }
 
     @Test

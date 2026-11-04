@@ -16,6 +16,16 @@ class FiniteWaterFlowPlannerTest {
     private static final int FULL = WaterVolumeChunk.UNITS_PER_BLOCK;
 
     @Test
+    void aFallingParcelRetainsItsMomentumInTheGravityDischarge() {
+        int resting = FiniteWaterFlowPlanner.verticalTransfer(FULL, 0, 0f, .05);
+        int falling = FiniteWaterFlowPlanner.verticalTransfer(FULL, 0, -8f, .05);
+        assertTrue(falling > resting, "Discharge must not reset a falling jet to resting head speed");
+        assertEquals(7, FiniteWaterFlowPlanner.verticalTransfer(FULL, FULL - 7, -8f, .05));
+        assertEquals(0, FiniteWaterFlowPlanner.verticalTransfer(FULL, 0, -8f, 0));
+        assertEquals(resting, FiniteWaterFlowPlanner.verticalTransfer(FULL, 0, Float.NaN, .05));
+    }
+
+    @Test
     void repeatEvaluationsDoNotInventElapsedTime() {
         assertEquals(0.0, FiniteWaterFlowPlanner.elapsedSeconds(80L, 80L));
         assertEquals(0.1, FiniteWaterFlowPlanner.elapsedSeconds(80L, 82L));

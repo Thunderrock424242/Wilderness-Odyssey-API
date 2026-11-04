@@ -40,6 +40,7 @@ public class ClientTickHandler {
                 CoastalBreakEffects.clear();
                 WaterEnvironmentalEffectPool.clear();
                 RiverSoundscape.clear();
+                WaterfallSurfaceDetails.clear();
                 return;
             }
             ClientOceanSeaState.tick(mc.level);
@@ -47,6 +48,7 @@ public class ClientTickHandler {
             SPHSimulationManager.get().tickLevel(mc.level, CLIENT_TICK_DELTA);
             ClientCoastalSegmentStore.tick(mc);
             CoastalBreakEffects.tick(mc);
+            WaterfallSurfaceDetails.tick(mc);
             WaterAmbientEffects.tick(mc);
             WaterEnvironmentalEffectPool.tick(mc.level);
             RiverSoundscape.tick(mc);
@@ -68,6 +70,7 @@ public class ClientTickHandler {
             CoastalBreakEffects.clear();
             WaterEnvironmentalEffectPool.clear();
             RiverSoundscape.clear();
+            WaterfallSurfaceDetails.clear();
         }
     }
 }

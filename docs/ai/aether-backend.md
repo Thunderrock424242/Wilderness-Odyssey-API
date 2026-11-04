@@ -34,6 +34,16 @@ The deprecated game-side `AetherSystemPrompt` builder remains as a compatibility
 
 Edit the server's `config/ai_config.yaml`; restart the logical server to apply changes.
 
+Private single-player conversations remain enabled by the existing master switch. Dedicated and LAN servers default to no Aether chat, scripted fallback or onboarding, and issue no startup backend health request. This also applies to existing configs that omit the new setting. Opening a private world to LAN disables further chat and suppresses pending reply delivery unless multiplayer was explicitly enabled; an already-running request may finish within its existing deadline. The independent AI service can remain running for other authorized installations.
+
+```yaml
+settings:
+  aether_enabled: true
+  multiplayer_enabled: false
+```
+
+Merge these values into the existing `settings` section. Set `multiplayer_enabled: true` only to opt a dedicated or LAN server into conversations. `aether_enabled: false` disables conversations in every hosting mode; `ai_backend.enabled: false` disables remote inference but retains scripted fallback wherever conversations are allowed. The old `atlas_enabled` key remains a compatibility alias when `aether_enabled` is absent; if both exist, `aether_enabled` takes precedence. Existing config files are preserved on disk. These settings do not control the standalone service process or authored cinematic narration. Voice retains its separate private-world-only restriction even if multiplayer text is enabled.
+
 ```yaml
 ai_backend:
   enabled: true

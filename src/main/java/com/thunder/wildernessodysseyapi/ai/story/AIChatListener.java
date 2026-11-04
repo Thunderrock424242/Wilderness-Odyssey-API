@@ -45,7 +45,7 @@ public class AIChatListener {
         Session current = session;
         String message = event.getMessage().getString().trim();
         if (current == null || current.server() != server || message.isEmpty()
-                || !current.client().isAtlasEnabled() || !AIChatAccessPolicy.isAvailable(server)) {
+                || !current.client().isChatAvailable(server)) {
             return;
         }
         AIClient client = current.client();
@@ -81,7 +81,7 @@ public class AIChatListener {
             VoiceIntegration.VoiceResult result = reply;
             server.execute(() -> {
                 current.requests().release(playerId);
-                if (session != current) {
+                if (session != current || !client.isChatAvailable(server)) {
                     return;
                 }
                 ServerPlayer online = server.getPlayerList().getPlayer(playerId);

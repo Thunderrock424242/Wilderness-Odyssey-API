@@ -150,8 +150,8 @@ final class HybridWaterBodyModel {
                 z,
                 localCell
         );
-        float surfaceHeight = column.baseSurfaceHeight()
-                + (column.falling() ? 0 : watershed.waterLevelOffset())
+        float surfaceHeight = (column.falling() ? column.baseSurfaceHeight()
+                : WatershedServices.surfaceHeight(level, surfacePosition, column.baseSurfaceHeight(), watershed))
                 + tideOffset
                 + wave.height()
                 + localDisturbance;
@@ -210,8 +210,25 @@ final class HybridWaterBodyModel {
             return SurfaceColumn.INVALID;
         }
 
-        int floorY = generated.snapshot().floorY(x & 15, z & 15);
         WaterVolumeChunk runtimeVolume = chunk.getExistingData(ModAttachments.WATER_VOLUME).orElse(null);
+        long raisedUnits = 0;
+        // Funded coastal projection can raise a connected surface by at most
+        // the configured four-metre surge envelope. Keep real canonical water
+        // queryable above the immutable generated baseline, without scanning
+        // a completed chunk or treating the regional offset as new inventory.
+        if (runtimeVolume != null) for (int rise = 0; rise < 4; rise++) {
+            BlockPos above = surfacePos.above();
+            var tracked = runtimeVolume.get(above);
+            if (!tracked.temporaryFlood() || tracked.volumeUnits() <= 0) break;
+            var raised = WildernessWaterAuthority.sampleCellOnly(level, above);
+            if (!raised.water() || !raised.authorityOwned() || raised.hostedWater()) break;
+            surfacePos = above;
+            surfaceY++;
+            cell = raised;
+            raisedUnits += raised.volumeUnits();
+        }
+
+        int floorY = generated.snapshot().floorY(x & 15, z & 15);
         if (level instanceof net.minecraft.server.level.ServerLevel serverLevel && runtimeVolume != null) {
             floorY = com.thunder.wildernessodysseyapi.watersystem.water.surface.WaterDepthSampler.floor(
                     serverLevel, x, z, surfaceY, floorY, runtimeVolume.revision());
@@ -219,7 +236,7 @@ final class HybridWaterBodyModel {
         float baseSurfaceFill = Math.max(0.05f, Math.min(1.0f, cell.surfaceFillHeight()));
         float baseSurfaceHeight = surfaceY + baseSurfaceFill;
         float depth = Math.max(0.0f, baseSurfaceHeight - (floorY + 1.0f));
-        long estimatedVolume = 0L;
+        long estimatedVolume = raisedUnits;
         for (GeneratedWaterChunk.WaterSpan span : spans) {
             estimatedVolume += (long) (span.topY() - span.bottomY() + 1)
                     * span.amountUnits();

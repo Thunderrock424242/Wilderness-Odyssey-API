@@ -95,7 +95,9 @@ corrupted_data:
   - "Signal jitter... memory block 7b missing."
 corrupted_prefix: "[Signal noise]"
 settings:
-  atlas_enabled: true
+  aether_enabled: true
+  # Dedicated and LAN servers: disables AI chat, scripted fallback and onboarding unless opted in.
+  multiplayer_enabled: false
   wake_word: "aether"
   max_history_messages: 12
   max_response_characters: 800

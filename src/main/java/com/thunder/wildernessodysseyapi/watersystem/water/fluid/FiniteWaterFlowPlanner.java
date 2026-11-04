@@ -41,6 +41,11 @@ final class FiniteWaterFlowPlanner {
      * evaluation as an arbitrary amount of physical time.</p>
      */
     static int verticalTransfer(int sourceVolume, int targetVolume, double dtSeconds) {
+        return verticalTransfer(sourceVolume, targetVolume, 0f, dtSeconds);
+    }
+
+    /** Retains downward parcel momentum while bounding discharge by exact available capacity. */
+    static int verticalTransfer(int sourceVolume, int targetVolume, float fallingVelocity, double dtSeconds) {
         int maximum = verticalTransfer(sourceVolume, targetVolume);
         if (maximum <= 0) {
             return 0;
@@ -52,6 +57,7 @@ final class FiniteWaterFlowPlanner {
         double sourceDepth = clampVolume(sourceVolume) / (double) WaterVolumeChunk.UNITS_PER_BLOCK;
         double speed = Math.sqrt(2.0 * GRAVITY_METERS_PER_SECOND_SQUARED
                 * Math.max(MINIMUM_HEAD_METERS, sourceDepth));
+        speed = Math.max(speed, clampFinite(-fallingVelocity, 0.0, 8.0));
         long requested = Math.round(DISCHARGE_COEFFICIENT
                 * Math.max(MINIMUM_HEAD_METERS, sourceDepth)
                 * speed

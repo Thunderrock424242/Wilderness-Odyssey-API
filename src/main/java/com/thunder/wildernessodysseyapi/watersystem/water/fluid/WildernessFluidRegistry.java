@@ -339,10 +339,13 @@ public final class WildernessFluidRegistry {
             int transfer = FiniteWaterFlowPlanner.verticalTransfer(
                     remaining,
                     ownershipBlocked ? WaterVolumeChunk.UNITS_PER_BLOCK : target.volumeUnits(),
+                    current.velocityY(),
                     dtSeconds
             );
             if (transfer > 0) {
-                int mobileTransfer = maybeCreateMobilePour(level, pos, current, target, transfer);
+                float fallingVelocity = Math.max(MAX_FALL_SPEED, current.velocityY()
+                        - (float) (FiniteWaterFlowPlanner.GRAVITY_METERS_PER_SECOND_SQUARED * dtSeconds));
+                int mobileTransfer = maybeCreateMobilePour(level, pos, current, target, transfer, fallingVelocity);
                 if (mobileTransfer > 0) {
                     remaining -= mobileTransfer;
                     transferredUnits += mobileTransfer;
@@ -354,9 +357,7 @@ public final class WildernessFluidRegistry {
                             below,
                             transfer,
                             current.velocityX() * 0.45f,
-                            Math.max(MAX_FALL_SPEED, current.velocityY()
-                                    - (float) (FiniteWaterFlowPlanner.GRAVITY_METERS_PER_SECOND_SQUARED
-                                    * dtSeconds)),
+                            fallingVelocity,
                             current.velocityZ() * 0.45f,
                             current
                     );
@@ -490,7 +491,8 @@ public final class WildernessFluidRegistry {
             BlockPos sourcePos,
             WaterVolumeChunk.WaterCell source,
             WaterVolumeChunk.WaterCell target,
-            int transfer
+            int transfer,
+            float fallingVelocity
     ) {
         // SPH currently owns exact canonical units but not flood-ledger provenance.
         // Keep flood-owned water canonical until that ownership token is represented by SPH.
@@ -508,7 +510,7 @@ public final class WildernessFluidRegistry {
                 level,
                 mobileVolume,
                 source.velocityX() * 0.35f,
-                Math.max(MAX_FALL_SPEED, source.velocityY() - 1.0f),
+                fallingVelocity,
                 source.velocityZ() * 0.35f
         );
         return created ? mobileVolume : 0;

@@ -14,6 +14,9 @@ public final class RegionalHydrologyConfig {
     private static ModConfigSpec.IntValue catchupSteps;
     private static ModConfigSpec.IntValue tolerance;
     private static ModConfigSpec.BooleanValue thermal;
+    private static ModConfigSpec.BooleanValue stormSurge;
+    private static ModConfigSpec.DoubleValue maximumSurge;
+    private static ModConfigSpec.DoubleValue surgeResponse;
 
     private RegionalHydrologyConfig() { }
 
@@ -40,6 +43,12 @@ public final class RegionalHydrologyConfig {
                 .defineInRange("budgetToleranceMilliUnits", 0, 0, 4096000);
         thermal = builder.comment("Exchange regional liquid/ice inventory and update aggregate water temperature without replacing blocks.")
                 .define("thermalStorageEnabled", true);
+        stormSurge = builder.comment("EXPERIMENTAL: let coastal storms fund regional floodwater through explicit open-ocean receipts. Uses existing loaded-only flood projection; disabled until pack acceptance.")
+                .define("enableStormSurge", false);
+        maximumSurge = builder.comment("Maximum funded coastal surge above the mean water level, in metres. Cosmetic wave crests never fund this inventory.")
+                .defineInRange("maximumStormSurgeMetres", 2.0, 0.0, 4.0);
+        surgeResponse = builder.comment("Exponential build/recession time for the coarse ocean boundary, in simulation seconds.")
+                .defineInRange("stormSurgeResponseSeconds", 120.0, 20.0, 3600.0);
         builder.pop();
     }
 
@@ -53,4 +62,7 @@ public final class RegionalHydrologyConfig {
     public static int catchupSteps() { return catchupSteps.get(); }
     public static int tolerance() { return tolerance.get(); }
     public static boolean thermal() { return thermal.get(); }
+    public static boolean stormSurge() { return stormSurge.get(); }
+    public static double maximumSurge() { return maximumSurge.get(); }
+    public static double surgeResponse() { return surgeResponse.get(); }
 }

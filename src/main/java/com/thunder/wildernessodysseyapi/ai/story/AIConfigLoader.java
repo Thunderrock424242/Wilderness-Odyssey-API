@@ -101,7 +101,10 @@ public final class AIConfigLoader {
         config.getPersonality().setEmpathy(readStringValue(personality.get("empathy")));
 
         Map<String, Object> settings = readStringObjectMap(root.get("settings"));
-        config.getSettings().setAtlasEnabled(readBoolean(settings.get("atlas_enabled")));
+        // Preserve existing configs while making the Aether name authoritative when both keys exist.
+        config.getSettings().setAetherEnabled(readBoolean(settings.get(
+                settings.containsKey("aether_enabled") ? "aether_enabled" : "atlas_enabled")));
+        config.getSettings().setMultiplayerEnabled(Boolean.TRUE.equals(readBoolean(settings.get("multiplayer_enabled"))));
         config.getSettings().setWakeWord(readStringValue(settings.get("wake_word")));
         config.getSettings().setProvider(readStringValue(settings.get("provider")));
         config.getSettings().setEndpoint(readStringValue(settings.get("endpoint")));

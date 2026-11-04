@@ -47,6 +47,7 @@ public final class TemporaryFloodSavedData extends SavedData {
     private final LinkedHashMap<Long, FloodEntry> entries = new LinkedHashMap<>();
     private final Map<Long, Integer> chunkCounts = new HashMap<>();
     private final Map<Long, int[]> chunkKindCounts = new HashMap<>();
+    private final Map<Long, Long> fundingMilliUnits = new HashMap<>();
 
     /** Returns the dimension-owned exact temporary-flood ledger. */
     public static TemporaryFloodSavedData get(ServerLevel level) {
@@ -281,7 +282,10 @@ public final class TemporaryFloodSavedData extends SavedData {
         if (entry == null) return 0;
         int released = Math.min(entry.ownedUnits, Math.max(0, requested));
         entry.ownedUnits -= released;
-        if (released > 0) setDirty();
+        if (released > 0) {
+            adjustFunding(entry.fundingRegion, -released * 1000L);
+            setDirty();
+        }
         return released;
     }
 
@@ -292,11 +296,7 @@ public final class TemporaryFloodSavedData extends SavedData {
 
     /** Exact detailed inventory is a memorandum, never also stored in regional reservoirs. */
     public long ownedMilliUnits(long fundingRegion) {
-        long total = 0;
-        for (FloodEntry entry : entries.values()) {
-            if (entry.fundingRegion == fundingRegion) total += entry.ownedUnits * 1000L;
-        }
-        return total;
+        return fundingMilliUnits.getOrDefault(fundingRegion, 0L);
     }
 
     /** Forgets an entry without touching world or canonical water state. */
@@ -305,6 +305,7 @@ public final class TemporaryFloodSavedData extends SavedData {
         if (removed == null) {
             return false;
         }
+        adjustFunding(removed.fundingRegion, -removed.ownedUnits * 1000L);
         decrementChunkCount(chunkKey(packedPosition), removed.kind);
         setDirty();
         return true;
@@ -418,8 +419,12 @@ public final class TemporaryFloodSavedData extends SavedData {
 
     private void put(long position, FloodEntry entry) {
         FloodEntry previous = entries.get(position);
-        if (previous != null) decrementChunkCount(chunkKey(position), previous.kind);
+        if (previous != null) {
+            decrementChunkCount(chunkKey(position), previous.kind);
+            adjustFunding(previous.fundingRegion, -previous.ownedUnits * 1000L);
+        }
         entries.put(position, entry);
+        adjustFunding(entry.fundingRegion, entry.ownedUnits * 1000L);
         long chunkKey = chunkKey(position);
         chunkCounts.merge(chunkKey, 1, Integer::sum);
         int[] counts = chunkKindCounts.computeIfAbsent(
@@ -427,6 +432,13 @@ public final class TemporaryFloodSavedData extends SavedData {
                 ignored -> new int[SurfaceWaterKind.values().length]
         );
         counts[entry.kind.ordinal()]++;
+    }
+
+    private void adjustFunding(long region, long delta) {
+        long next = Math.addExact(fundingMilliUnits.getOrDefault(region, 0L), delta);
+        if (next < 0) throw new IllegalStateException("Negative live flood ownership");
+        if (next == 0) fundingMilliUnits.remove(region);
+        else fundingMilliUnits.put(region, next);
     }
 
     private void decrementChunkCount(long chunkKey, SurfaceWaterKind kind) {

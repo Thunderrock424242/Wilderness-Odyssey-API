@@ -33,6 +33,7 @@ public final class WaterRenderingConfig {
     public static ModConfigSpec.BooleanValue ENABLE_RIPPLES;
     public static ModConfigSpec.BooleanValue ENABLE_AMBIENT_WATER_PARTICLES;
     public static ModConfigSpec.BooleanValue ENABLE_RIVER_FOAM;
+    public static ModConfigSpec.BooleanValue ENABLE_WATERFALL_SHEETS;
     public static ModConfigSpec.BooleanValue ENABLE_RIVER_SPRAY;
     public static ModConfigSpec.BooleanValue ENABLE_RIVER_DEBRIS;
     public static ModConfigSpec.BooleanValue ENABLE_RIVER_AUDIO;
@@ -149,6 +150,8 @@ public final class WaterRenderingConfig {
                 .define("enableAmbientWaterParticles", true);
         ENABLE_RIVER_FOAM = builder.comment("Bounded local river and confluence foam; cosmetic only.")
                 .define("enableRiverFoam", true);
+        ENABLE_WATERFALL_SHEETS = builder.comment("Animated whitewater detail on verified flowing native waterfall curtains. Quality capped; external shader packs retain their native curtain material.")
+                .define("enableWaterfallSheets", true);
         ENABLE_RIVER_SPRAY = builder.comment("Bounded waterfall/rapids spray and receiving-water mist.")
                 .define("enableRiverSpray", true);
         ENABLE_RIVER_DEBRIS = builder.comment("Locally drifting leaf and twig flecks; no server entities.")

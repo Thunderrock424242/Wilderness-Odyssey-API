@@ -364,6 +364,9 @@ tasks.named('processResources') {
         into 'data/wildernessodysseyapi_storm_runoff_tests/structure'
     }
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
+        into 'data/wildernessodysseyapi_coastal_storm_tests/structure'
+    }
+    from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
         into 'data/wildernessodysseyapi_river_tests/structure'
     }
     from('src/main/resources/data/wildernessodysseyapi/structure/water_flow.nbt') {
@@ -1099,6 +1102,15 @@ tasks.register('riverNetworkBenchmark', JavaExec) {
     dependsOn tasks.named('compileTestJava')
     classpath = structureGenOfflineRuntime
     mainClass.set('com.thunder.wildernessodysseyapi.watersystem.water.worldgen.river.RiverNetworkPlannerBenchmark')
+    maxHeapSize = '512m'
+}
+
+tasks.register('waterDynamicsBenchmark', JavaExec) {
+    group = 'performance'
+    description = 'Measures bounded waterfall/storm arithmetic with exact receipts; does not predict gameplay FPS or GPU cost.'
+    dependsOn tasks.named('compileTestJava')
+    classpath = structureGenOfflineRuntime
+    mainClass.set('com.thunder.wildernessodysseyapi.watersystem.water.hydrology.WaterDynamicsBenchmark')
     maxHeapSize = '512m'
 }
 

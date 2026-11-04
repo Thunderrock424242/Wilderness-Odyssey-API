@@ -66,8 +66,20 @@ public class AIClient implements AutoCloseable {
         return settings.getPersonaName();
     }
 
+    public boolean isAetherEnabled() {
+        return settings.isAetherEnabled();
+    }
+
+    /** @deprecated Use {@link #isAetherEnabled()}. */
+    @Deprecated
     public boolean isAtlasEnabled() {
-        return settings.isAtlasEnabled();
+        return isAetherEnabled();
+    }
+
+    /** The logical server owns the multiplayer opt-in; clients cannot override it. */
+    public boolean isChatAvailable(MinecraftServer server) {
+        return settings.isAetherEnabled()
+                && AIChatAccessPolicy.isAvailable(server, settings.isMultiplayerEnabled());
     }
 
     /** Ordinary multiplayer conversation is never forwarded unless Aether is addressed. */
@@ -87,12 +99,12 @@ public class AIClient implements AutoCloseable {
 
     /** Records the owning tick thread, then checks the gateway on the bounded shared I/O pool. */
     public void scanGameData(MinecraftServer server) {
-        if (!AIChatAccessPolicy.isAvailable(server)) {
+        if (!isChatAvailable(server)) {
             return;
         }
         serverThread = Thread.currentThread();
         active = true;
-        if (settings.isAtlasEnabled() && settings.getBackend().enabled()) {
+        if (settings.isAetherEnabled() && settings.getBackend().enabled()) {
             AsyncTaskManager.trySubmitIoWork("Aether_Backend_Health", backend::checkHealth);
         }
     }
@@ -104,8 +116,9 @@ public class AIClient implements AutoCloseable {
 
     private void applySettings(AIConfig config) {
         AIConfig.Settings configured = config.getSettings();
-        if (configured.getAtlasEnabled() != null) {
-            settings.setAtlasEnabled(configured.getAtlasEnabled());
+        settings.setMultiplayerEnabled(configured.isMultiplayerEnabled());
+        if (configured.getAetherEnabled() != null) {
+            settings.setAetherEnabled(configured.getAetherEnabled());
         }
         if (configured.getWakeWord() != null) {
             settings.setWakeWord(configured.getWakeWord());
@@ -184,7 +197,7 @@ public class AIClient implements AutoCloseable {
      */
     public VoiceIntegration.VoiceResult sendMessageWithVoice(String world, String profileKey, UUID playerId,
             String player, String message, AIFallbackResponder.ResponseContext responseContext) {
-        if (!settings.isAtlasEnabled()) {
+        if (!settings.isAetherEnabled()) {
             return voiceIntegration.wrap(settings.getPersonaName(), "");
         }
         AIFallbackResponder.ResponseContext context = responseContext == null

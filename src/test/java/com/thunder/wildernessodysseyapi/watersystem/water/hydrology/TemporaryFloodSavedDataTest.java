@@ -13,6 +13,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Verifies exact temporary ownership, persistence, and conservative recession gates. */
 class TemporaryFloodSavedDataTest {
+    @Test
+    void fundingTotalsFollowTransfersWithdrawalsForgettingAndReload() {
+        var data = new TemporaryFloodSavedData();
+        var a = new BlockPos(1, 64, 1);
+        var b = a.east();
+        assertTrue(data.record(a, 0, 0, 16, null, SurfaceWaterKind.FLOOD, 2048, 7));
+        assertTrue(data.record(b, 0, 0, 16, null, SurfaceWaterKind.FLOOD, 1024, 7));
+        assertTrue(data.record(b.east(), 0, 0, 16, null, SurfaceWaterKind.FLOOD, 4096, 8));
+        assertTrue(data.transferOwnedUnits(a, b, 512, 1, 16, null));
+        assertEquals(3072000, data.ownedMilliUnits(7));
+        assertEquals(512, data.releaseOwnedUnits(a, 512));
+        assertEquals(2560000, data.ownedMilliUnits(7));
+        assertTrue(data.forget(a.asLong()));
+        data = TemporaryFloodSavedData.load(data.save(new CompoundTag(), null), null);
+        assertEquals(1536000, data.ownedMilliUnits(7));
+        assertEquals(4096000, data.ownedMilliUnits(8));
+        assertTrue(data.forget(b.asLong()));
+        assertEquals(0, data.ownedMilliUnits(7));
+    }
+
 
     @Test
     void ledgerRoundTripRetainsExactChunkCounts() {

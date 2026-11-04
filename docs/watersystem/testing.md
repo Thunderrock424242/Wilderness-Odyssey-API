@@ -64,6 +64,13 @@ The [distance-based detail checkpoint](distance-based-mesh-detail.md) adds
 selection/dwell, transition coverage/winding, detail-queue and production-GPU
 edge regressions. Compare all four tiers and near/far camera movement in the
 remaining live pass; submitted triangle reduction alone is not an FPS result.
+The [waterfall and coastal-storm checkpoint](waterfalls-and-storms.md) adds
+ballistic/discharge, live projection funding and single-surface regressions,
+33 required water-safety GameTests and a separate loaded coastal-surge fixture.
+`waterDynamicsBenchmark` measures repeated bounded arithmetic with conservation
+assertions. It does not measure gameplay frame or server tick cost. See the
+[runtime acceptance record](water-dynamics-runtime-acceptance.md) for actual
+native/Sodium/Iris/Distant Horizons observations and pending visual/soak tests.
 
 Use JDK 21 and the checked-in wrapper from the repository root. Run commands one
 at a time. Do not run another Gradle/NeoForm task alongside a development client,

@@ -24,7 +24,8 @@ public class AISettings {
         return backend.enabled();
     }
 
-    private boolean atlasEnabled = true;
+    private boolean aetherEnabled = true;
+    private boolean multiplayerEnabled;
     private String provider = "scripted";
     private String endpoint = "http://127.0.0.1:11434";
     private String modelName = DEFAULT_OLLAMA_MODEL;
@@ -40,12 +41,32 @@ public class AISettings {
     private String personalityTone = "warm and conversational";
     private String empathyLevel = "balanced";
 
-    public boolean isAtlasEnabled() {
-        return atlasEnabled;
+    public boolean isAetherEnabled() {
+        return aetherEnabled;
     }
 
-    public void setAtlasEnabled(boolean atlasEnabled) {
-        this.atlasEnabled = atlasEnabled;
+    public void setAetherEnabled(boolean aetherEnabled) {
+        this.aetherEnabled = aetherEnabled;
+    }
+
+    /** @deprecated Use {@link #isAetherEnabled()}. */
+    @Deprecated
+    public boolean isAtlasEnabled() {
+        return isAetherEnabled();
+    }
+
+    /** @deprecated Use {@link #setAetherEnabled(boolean)}. */
+    @Deprecated
+    public void setAtlasEnabled(boolean aetherEnabled) {
+        setAetherEnabled(aetherEnabled);
+    }
+
+    public boolean isMultiplayerEnabled() {
+        return multiplayerEnabled;
+    }
+
+    public void setMultiplayerEnabled(boolean multiplayerEnabled) {
+        this.multiplayerEnabled = multiplayerEnabled;
     }
 
     public String getModelName() {

@@ -13,6 +13,12 @@ public final class RegionalHydrologyModel {
     /** Executes one bounded coarse interval, returning exact atmospheric receipts. */
     public static Exchange advance(RegionalHydrologyState state, RegionalHydrologyState downstream,
                                    Parameters parameters, double dt) {
+        return advance(state, downstream, parameters, dt, 0);
+    }
+
+    /** Supplies live detailed ownership separately from regional inventory and lifetime export receipts. */
+    public static Exchange advance(RegionalHydrologyState state, RegionalHydrologyState downstream,
+                                   Parameters parameters, double dt, long liveProjectionMilliUnits) {
         if (!Double.isFinite(dt) || dt <= 0 || dt > 3600.0) {
             throw new IllegalArgumentException("Regional hydrology requires a positive step at most one simulation hour");
         }
@@ -47,9 +53,17 @@ public final class RegionalHydrologyModel {
             long oceanInput = state.credit(SURFACE_RUNOFF, potentialEt, OCEAN_IN);
             et = state.debit(SURFACE_RUNOFF, oceanInput, EVAPORATION);
             for (HydrologicReservoir reservoir : new HydrologicReservoir[]{SURFACE_RUNOFF, RIVER, LAKE, FLOODPLAIN}) {
+                if (reservoir == FLOODPLAIN && parameters.stormSurgeEnabled) continue;
                 state.debit(reservoir, state.stored(reservoir), OCEAN_OUT);
             }
-            state.lastFlux = new HydrologicFlux(rain, snowfall ? rain : 0, melt, 0, 0, et, 0, 0, 0, 0, 0, 0);
+            if (parameters.stormSurgeEnabled) {
+                CoastalStormSurge.advance(state, state.surgeTargetMetres, parameters.surgeResponseSeconds, dt,
+                        liveProjectionMilliUnits);
+            } else {
+                state.stage = 0;
+            }
+            state.lastFlux = new HydrologicFlux(rain, snowfall ? rain : 0, melt, 0, 0, et, 0, 0, 0, 0,
+                    state.stored(FLOODPLAIN) - initialFlood, 0);
             return new Exchange(rain, et);
         }
 
@@ -139,5 +153,13 @@ public final class RegionalHydrologyModel {
     public record Exchange(long precipitationMilliUnits, long evaporationMilliUnits) { }
     public record Parameters(double rainfallMmPerGameHour, double evaporationMmPerGameHour,
                              double roughness, double bankfullDepth, double aquiferSeconds,
-                             boolean groundwaterEnabled, boolean thermalEnabled) { }
+                             boolean groundwaterEnabled, boolean thermalEnabled,
+                             boolean stormSurgeEnabled, double surgeResponseSeconds) {
+        public Parameters(double rainfallMmPerGameHour, double evaporationMmPerGameHour,
+                          double roughness, double bankfullDepth, double aquiferSeconds,
+                          boolean groundwaterEnabled, boolean thermalEnabled) {
+            this(rainfallMmPerGameHour, evaporationMmPerGameHour, roughness, bankfullDepth,
+                    aquiferSeconds, groundwaterEnabled, thermalEnabled, false, 120);
+        }
+    }
 }

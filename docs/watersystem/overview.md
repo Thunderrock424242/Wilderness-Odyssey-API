@@ -38,6 +38,12 @@ The [distance-based detail checkpoint](distance-based-mesh-detail.md) adds
 bounded calm-water detail reduction, fixed shared borders and transition-face
 sampling through the same cache and rebuild queue. Synthetic geometry savings
 and GPU checks are recorded separately from pending live performance acceptance.
+The [waterfall and coastal-storm checkpoint](waterfalls-and-storms.md) adds
+gravity-aware finite discharge, verified waterfall currents and bounded
+whitewater detail, plus default-disabled conserved coastal surge. Its loaded
+regressions cover interrupted falls, funded flood expansion/recession and
+serialization; [live renderer acceptance](water-dynamics-runtime-acceptance.md)
+records the installed-mod observations and remaining manual coverage.
 
 Wilderness water is generated as a first-class world fluid. Newly generated
 terrain stores the namespaced Wilderness source or flowing fluid immediately;

@@ -114,7 +114,8 @@ public class AIConfig {
     }
 
     public static class Settings {
-        private Boolean atlasEnabled;
+        private Boolean aetherEnabled;
+        private boolean multiplayerEnabled;
         private String wakeWord;
         private String provider;
         private String endpoint;
@@ -127,12 +128,33 @@ public class AIConfig {
         private Integer ollamaStartupTimeoutSeconds;
         private String ollamaExecutable;
 
-        public Boolean getAtlasEnabled() {
-            return atlasEnabled;
+        public Boolean getAetherEnabled() {
+            return aetherEnabled;
         }
 
-        public void setAtlasEnabled(Boolean atlasEnabled) {
-            this.atlasEnabled = atlasEnabled;
+        public void setAetherEnabled(Boolean aetherEnabled) {
+            this.aetherEnabled = aetherEnabled;
+        }
+
+        /** @deprecated Use {@link #getAetherEnabled()}. */
+        @Deprecated
+        public Boolean getAtlasEnabled() {
+            return getAetherEnabled();
+        }
+
+        /** @deprecated Use {@link #setAetherEnabled(Boolean)}. */
+        @Deprecated
+        public void setAtlasEnabled(Boolean aetherEnabled) {
+            setAetherEnabled(aetherEnabled);
+        }
+
+        /** Missing settings in existing configs keep multiplayer conversations disabled. */
+        public boolean isMultiplayerEnabled() {
+            return multiplayerEnabled;
+        }
+
+        public void setMultiplayerEnabled(boolean multiplayerEnabled) {
+            this.multiplayerEnabled = multiplayerEnabled;
         }
 
         public String getWakeWord() {

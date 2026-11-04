@@ -27,6 +27,7 @@ public final class RegionalHydrologyState {
     double airTemperature = 15.0;
     double humidity = 0.5;
     double wind;
+    double surgeTargetMetres;
     double sunlight;
     double precipitationRemainder;
     double evaporationRemainder;
@@ -130,6 +131,7 @@ public final class RegionalHydrologyState {
         tag.putDouble("air", airTemperature);
         tag.putDouble("humidity", humidity);
         tag.putDouble("wind", wind);
+        tag.putDouble("surge_target", surgeTargetMetres);
         tag.putDouble("sun", sunlight);
         tag.putDouble("rain_remainder", precipitationRemainder);
         tag.putDouble("et_remainder", evaporationRemainder);
@@ -167,6 +169,7 @@ public final class RegionalHydrologyState {
         state.airTemperature = finite(tag, "air");
         state.humidity = finite(tag, "humidity");
         state.wind = finite(tag, "wind");
+        state.surgeTargetMetres = Math.max(0, Math.min(4, finite(tag, "surge_target")));
         state.sunlight = finite(tag, "sun");
         state.precipitationRemainder = finite(tag, "rain_remainder");
         state.evaporationRemainder = finite(tag, "et_remainder");

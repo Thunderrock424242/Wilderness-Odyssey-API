@@ -87,7 +87,9 @@ public final class RegionalHydrologyManager {
                 RegionalHydrologyConfig.rainfall(), RegionalHydrologyConfig.evaporation(),
                 RegionalHydrologyConfig.roughness(), RegionalHydrologyConfig.bankfullDepth(),
                 RegionalHydrologyConfig.aquiferTime(), WaterSimulationConfig.watershedGroundwaterEnabled(),
-                RegionalHydrologyConfig.thermal());
+                RegionalHydrologyConfig.thermal(), RegionalHydrologyConfig.stormSurge()
+                        && WaterSimulationConfig.weatherWaterCouplingEnabled()
+                        && WeatherConfig.dimensionEnabled(level.dimension()), RegionalHydrologyConfig.surgeResponse());
         int count = Math.min(data.size(), WaterSimulationConfig.WATERSHED_CHUNKS_PER_TICK.get());
         for (int i = 0; i < count; i++) {
             RegionalHydrologyState state = data.next();
@@ -106,7 +108,9 @@ public final class RegionalHydrologyManager {
                 long stepTicks = catchupStepTicks(now - state.lastSimulationTick,
                         RegionalHydrologyConfig.catchupSteps() - steps++);
                 AtmosphericWaterExchange.applyPrecipitation(level, state);
-                RegionalHydrologyModel.Exchange exchange = RegionalHydrologyModel.advance(state, target, parameters, stepTicks / 20.0);
+                RegionalHydrologyModel.Exchange exchange = RegionalHydrologyModel.advance(state, target, parameters,
+                        stepTicks / 20.0, state.ocean && parameters.stormSurgeEnabled()
+                                ? TemporaryFloodSavedData.get(level).ownedMilliUnits(state.key) : 0);
                 state.lastSimulationTick += stepTicks;
                 AtmosphericWaterExchange.publish(level, new ChunkPos(state.key), exchange.precipitationMilliUnits(),
                         exchange.evaporationMilliUnits(), state.stored(SNOW), RegionalHydrologyState.AREA, state.lastSimulationTick);
@@ -158,6 +162,22 @@ public final class RegionalHydrologyManager {
         state.airTemperature = weather.temperature();
         state.humidity = enabled ? weather.humidity() : 1.0;
         state.wind = Math.min(1, Math.hypot(weather.wind().x(), weather.wind().z()));
+        state.surgeTargetMetres = 0;
+        if (enabled && state.ocean && RegionalHydrologyConfig.stormSurge()) {
+            double onshore = 0;
+            var data = RegionalHydrologySavedData.get(level);
+            // The cached regional DEM supplies exposure. No terrain/chunk scan
+            // is needed, and unknown neighbors cannot invent an onshore wind.
+            for (var direction : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                var neighbor = data.state(ChunkPos.asLong(chunk.x + direction.getStepX(),
+                        chunk.z + direction.getStepZ()));
+                if (neighbor == null || neighbor.ocean || neighbor.elevation < level.getSeaLevel() - 1) continue;
+                onshore = Math.max(onshore, weather.wind().x() * direction.getStepX()
+                        + weather.wind().z() * direction.getStepZ());
+            }
+            state.surgeTargetMetres = CoastalStormSurge.targetMetres(weather.pressure(), weather.stormEnergy(),
+                    onshore, RegionalHydrologyConfig.maximumSurge());
+        }
         state.sunlight = Math.max(0, Math.cos((level.getDayTime() % 24000 - 6000) * Math.PI / 12000))
                 * (1.0 - weather.cloudWater() * 0.8);
         state.forcingTick = level.getGameTime();
@@ -178,7 +198,7 @@ public final class RegionalHydrologyManager {
         double length = Math.max(1, Math.hypot(dx, dz));
         return new WatershedSimulationModel.Result(soil, unit(state.precipitationFraction), runoff, discharge,
                 (float) Math.min(WaterSimulationConfig.watershedMaximumWaterLevelOffset(),
-                        Math.max(0, state.stage - RegionalHydrologyConfig.bankfullDepth())),
+                        Math.max(0, state.ocean ? state.stage : state.stage - RegionalHydrologyConfig.bankfullDepth())),
                 flood ? 1 : unit(state.stage / RegionalHydrologyConfig.bankfullDepth()), flood,
                 sediment, 1 - sediment, (float) (dx / length * state.velocity / 20),
                 (float) (dz / length * state.velocity / 20),

@@ -211,7 +211,8 @@ public final class ClientWaterImmersion {
                 new BlockPos(blockX, column.surfaceBlockY(), blockZ)
         );
         WaterSurfaceMeshSamples mesh = WaterRenderCoordinator.surfaceSamples(level, worldX, worldZ);
-        float fallbackHeight = column.baseSurfaceY() + watershed.waterLevelOffset();
+        float fallbackHeight = WatershedServices.surfaceHeight(level,
+                new BlockPos(blockX, column.surfaceBlockY(), blockZ), column.baseSurfaceY(), watershed);
         if (mesh == null) return fallbackHeight;
         int originX = (blockX >> 4) << 4;
         int originZ = (blockZ >> 4) << 4;

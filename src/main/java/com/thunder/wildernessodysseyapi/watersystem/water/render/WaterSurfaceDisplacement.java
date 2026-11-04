@@ -47,6 +47,13 @@ public final class WaterSurfaceDisplacement {
     private WaterSurfaceDisplacement() {
     }
 
+    /** Adds a throttled receiving-water pulse to the existing capped shared impulse pool. */
+    static void spawnWaterfallImpact(Level level, double x, double z, float strength) {
+        if (!shouldRecord(level) || !Float.isFinite(strength) || strength <= .02f) return;
+        add(level, x, z, .025f + Math.min(1, strength) * .055f,
+                .8f + Math.min(1, strength) * .7f, 24, DisturbanceKind.IMPACT);
+    }
+
     /**
      * Shared admission range for client entry effects and entity wakes. Check
      * before collecting motion or sampling SPH so distant entities cannot

@@ -502,6 +502,7 @@ public final class WaterRenderCoordinator {
         FluidRenderer.clear();
         RippleRenderer.clear();
         CoastalRunupRenderer.clear();
+        WaterfallSurfaceDetails.clear();
         WaterRenderDiagnostics.publishCoastalDebug(0);
     }
 
@@ -512,6 +513,7 @@ public final class WaterRenderCoordinator {
         FluidRenderer.onRenderLevel(event);
         RippleRenderer.onRenderLevel(event);
         CoastalRunupRenderer.onRenderLevel(event);
+        WaterfallSurfaceDetails.render(event);
         minecraft.renderBuffers().bufferSource().endBatch(RenderType.translucent());
         if (CoastalDebugRenderer.onRenderLevel(event)) {
             minecraft.renderBuffers().bufferSource().endBatch(RenderType.lines());

@@ -98,6 +98,46 @@ float stableWaveLayer(vec2 localOffset, vec2 direction,
         + dot(localOffset, coefficient), TWO_PI)) * phaseBandLimit(coefficient);
 }
 
+float foamCornerValue(ivec2 cell) {
+    uint value = uint(cell.x) * 0x8da6b343u ^ uint(cell.y) * 0xd8163841u;
+    value = (value ^ (value >> 16u)) * 0x7feb352du;
+    value = (value ^ (value >> 15u)) * 0x846ca68bu;
+    return float(value ^ (value >> 16u)) * (1.0 / 4294967295.0);
+}
+
+float foamValueNoise(vec2 drift, int cellsPerBlock) {
+    // Integer origins preserve individual cells at the world border; fractional
+    // interpolation stays in the small mesh-local coordinate domain. Adjacent
+    // chunks therefore hash the same lattice corners without rounding a large
+    // absolute world position to float.
+    vec2 local = phaseLocalXZ * float(cellsPerBlock) + drift;
+    ivec2 cell = ivec2(phaseChunkIndex) * (16 * cellsPerBlock) + ivec2(floor(local));
+    vec2 fraction = fract(local);
+    vec2 weight = fraction * fraction * (3.0 - 2.0 * fraction);
+    return mix(
+        mix(foamCornerValue(cell), foamCornerValue(cell + ivec2(1, 0)), weight.x),
+        mix(foamCornerValue(cell + ivec2(0, 1)), foamCornerValue(cell + ivec2(1, 1)), weight.x),
+        weight.y
+    );
+}
+
+float foamBreakup(float footprint) {
+    // A product of two sinusoidal carriers makes an exact checker lattice.
+    // Irregular corner values break that repetition while the existing reduced
+    // phases provide bounded drift continuous across animation-clock wraps.
+    vec2 drift = vec2(sin(SurfaceAnimationPhases1.z), cos(SurfaceAnimationPhases1.w)) * 0.65;
+    float coarseWeight = 1.0 - smoothstep(0.35, 1.0, footprint);
+    float breakup = mix(0.5, foamValueNoise(drift, 1), coarseWeight);
+    if (OpticalQuality.x >= 1.0) {
+        float fineWeight = 1.0 - smoothstep(0.35, 1.0, footprint * 2.0);
+        float fine = mix(0.5, foamValueNoise(drift + vec2(3.7, -8.9), 2), fineWeight);
+        breakup = breakup * 0.65 + fine * 0.35;
+    }
+    // Unresolvable detail converges to mean coverage instead of aliasing into
+    // moving distant bands or removing eligible whitewater altogether.
+    return smoothstep(0.20, 0.80, breakup);
+}
+
 vec2 normalizedOr(vec2 direction, vec2 fallbackDirection) {
     float directionLength = length(direction);
     return directionLength > 0.000001 ? direction / directionLength : fallbackDirection;
@@ -331,6 +371,9 @@ vec4 traceScreenReflection(vec3 origin, vec3 direction, int stepCount, float max
 }
 
 void main() {
+    // Evaluate derivatives before foreground rejection can discard neighboring
+    // fragments in the quad; the later material branches use only this value.
+    float foamFootprint = max(length(dFdx(phaseLocalXZ)), length(dFdy(phaseLocalXZ)));
     float sea = clamp(regionalSeaState, 0.0, 1.0);
     float frozen = clamp(Weather.w, 0.0, 1.0);
     vec3 baseWorldNormal = normalize(worldNormal);
@@ -510,9 +553,7 @@ void main() {
     float crestFoam = smoothstep(0.08, 0.48, crestCompression)
         * (0.40 + 0.60 * smoothstep(0.12, 0.65, breakingEnergy))
         * smoothstep(0.025, 0.24, normalizedWaveSlope);
-    float foamPattern = smoothstep(-0.55, 0.60,
-        sin(stableWorldPhase(vec2(2.73, 1.91)) - SurfaceAnimationPhases1.z)
-        * cos(stableWorldPhase(vec2(-1.37, 3.17)) + SurfaceAnimationPhases1.w));
+    float foamPattern = foamBreakup(foamFootprint);
     // Whitewater follows the elevated native crest, including where horizontal
     // shore taper deliberately reduces the Gerstner compression cue.
     crestFoam = max(crestFoam, coastalCrest * 0.85);

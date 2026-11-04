@@ -21,6 +21,26 @@ public final class WatershedServices {
     private WatershedServices() {
     }
 
+    static float composeSurfaceHeight(float canonicalHeight, float offset, long representative, boolean coastal) {
+        if (coastal && representative != WatershedChunkState.NO_REPRESENTATIVE) {
+            return Math.max(canonicalHeight, BlockPos.of(representative).getY() + 8f / 9f + offset);
+        }
+        return canonicalHeight + offset;
+    }
+
+    /** Composes coastal stage from one absolute reference, including already raised canonical cells. */
+    public static float surfaceHeight(Level level, BlockPos position, float canonicalHeight, WatershedConditions conditions) {
+        float offset = conditions.waterLevelOffset();
+        if (offset == 0 || level == null) return canonicalHeight;
+        WatershedChunkState state = level instanceof ServerLevel server
+                ? WatershedSavedData.get(server).state(net.minecraft.world.level.ChunkPos.asLong(
+                        position.getX() >> 4, position.getZ() >> 4))
+                : ClientWatershedSnapshotStore.state(level, position.getX() >> 4, position.getZ() >> 4);
+        return composeSurfaceHeight(canonicalHeight, offset,
+                state == null ? WatershedChunkState.NO_REPRESENTATIVE : state.representativePosition(),
+                state != null && state.baseWaterFeature() == WatershedConditions.WaterFeature.COASTAL);
+    }
+
     /** Returns loaded chunk-scale conditions for a world position. */
     public static WatershedConditions conditions(Level level, BlockPos position) {
         if (level == null || position == null || !WildernessWaterRules.isEnabled(level)
