@@ -22,6 +22,7 @@ import uuid
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".codex-build/aether-laptop"
+RUNTIME_PORT = 11434
 PROFILES = {
     "laptop-lora-smoke": {"bounds": (8, 256, 8), "chatTemplate": True, "quantization": "none"},
     "laptop-qlora-smoke": {"bounds": (8, 256, 8), "chatTemplate": True, "quantization": "nf4"},
@@ -99,6 +100,33 @@ def read_dataset(path, digest, maximum):
         identities.add(identifier)
         text(item["revision"], 1, 120); text(item["prompt"], 1, 4000); text(item["target"], 1, 12000)
     return items
+
+
+def configure_local(state_directory, runtime_port):
+    global STATE, RUNTIME_PORT
+    require(type(runtime_port) is int and runtime_port in (11434, 11435), "LOCAL_RUNTIME_PORT_REQUIRED")
+    if state_directory is not None:
+        raw = Path(state_directory).absolute()
+        require(not str(raw).startswith(("\\\\", "//")), "LOCAL_STATE_REQUIRED")
+        state = safe_path(raw)
+        for source in (ROOT / "tools", ROOT / "aether-server", ROOT / "src", ROOT / ".git"):
+            require(state != source and source not in state.parents and state not in source.parents, "OVERLAPPING_STATE")
+        STATE = state
+    RUNTIME_PORT = runtime_port
+
+
+def read_profile(path, digest):
+    require((path is None) == (digest is None), "PROFILE_FLAGS_REQUIRED_TOGETHER")
+    if path is None:
+        return None
+    require(isinstance(digest, str) and re.fullmatch("[a-f0-9]{64}", digest), "INVALID_PROFILE_HASH")
+    require(sha(safe_path(path)) == digest, "PROFILE_HASH_MISMATCH")
+    data = read_json(path, 32768)
+    require(set(data) == {"schemaVersion", "profileId", "revision", "systemPrompt"} and data["schemaVersion"] == "1.0", "INVALID_PROFILE_SNAPSHOT")
+    require(str(uuid.UUID(data["profileId"])) == data["profileId"], "INVALID_PROFILE_ID")
+    require(type(data["revision"]) is int and data["revision"] > 0, "INVALID_PROFILE_REVISION")
+    text(data["systemPrompt"], 1, 4000)
+    return data
 
 
 def core():
@@ -259,7 +287,7 @@ def runtime_modelfile(base, store, model_source):
 
 def runtime_show(name, blob, expected_template_hash=None):
     import http.client
-    connection = http.client.HTTPConnection("127.0.0.1",11434,timeout=30)
+    connection = http.client.HTTPConnection("127.0.0.1",RUNTIME_PORT,timeout=30)
     try:
         connection.request("POST","/api/show",body=json.dumps({"model":name}),headers={"Content-Type":"application/json"})
         response = connection.getresponse(); require(response.status == 200,"OLLAMA_SHOW_FAILED")
@@ -277,7 +305,7 @@ def require_local_ollama():
     import http.client
     connection = None
     try:
-        connection = http.client.HTTPConnection("127.0.0.1",11434,timeout=5)
+        connection = http.client.HTTPConnection("127.0.0.1",RUNTIME_PORT,timeout=5)
         connection.request("GET","/api/version"); response = connection.getresponse()
         raw = response.read(4097)
         require(response.status == 200 and len(raw) <= 4096 and isinstance(strict_json(raw.decode("utf-8")).get("version"),str),
@@ -439,6 +467,8 @@ def validate_candidate(candidate, approved):
     require(metadata["weightsChanged"] is True and math.isfinite(metadata["loss"]) and metadata["loss"] >= 0)
     require(sha(candidate / "adapter_model.safetensors") == metadata["weightsSha256"], "ADAPTER_HASH_MISMATCH")
     require(read_json(candidate / "adapter_config.json")["peft_type"] == "LORA")
+    if "profileSha256" in metadata:
+        require(isinstance(metadata["profileSha256"], str) and re.fullmatch("[a-f0-9]{64}", metadata["profileSha256"]), "INVALID_PROFILE_HASH")
     return metadata
 
 
@@ -485,7 +515,7 @@ def ollama_environment(source, home):
     locations = {k.upper():v for k,v in source.items() if k.upper() in ("LOCALAPPDATA","APPDATA")}
     environment["LOCALAPPDATA"] = locations.get("LOCALAPPDATA",str(Path(home) / "AppData/Local"))
     environment["APPDATA"] = locations.get("APPDATA",str(Path(home) / "AppData/Roaming"))
-    environment["OLLAMA_HOST"] = "http://127.0.0.1:11434"
+    environment["OLLAMA_HOST"] = f"http://127.0.0.1:{RUNTIME_PORT}"
     return environment
 
 
@@ -523,6 +553,9 @@ def run_training(args):
     approved, base = approval(args.base_approval)
     profile = PROFILES[args.preset]
     read_dataset(args.dataset, args.dataset_sha256, profile["bounds"][2])
+    profile_path = getattr(args, "profile_snapshot", None)
+    profile_hash = getattr(args, "profile_sha256", None)
+    reviewed_profile = read_profile(profile_path, profile_hash)
     output = new_output(args.output, [base, args.dataset, args.base_approval])
     require(1024 <= args.gpu_memory_mib <= 16384 and 1024 <= args.memory_mib <= 131072)
     require(10 <= args.timeout_seconds <= 3600 and 1 <= args.cpu_threads <= 16)
@@ -537,6 +570,11 @@ def run_training(args):
                   "presetId": args.preset, "quantization": profile["quantization"], "datasetHash": args.dataset_sha256,
                   "datasetPath": str(snapshot), "outputDirectory": str(staged), "cpuThreads": args.cpu_threads,
                   "device": "cuda", "minFreeGpuMiB": args.gpu_memory_mib, "memoryMiB": args.memory_mib}
+        if reviewed_profile is not None:
+            saved_profile = work / "profile.json"
+            saved_profile.write_bytes(safe_path(profile_path).read_bytes())
+            read_profile(saved_profile, profile_hash)
+            config.update(profileSnapshotPath=str(saved_profile), profileSha256=profile_hash)
         write_json(work / "config.json", config)
         environment = child_environment(os.environ)
         started = time.monotonic(); process = None
@@ -562,10 +600,15 @@ def run_training(args):
                 failure = diagnostic["error"]
                 require(False, failure if re.fullmatch("[A-Za-z0-9_]+", failure) else "GPU_TRAINING_FAILED")
             metadata = read_json(staged / "metadata.json")
+            if reviewed_profile is not None:
+                require(metadata.get("profileSha256") == profile_hash, "CANDIDATE_PROFILE_MISMATCH")
             write_json(staged / "local-run.json", {"durationSeconds": time.monotonic()-started, "peakObservedRssMiB": peak/1048576,
                 "gpu": read_json(work / "success.json")["gpu"], "cpuThreads": args.cpu_threads})
-            write_manifest(staged, {"baseSha256": approved["baseSha256"], "datasetHash": args.dataset_sha256,
-                                   "trainerSha256": sha(ROOT / "aether-server/src/main/resources/training/trainer.py")})
+            provenance = {"baseSha256": approved["baseSha256"], "datasetHash": args.dataset_sha256,
+                          "trainerSha256": sha(ROOT / "aether-server/src/main/resources/training/trainer.py")}
+            if reviewed_profile is not None:
+                provenance["profileSha256"] = profile_hash
+            write_manifest(staged, provenance)
             validate_candidate(staged, approved)
             require(not output.exists(), "OUTPUT_ALREADY_EXISTS"); staged.rename(output)
             return {"candidate": str(output), "metadata": metadata, "resources": read_json(output / "local-run.json")}
@@ -578,6 +621,9 @@ def training_child(path):
     profile = PROFILES[config["presetId"]]
     require(config["quantization"] == profile["quantization"] and config["device"] == "cuda")
     read_dataset(config["datasetPath"], config["datasetHash"], profile["bounds"][2])
+    reviewed_profile = read_profile(config.get("profileSnapshotPath"), config.get("profileSha256"))
+    if reviewed_profile is not None:
+        profile = {**profile, "systemPrompt": reviewed_profile["systemPrompt"]}
     module = core(); runtime = module.runtime(config, laptop=True)
     gpu = runtime[0].cuda.get_device_name(0)
     module.train(config, runtime, profile)
@@ -599,6 +645,8 @@ def export_model(args):
     provenance = {"candidateName": name, "baseModelId": approved["modelId"], "baseSha256": approved["baseSha256"],
                   "datasetHash": metadata["datasetHash"], "adapterSha256": metadata["weightsSha256"],
                   "activation": "separate-reviewed-operation", **merged}
+    if "profileSha256" in metadata:
+        provenance["profileSha256"] = metadata["profileSha256"]
     write_json(output / "deployment.json", provenance)
     write_manifest(output, provenance); verify_manifest(output)
     return {"package": str(output), "model": name, "nextStep": "import-runtime with this merged package and matching base approval",
@@ -676,12 +724,15 @@ def doctor():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--state-directory")
+    parser.add_argument("--runtime-port", type=int, choices=(11434, 11435), default=11434)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor")
     a = sub.add_parser("approve-base"); a.add_argument("--directory", required=True); a.add_argument("--model-id", required=True); a.add_argument("--output", required=True)
     i = sub.add_parser("import-ollama"); i.add_argument("--store"); i.add_argument("--model", required=True); i.add_argument("--output", required=True)
     i.add_argument("--memory-mib",type=int,default=24576); i.add_argument("--timeout-seconds",type=int,default=1800)
     t = sub.add_parser("train"); t.add_argument("--base-approval", required=True); t.add_argument("--dataset", required=True); t.add_argument("--dataset-sha256", required=True)
+    t.add_argument("--profile-snapshot"); t.add_argument("--profile-sha256")
     t.add_argument("--preset", choices=PROFILES, required=True); t.add_argument("--output", required=True); t.add_argument("--acknowledge-reviewed-data", action="store_true")
     t.add_argument("--gpu-memory-mib", type=int, default=11000); t.add_argument("--memory-mib", type=int, default=16384); t.add_argument("--cpu-threads", type=int, default=2); t.add_argument("--timeout-seconds", type=int, default=900)
     e = sub.add_parser("export"); e.add_argument("--base-approval", required=True); e.add_argument("--candidate", required=True); e.add_argument("--output", required=True); e.add_argument("--name", required=True)
@@ -697,6 +748,7 @@ def main():
     hidden_export = sub.add_parser("_export",help=argparse.SUPPRESS);hidden_export.add_argument("config")
     hidden_import = sub.add_parser("_import",help=argparse.SUPPRESS);hidden_import.add_argument("config")
     args = parser.parse_args()
+    configure_local(args.state_directory, args.runtime_port)
     if args.command == "doctor": result = doctor()
     elif args.command == "approve-base": result = approve(args)
     elif args.command == "import-ollama": result = import_ollama(args)

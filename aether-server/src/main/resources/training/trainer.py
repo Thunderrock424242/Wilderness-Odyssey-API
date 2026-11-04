@@ -95,8 +95,9 @@ def runtime(c, laptop=False):
     return torch, peft, transformers, base
 
 
-def chat_sample(tokenizer, prompt, target):
-    user = [{"role": "user", "content": prompt}]
+def chat_sample(tokenizer, prompt, target, system_prompt=None):
+    user = ([{"role": "system", "content": system_prompt}] if system_prompt is not None else [])
+    user += [{"role": "user", "content": prompt}]
     prefix = tokenizer.apply_chat_template(user, tokenize=True, add_generation_prompt=True, return_dict=False)
     full = tokenizer.apply_chat_template(user + [{"role": "assistant", "content": target}],
                                          tokenize=True, add_generation_prompt=False, return_dict=False)
@@ -128,7 +129,7 @@ def train(c, checked_runtime=None, profile=None):
     samples = []
     for example in examples:
         if profile is not None and profile.get("chatTemplate"):
-            prompt, target = chat_sample(tokenizer, example["prompt"], example["target"])
+            prompt, target = chat_sample(tokenizer, example["prompt"], example["target"], profile.get("systemPrompt"))
         else:
             prompt = tokenizer.encode(example["prompt"], add_special_tokens=False)
             target = tokenizer.encode(example["target"], add_special_tokens=False)
@@ -192,6 +193,8 @@ def train(c, checked_runtime=None, profile=None):
                 "device": c["device"], "torchVersion": torch.__version__,
                 "transformersVersion": transformers.__version__, "peftVersion": peft.__version__}
     if profile is not None:
+        if "profileSha256" in c:
+            metadata["profileSha256"] = c["profileSha256"]
         metadata["quantization"] = c.get("quantization", "none")
         metadata["chatTemplate"] = bool(profile.get("chatTemplate"))
         metadata["peakGpuAllocatedMiB"] = torch.cuda.max_memory_allocated() / 1048576 if c["device"] == "cuda" else None

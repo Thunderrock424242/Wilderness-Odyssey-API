@@ -29,6 +29,71 @@ class LaptopPolicyTest(unittest.TestCase):
         path.write_text(json.dumps([{"id":"reviewed-1","revision":"r1","prompt":"Hello","target":"Welcome"}]), encoding="utf-8")
         return path, hashlib.sha256(path.read_bytes()).hexdigest()
 
+    def test_private_runtime_options_are_local_and_state_cannot_overlap_engine(self):
+        with patch.object(laptop, "STATE", laptop.STATE), patch.object(laptop, "RUNTIME_PORT", 11434, create=True):
+            laptop.configure_local(self.root / "private-state", 11435)
+            self.assertEqual(laptop.STATE, self.root / "private-state")
+            self.assertEqual(laptop.ollama_environment({}, self.root)["OLLAMA_HOST"], "http://127.0.0.1:11435")
+            for port in (80, 11436, "11435"):
+                with self.assertRaises(ValueError):
+                    laptop.configure_local(None, port)
+            with self.assertRaises(ValueError):
+                laptop.configure_local(ROOT / "tools/aether", 11435)
+
+    def test_profile_snapshot_is_strict_and_hash_bound(self):
+        path = self.root / "profile.json"
+        content = {"schemaVersion":"1.0", "profileId":"00000000-0000-4000-8000-000000000001",
+                   "revision":1, "systemPrompt":"Be a concise guide."}
+        path.write_bytes(json.dumps(content).encode())
+        digest = laptop.sha(path)
+        self.assertEqual(laptop.read_profile(path, digest)["systemPrompt"], "Be a concise guide.")
+        for path_arg, digest_arg in ((path, None), (None, digest), (path, "f" * 64)):
+            with self.assertRaises(ValueError): laptop.read_profile(path_arg, digest_arg)
+        self.assertIsNone(laptop.read_profile(None, None))
+        for bad in ({**content, "extra":True}, {**content, "revision":True}, {**content, "systemPrompt":"a" * 4001}):
+            path.write_bytes(json.dumps(bad).encode())
+            with self.assertRaises(ValueError): laptop.read_profile(path, laptop.sha(path))
+        path.write_bytes(b'{"schemaVersion":"1.0","schemaVersion":"1.0"}')
+        with self.assertRaises(ValueError): laptop.read_profile(path, laptop.sha(path))
+
+    def test_chat_sample_includes_system_in_masked_prefix(self):
+        class Tokenizer:
+            def apply_chat_template(self, messages, **options):
+                assert messages[0] == {"role":"system", "content":"Guide"}
+                assert messages[1] == {"role":"user", "content":"Question"}
+                return [1,2,3] if options["add_generation_prompt"] else [1,2,3,4,5]
+        prefix, target = laptop.core().chat_sample(Tokenizer(), "Question", "Answer", system_prompt="Guide")
+        self.assertEqual(prefix, [1,2,3]); self.assertEqual(target, [4,5])
+
+    def test_system_profile_context_is_counted_before_loading_model(self):
+        from types import SimpleNamespace
+        path, digest = self.dataset()
+        config = {"presetId":"laptop-qlora-smoke", "datasetPath":str(path), "datasetHash":digest, "device":"cuda"}
+        class Tokenizer:
+            def apply_chat_template(self, messages, **options):
+                self_test.assertEqual(messages[0]["role"], "system")
+                return list(range(256)) if options["add_generation_prompt"] else list(range(257))
+        self_test = self
+        transformers = SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **k: Tokenizer()))
+        torch = SimpleNamespace(manual_seed=lambda seed: None)
+        profile = {**laptop.PROFILES["laptop-qlora-smoke"], "systemPrompt":"Long instruction"}
+        with self.assertRaisesRegex(RuntimeError, "SAMPLE_EXCEEDS_PRESET_CONTEXT"):
+            laptop.core().train(config, (torch, None, transformers, self.root), profile)
+
+    def test_system_profile_bpe_fallback_keeps_inference_prefix(self):
+        class Tokenizer:
+            def apply_chat_template(self, messages, **options):
+                self_test.assertEqual(messages[0]["content"], "Guide")
+                if options["tokenize"]:
+                    return [1,271] if options["add_generation_prompt"] else [1,198,198,42,99]
+                return "system:Guide\n\n" if options["add_generation_prompt"] else "system:Guide\n\nanswer<end>"
+            def encode(self, value, **options):
+                self_test.assertEqual(value, "answer<end>")
+                return [42,99]
+        self_test = self
+        prefix, target = laptop.core().chat_sample(Tokenizer(), "Q", "answer", "Guide")
+        self.assertEqual(prefix, [1,271]); self.assertEqual(target, [42,99])
+
     def test_literal_snapshot_hash_and_strict_members(self):
         path, digest = self.dataset()
         self.assertEqual(laptop.read_dataset(path, digest, 8)[0]["id"], "reviewed-1")
