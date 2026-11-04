@@ -1,6 +1,6 @@
 # Aether Teacher desktop design
 
-Status: proposed design for user review; no desktop implementation is authorized by this document alone.
+Status: desktop direction and simple/Advanced split accepted for preparation. The user explicitly deferred implementation until they return in the morning. Technical proposals below are recorded for review with the implementation plan; do not begin building overnight.
 
 ## Intent and agreed direction
 
@@ -61,7 +61,7 @@ Simple and Advanced views must use the same validated actions, not two implement
 
 Setup explicitly imports the already installed source model into the private store by copying and verifying the required manifest and content-addressed model/license/template/parameter blobs. Preserve the source hashes; no model download is needed. Do not share a writable Ollama store between independent servers, and do not depend on another server's pruning or lifecycle. An unchanged source blob may be reused within the app's own verified store.
 
-The existing CLI gains a local-only validated runtime-port option restricted to 11434/11435, defaulting to 11434 for compatibility. The GUI selects 11435 and supplies the private store. No arbitrary host, URL or remote proxy option is added. The app talks directly to the private loopback service; it does not expose a browser HTTP frontend.
+The existing CLI gains a local-only validated runtime-port option restricted to 11434/11435, defaulting to 11434 for compatibility. It also gains an optional private state-directory override, preserving the existing repository-local default when absent; GUI-owned staging and locks must not leak back into the engine checkout. The GUI selects 11435 and supplies its private store/state root. No arbitrary host, URL or remote proxy option is added. The app talks directly to the private loopback service; it does not expose a browser HTTP frontend.
 
 The app owns its service and all launched CLI descendants through Windows kill-on-close Job Objects. Keep the UI out of the training process tree. Serialize model preparation, training, export and runtime conversion under one workspace lease and the engine lock. Before training, finish/cancel chat and stop the app-owned runtime to release its memory. Restart it for import/testing afterward. The user can still edit profile/lesson drafts while a job runs; those edits cannot change the accepted snapshot.
 
