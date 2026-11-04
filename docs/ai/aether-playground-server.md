@@ -244,8 +244,11 @@ backup copies; secure deletion is not a guarantee against retained host snapshot
    running cancellation, then inspect the private candidate metadata/weights. Do not
    activate it. Record deployed API/bot/gateway/website revisions separately.
 
-No host deployment, Kinetic secret change, production model approval, live GPU run
-or complete website→gateway→bot→API verification was performed in the coding session.
+No host deployment, Kinetic secret change, production model activation or complete
+website→gateway→bot→API verification was performed. Subsequent local GPU training
+and the laptop-to-Ollama export workflow are documented in
+[the laptop training guide](aether-laptop-training.md); they do not weaken hosted
+Linux/cgroup admission or establish that Kinetic has sufficient inference capacity.
 
 ## Reproducible verification
 

@@ -55,7 +55,7 @@ def host_limits(c):
     resource.setrlimit(resource.RLIMIT_CPU, (c["timeoutSeconds"] * c["cpuThreads"],) * 2)
 
 
-def runtime(c):
+def runtime(c, laptop=False):
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1",
                       TOKENIZERS_PARALLELISM="false", OMP_NUM_THREADS=str(c["cpuThreads"]),
                       MKL_NUM_THREADS=str(c["cpuThreads"]))
@@ -82,7 +82,10 @@ def runtime(c):
     # This worker uses unquantized frozen base weights. Reserve room for activations,
     # adapter gradients and optimizer state before advertising a model as trainable.
     weights_bytes = sum(p.stat().st_size for p in base.glob("*.safetensors"))
-    required_bytes = weights_bytes * 2 + 512 * 1048576
+    quantized = c.get("quantization") == "nf4"
+    if quantized and not laptop:
+        raise RuntimeError("QUANTIZATION_REQUIRES_LOCAL_PROFILE")
+    required_bytes = int(weights_bytes * 0.5) + 2048 * 1048576 if quantized else weights_bytes * 2 + 512 * 1048576
     budget_bytes = c["minFreeGpuMiB"] * 1048576 if c["device"] == "cuda" else c["memoryMiB"] * 1048576
     if required_bytes > budget_bytes:
         raise RuntimeError("MODEL_EXCEEDS_TRAINING_BUDGET")
@@ -92,10 +95,28 @@ def runtime(c):
     return torch, peft, transformers, base
 
 
-def train(c, checked_runtime=None):
+def chat_sample(tokenizer, prompt, target):
+    user = [{"role": "user", "content": prompt}]
+    prefix = tokenizer.apply_chat_template(user, tokenize=True, add_generation_prompt=True, return_dict=False)
+    full = tokenizer.apply_chat_template(user + [{"role": "assistant", "content": target}],
+                                         tokenize=True, add_generation_prompt=False, return_dict=False)
+    if full[:len(prefix)] != prefix:
+        # BPE can encode the same trailing header whitespace differently when
+        # completion text follows it. Preserve the exact inference prefix and
+        # encode only the rendered completion suffix, including its end marker.
+        prefix_text = tokenizer.apply_chat_template(user, tokenize=False, add_generation_prompt=True)
+        full_text = tokenizer.apply_chat_template(user + [{"role":"assistant", "content":target}],
+                                                   tokenize=False, add_generation_prompt=False)
+        if not full_text.startswith(prefix_text):
+            raise RuntimeError("CHAT_TEMPLATE_PREFIX_MISMATCH")
+        return prefix, tokenizer.encode(full_text[len(prefix_text):], add_special_tokens=False)
+    return prefix, full[len(prefix):]
+
+
+def train(c, checked_runtime=None, profile=None):
     torch, peft, transformers, base = checked_runtime or runtime(c)
     torch.manual_seed(424242)
-    steps, sequence, maximum = PRESETS[c["presetId"]]
+    steps, sequence, maximum = PRESETS[c["presetId"]] if profile is None else profile["bounds"]
     dataset = Path(c["datasetPath"]).read_bytes()
     if len(dataset) > 262144 or hashlib.sha256(dataset).hexdigest() != c["datasetHash"]:
         raise RuntimeError("SNAPSHOT_HASH_MISMATCH")
@@ -106,24 +127,37 @@ def train(c, checked_runtime=None):
     # Supervised completion only: prompt tokens never contribute to the target loss.
     samples = []
     for example in examples:
-        prompt = tokenizer.encode(example["prompt"], add_special_tokens=False)
-        target = tokenizer.encode(example["target"], add_special_tokens=False)
-        if tokenizer.eos_token_id is not None:
-            target.append(tokenizer.eos_token_id)
+        if profile is not None and profile.get("chatTemplate"):
+            prompt, target = chat_sample(tokenizer, example["prompt"], example["target"])
+        else:
+            prompt = tokenizer.encode(example["prompt"], add_special_tokens=False)
+            target = tokenizer.encode(example["target"], add_special_tokens=False)
+            if tokenizer.eos_token_id is not None:
+                target.append(tokenizer.eos_token_id)
         if not prompt or not target or len(prompt) + len(target) > sequence:
             raise RuntimeError("SAMPLE_EXCEEDS_PRESET_CONTEXT")
         ids = torch.tensor([prompt + target], dtype=torch.long, device=c["device"])
         labels = ids.clone()
         labels[:, :len(prompt)] = -100
         samples.append((ids, labels))
+    quantized = c.get("quantization") == "nf4" and profile is not None
+    loading = {}
+    if quantized:
+        loading = {"quantization_config": transformers.BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
+            bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16),
+            "device_map": {"": 0}}
     model = transformers.AutoModelForCausalLM.from_pretrained(
         base, local_files_only=True, trust_remote_code=False, use_safetensors=True,
-        torch_dtype=torch.float32 if c["device"] == "cpu" else torch.float16)
+        torch_dtype=torch.float32 if c["device"] == "cpu" else torch.float16, **loading)
     model.config.use_cache = False
+    if quantized:
+        model = peft.prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
     model = peft.get_peft_model(model, peft.LoraConfig(
         task_type="CAUSAL_LM", r=4, lora_alpha=8, lora_dropout=0.0,
         target_modules="all-linear", bias="none"))
-    model.to(c["device"])
+    if not quantized:
+        model.to(c["device"])
     model.train()
     params = [p for p in model.parameters() if p.requires_grad]
     before = [p.detach().float().cpu().clone() for p in params]
@@ -157,6 +191,10 @@ def train(c, checked_runtime=None):
                 "approvedBaseSha256": c["approvedBaseSha256"],
                 "device": c["device"], "torchVersion": torch.__version__,
                 "transformersVersion": transformers.__version__, "peftVersion": peft.__version__}
+    if profile is not None:
+        metadata["quantization"] = c.get("quantization", "none")
+        metadata["chatTemplate"] = bool(profile.get("chatTemplate"))
+        metadata["peakGpuAllocatedMiB"] = torch.cuda.max_memory_allocated() / 1048576 if c["device"] == "cuda" else None
     (output / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     for path in output.iterdir():
         if path.is_file():
