@@ -6,7 +6,7 @@ class VersionsView(QWidget):
     def __init__(self,workflow):
         super().__init__();self.rows=[]
         layout=QVBoxLayout(self)
-        self.selection=QLabel("App selection: original Llama 3.1 8B")
+        self.selection=QLabel("App selection: original Qwen 3.5 4B")
         layout.addWidget(self.selection)
         self.list=QListWidget();layout.addWidget(self.list,1)
         buttons=QHBoxLayout()

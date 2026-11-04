@@ -16,7 +16,7 @@ def restore_selection(store,coordinator):
     profile=store.active_profile()
     require(profile is not None,"PROFILE_MISSING")
     if selected["version"]=="original":
-        return profile,"llama3.1:8b"
+        return profile,"qwen3.5:4b"
     return profile,coordinator.model_for_job(store.get_job(selected["version"]))
 
 
@@ -44,7 +44,11 @@ class Workflow(QObject):
             if runtime and runtime.process and runtime.process.poll() is None:
                 try:observed["runtimeRssMiB"]=psutil.Process(runtime.process.pid).memory_info().rss//1048576
                 except (psutil.NoSuchProcess,psutil.AccessDenied):pass
-            return store.jobs(),store.selection(),observed
+            jobs=store.jobs()
+            if self.c.readiness:
+                jobs=tuple(job for job in jobs if job.binding.base_sha256==self.c.readiness["base"]["baseSha256"]
+                           and job.binding.engine_sha256==self.c.readiness["engineSha256"])
+            return jobs,store.selection(),observed
         self.c.submit(inspect,self._show,storage=True)
 
     def _show(self, data):
@@ -179,7 +183,7 @@ class Workflow(QObject):
                 previous=json.loads(store.setting("previousSelection","null"))
                 require(previous is not None,"NO_PREVIOUS_SELECTION")
                 version=previous["version"]
-                model="llama3.1:8b"
+                model="qwen3.5:4b"
                 if version!="original":
                     job=store.get_job(version);require(job is not None and job.state=="completed","VERSION_NOT_VERIFIED")
                     coordinator=self.coordinator(store)
@@ -211,7 +215,7 @@ class Workflow(QObject):
                 c.runtime.cancelled.clear();c.runtime.ensure_started()
                 results=[]
                 for question,context in zip(questions,contexts):
-                    for model in ("llama3.1:8b",deployment["candidateName"]):
+                    for model in ("qwen3.5:4b",deployment["candidateName"]):
                         require(not c.runner.cancelled.is_set(),"CANCELLED")
                         payload=chat_payload(model,profile,context);payload["keep_alive"]=0
                         answer=reply_text(request_json("/api/chat",payload,cancelled=c.runner.cancelled))

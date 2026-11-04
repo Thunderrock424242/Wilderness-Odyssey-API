@@ -1,8 +1,10 @@
 {
-  "tools/aether/laptop.py": "239ef15d9a9d704ae3814988f21cd53c66b67620e1bb4e3cd9378fdfd7f2987f",
+  "tools/aether/laptop.py": "e7ca0fb797e37fbbbd0064f7a13296e692a9ee7a715ad7871bc94373f52a93b2",
   "tools/aether/local_process.py": "8761659d26c9e6160fb345fff2f2460a61237d57c04df9931ca9dd8909e5d39c",
   "tools/aether/gguf_import.py": "ddce69cbc7a0db29f4981f59a90c9d473f82aceb89228b3acae2cb9eba018cce",
-  "tools/aether/merge_export.py": "ff5c495a4efdb8e92d1c63ab21c56b030698299ca0bc8bad02d11df7caae8d9f",
+  "tools/aether/merge_export.py": "d1290e3e17e376377f55f1dafb0e361a5aa782731af0e75e315aeaf936d6c4f5",
   "tools/aether/laptop-requirements.txt": "e09400759a72f28f4f22f984dcaba330ccb603c4ec8509f1eee02daefe3ae543",
-  "aether-server/src/main/resources/training/trainer.py": "a04e7a676717312b92c987a83af46a1a0884e9d770415fc1b79d0bbb1ebe549a"
+  "tools/aether/qwen35.py": "6795182345ffe840a5bb0f770ee2030a4b0642dd840573639cdd6ad3e5c903aa",
+  "tools/aether/qwen35-source.json": "181b952b9c6662e4826a4f8e965411e96aee82ff0759473d9c39d1dca8da58c7",
+  "aether-server/src/main/resources/training/trainer.py": "0511dcf742c1fe11393b7506ebc2ff8c7ce441931062c24b0d94412d0cd1b495"
 }

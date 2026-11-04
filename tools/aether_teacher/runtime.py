@@ -29,7 +29,7 @@ def reserve_port():
 def runtime_environment(root):
     root = local_path(root)
     environment = private_environment()
-    environment.update(OLLAMA_HOST="127.0.0.1:11435", OLLAMA_MODELS=str(root / "models"),
+    environment.update(OLLAMA_HOST="127.0.0.1:11435", OLLAMA_MODELS=str(root / "qwen35-models"),
                        USERPROFILE=str(root / "home"), HOME=str(root / "home"),
                        OLLAMA_NUM_PARALLEL="1", OLLAMA_MAX_LOADED_MODELS="1", OLLAMA_NO_CLOUD="1")
     return environment
@@ -40,7 +40,7 @@ class ManagedRuntime:
         require(settings.port == 11435)
         require(type(memory_mib) is int and 8192 <= memory_mib <= 32768, "RUNTIME_MEMORY_LIMIT")
         self.settings, self.origin, self.memory_mib = settings, origin, memory_mib
-        self.store = local_path(settings.workspace_root / "runtime/models")
+        self.store = local_path(settings.workspace_root / "runtime/qwen35-models")
         self.process = self.owner = None
         self.cancelled = threading.Event()
 
@@ -91,7 +91,7 @@ class ManagedRuntime:
     def import_source(self, source_tag):
         import re
         require(self.process is None, "STOP_RUNTIME_BEFORE_COPY")
-        require(source_tag == self.origin["ollamaTag"] == "llama3.1:8b", "SOURCE_TAG_MISMATCH")
+        require(source_tag == self.origin["ollamaTag"] == "qwen3.5:4b", "SOURCE_TAG_MISMATCH")
         name, tag = source_tag.split(":")
         relative = Path("manifests/registry.ollama.ai/library") / name / tag
         source_manifest = local_path(self.settings.source_store / relative)

@@ -83,6 +83,7 @@ class RuntimeSettings:
     approval_path: Path
     workspace_root: Path
     port: int = 11435
+    converter_manifest: Path | None = None
 
 
 @dataclass(frozen=True)

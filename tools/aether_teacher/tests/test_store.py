@@ -24,6 +24,23 @@ class StoreTest(unittest.TestCase):
                                data.dataset_sha256, data.profile_sha256)
         return binding, data, self.store.accept_job(binding, data)
 
+    def test_base_migration_preserves_teaching_data_and_invalidates_old_selection(self):
+        _,data,job=self.accepted()
+        profile=self.store.active_profile()
+        session=self.store.create_session();self.store.append_message(session,"user","Keep this question")
+        self.store._setting("previousSelection",'{"version":"old-llama"}')
+        self.store.connection.commit()
+        self.store.bind_base("c"*64)
+        self.assertEqual(self.store.active_profile(),profile)
+        self.assertEqual(len(self.store.lessons()),1)
+        self.assertEqual(self.store.job_snapshot(job.id),data)
+        self.assertEqual(self.store.get_job(job.id).state,"needs-verification")
+        self.assertEqual(self.store.selection()["version"],"original")
+        self.assertEqual(self.store.setting("previousSelection"),"null")
+        revision=self.store.selection()["revision"]
+        self.store.bind_base("c"*64)
+        self.assertEqual(self.store.selection()["revision"],revision)
+
     def test_profile_revision_and_review_are_explicit_and_stale_edits_rejected(self):
         first = self.store.save_profile("Help", "Brief", "Careful")
         second = self.store.save_profile("Guide", "Brief", "Careful", expected_revision=1)

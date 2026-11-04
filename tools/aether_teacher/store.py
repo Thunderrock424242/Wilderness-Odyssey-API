@@ -287,6 +287,22 @@ class Store:
     def selection(self):
         return json.loads(self.setting("selection", '{"revision":0,"version":"original"}'))
 
+    def bind_base(self, base_sha256):
+        """Retain teaching records while retiring selections from another base."""
+        require(isinstance(base_sha256,str) and len(base_sha256)==64,"INVALID_BASE_HASH")
+        with self.transaction():
+            if self.setting("selectedBaseSha256")==base_sha256:return
+            current=self.selection()
+            self._setting("baseMigrationArchive",json.dumps({"selection":current,
+                "previousSelection":json.loads(self.setting("previousSelection","null")),
+                "priorBaseSha256":self.setting("selectedBaseSha256")}))
+            self._setting("selection",json.dumps({"revision":current["revision"]+1,"version":"original"}))
+            self._setting("previousSelection","null")
+            self._setting("selectedBaseSha256",base_sha256)
+            for job in self.jobs():
+                if job.binding.base_sha256!=base_sha256 and job.state in ("queued","running","cancel-requested"):
+                    self.connection.execute("UPDATE jobs SET state='needs-verification',error='ACCEPTED_BINDING_CHANGED' WHERE id=?",(job.id,))
+
     def select_version(self, version, profile_id, profile_revision, expected_selection_revision):
         with self.transaction():
             current = self.selection()

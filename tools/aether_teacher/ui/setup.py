@@ -12,24 +12,25 @@ class SetupDialog(QDialog):
         self.setWindowTitle("Local model setup")
         self.resize(760, 420)
         layout = QVBoxLayout(self)
-        note = QLabel("Connect the installed Llama 3.1 8B and reviewed training environment.\n"
-                      "The source model is copied into private app storage (about 5 GiB). No models are downloaded.")
+        note = QLabel("Connect the prepared Qwen 3.5 4B and reviewed training environment.\n"
+                      "The source model is copied into private app storage (about 3 GiB). No models are downloaded.")
         note.setWordWrap(True)
         layout.addWidget(note)
         current = controller.settings
         root = Path(__file__).resolve().parents[3]
         defaults = {
             "engine_root":root,
-            "python_executable":root / ".codex-build/aether-laptop/.venv/Scripts/python.exe",
+            "python_executable":root / ".codex-build/aether-teacher/.venv-training-cpython/Scripts/python.exe",
             "ollama_executable":Path(shutil.which("ollama") or Path(os.environ.get("LOCALAPPDATA", "")) / "Programs/Ollama/ollama.exe"),
-            "source_store":Path.home() / ".ollama/models",
-            "approval_path":root / ".codex-build/aether-laptop/llama31-ollama-base.json",
+            "source_store":root / ".codex-build/aether-qwen/source-workspace/runtime/qwen35-models",
+            "approval_path":root / ".codex-build/aether-qwen/base-approval.json",
+            "converter_manifest":root / ".codex-build/aether-qwen/toolchain/toolchain.json",
         }
         form = QFormLayout()
         self.fields = {}
         for key, label in (("engine_root", "Reviewed engine folder"), ("python_executable", "Training Python"),
-                           ("ollama_executable", "Installed Ollama"), ("source_store", "Original Ollama model store"),
-                           ("approval_path", "Reviewed base approval")):
+                           ("ollama_executable", "Installed Ollama"), ("source_store", "Prepared Qwen model store"),
+                           ("approval_path", "Reviewed base approval"),("converter_manifest","Pinned Qwen converter manifest")):
             field = QLineEdit(str(getattr(current, key) if current else defaults[key]))
             self.fields[key] = field
             form.addRow(label, field)

@@ -6,7 +6,7 @@ The local installation is `%LOCALAPPDATA%/Programs/AetherTeacher`, with an **Aet
 
 ## Everyday use
 
-1. Open the **Aether Teacher** desktop shortcut. The working laptop delivery uses the installed Python GUI environment and native source launcher; it opens a Windows application window without a browser or console. Use **Local setup** to register the reviewed engine folder, training interpreter, installed Ollama, original source model store and base approval. Setup verifies source/engine hashes and copies the installed source into a private runtime store; it downloads no model.
+1. Open the **Aether Teacher** desktop shortcut. The working laptop delivery uses the installed Python GUI environment and native source launcher; it opens a Windows application window without a browser or console. Its only base is Qwen 3.5 4B. Use **Local setup** to register the reviewed engine folder, training interpreter, installed Ollama, prepared Qwen source store, base approval and pinned converter manifest. Setup verifies source/engine hashes and copies the prepared source into a private runtime store; it downloads no model.
 2. In **Job & personality**, describe the job, tone and boundaries, then **Save profile**. The next message uses those instructions immediately. Saving is not weight training.
 3. In **Teach Aether**, try questions. A model can draft a profile change, but only your Save action applies it. Select an answer and **Correct selected answer** to prepare a lesson.
 4. In **Lessons**, save/edit drafts, explicitly review selected lessons, select the reviewed rows, and choose **Train new version**. The confirmation shows the exact profile, examples, preset, budgets and hashes. Editing a lesson revokes its review.
@@ -27,7 +27,7 @@ Private runtime environment (set by the application, not global Windows settings
 | Setting | Value |
 | --- | --- |
 | `OLLAMA_HOST` | `127.0.0.1:11435` |
-| `OLLAMA_MODELS` | `<workspace>/runtime/models` |
+| `OLLAMA_MODELS` | `<workspace>/runtime/qwen35-models` |
 | `USERPROFILE`, `HOME` for the managed service | `<workspace>/runtime/home` |
 | `OLLAMA_NO_CLOUD` | `1` |
 | `OLLAMA_NUM_PARALLEL`, `OLLAMA_MAX_LOADED_MODELS` | `1` |
@@ -37,11 +37,11 @@ No Hugging Face, OpenAI, gateway monitoring or administration credential is requ
 
 ## Verified laptop prerequisites
 
-The acceptance machine is Windows 11 x64 with an RTX 4090 Laptop GPU (16 GiB), approximately 32 GiB RAM, an installed compatible NVIDIA/CUDA driver, and local Ollama. The original `llama3.1:8b` GGUF, license/template/params, reviewed dequantized safetensors base and approval must remain available. The existing conversion does not recover the original pre-quantization precision.
+The acceptance machine is Windows 11 x64 with an RTX 4090 Laptop GPU (16 GiB), approximately 32 GiB RAM, an installed compatible NVIDIA/CUDA driver, and local Ollama 0.17.7. Keep the pinned official Qwen text safetensors base and approval, prepared Qwen source Ollama store, converter archives/extracted tools/manifest, and registered Python environments available. No original Llama model is required by the app. The reviewed model is text-only; image/video teaching is not provided.
 
 Training defaults: RAM/commit ceiling 24576 MiB, GPU allocation budget 11000 MiB, two CPU threads; smoke 8 steps/256 tokens/up to 8 examples/600 seconds. Small is 100 steps/1024 tokens/up to 100 examples, deadline at most 3600 seconds. Rank 4, alpha 8, learning rate 0.0002 and batch 1 are preset-owned. A profile that exceeds the smoke context must use an admitted larger preset or be shortened explicitly.
 
-Export ceiling is 8192 MiB/1800 seconds. Runtime import has an independent 32768 MiB committed-memory ceiling and an 1800-second deadline. Full-run admission requires at least 60 GiB and the larger calculated peak estimate on each involved volume. These are ceilings/admission rules, not a promise that another machine fits. Keep model operations serialized.
+Qwen export ceiling is 16384 MiB/1800 seconds; merge and converter processes run sequentially. The native converter's diagnostics are drained with a finite 16 MiB total/32 KiB tail, without forwarding raw private diagnostics to the UI. Runtime import has an independent 32768 MiB committed-memory ceiling and an 1800-second deadline. Full-run admission requires at least 60 GiB and the larger calculated peak estimate on each involved volume. These are ceilings/admission rules, not a promise that another machine fits. Keep model operations serialized.
 
 The laptop launcher uses the separate GUI environment containing Qt/Python/psutil, without importing CUDA/Torch into the GUI. It needs the registered reviewed engine and training environment for training. There is no automatic clean-machine dependency installer.
 
@@ -66,8 +66,8 @@ Native access violations were observed in the bundled CPython 3.12.14 training a
 
 Export creates a new outer directory with `model/` (the unchanged hashed portable bundle), `profile.json`, `teacher-export.json` and operator instructions. It excludes chats, lesson text, accepted input files, credentials and machine paths. Every inventory/hash is verified before atomic publication. Profile/model mismatches and corrupt/extra files fail closed.
 
-Transfer only a reviewed export to a separately provisioned inference host. Verify both the outer inventory and inner `model/package.json`; import the inner Modelfile locally on that host. `profile.json` is an operator handoff: the existing gateway does not consume it automatically, so review/map it to gateway-owned instructions separately. This release does not establish Kinetic capacity, change remote environment settings, or deploy/activate a candidate. Hosting the 8B model alongside Minecraft still needs its own measured memory/runtime admission.
+Transfer only a reviewed export to a separately provisioned inference host. Verify both the outer inventory and inner `model/package.json`; import the inner Modelfile locally on that host. `profile.json` is an operator handoff: the existing gateway does not consume it automatically, so review/map it to gateway-owned instructions separately. This release does not establish Kinetic capacity, change remote environment settings, or deploy/activate a candidate. Hosting Qwen alongside Minecraft still needs its own measured CPU/RAM/runtime admission; the 2.71 GB file size is not the complete runtime budget.
 
 See the [dated acceptance evidence](aether-teacher-acceptance-2026-11-04.md), [design](../superpowers/specs/2026-11-04-aether-teacher-desktop-design.md) and [implementation plan](../superpowers/plans/2026-11-04-aether-teacher-desktop.md).
 
-The owner's conditional Qwen 3.5 4B preference is assessed in [model compatibility](aether-teacher-model-compatibility.md). Its inference artifact exists, but the reviewed converters do not yet support it; the verified Llama fallback is retained.
+The Qwen migration supersedes the model choice in the earlier Llama acceptance record. See [model compatibility](aether-teacher-model-compatibility.md) and the [Qwen acceptance record](aether-teacher-qwen-acceptance-2026-11-04.md). Changing the approved base preserves teaching/history records, resets the app selection to Qwen, clears rollback to a previous-base selection, and quarantines active jobs with a different base identity. Old-base/engine versions are omitted from current selectable versions; accepted inputs remain immutable.

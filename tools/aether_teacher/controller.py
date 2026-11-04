@@ -26,7 +26,7 @@ class Controller(QObject):
         self.chat.failed.connect(self._chat_failed)
         self.window = self.profile = self.session = None
         self.settings = self.readiness = self.runtime = self.runner = None
-        self.model = "llama3.1:8b"
+        self.model = "qwen3.5:4b"
         self.turns = []
         self.pending_question = None
         self.proposal_revision = None
@@ -337,13 +337,14 @@ class Controller(QObject):
             runtime = ManagedRuntime(settings, readiness["origin"])
             runtime.cancelled = self.stopping
             try:
-                runtime.import_source("llama3.1:8b")
+                runtime.import_source("qwen3.5:4b")
                 runtime.ensure_started()
                 save_settings(settings)
                 runner = EngineRunner(settings, self.manifest)
                 runner.cancelled = self.stopping
                 from tools.aether_teacher.jobs import JobCoordinator
                 with Store(self.database) as store:
+                    store.bind_base(readiness["base"]["baseSha256"])
                     coordinator=JobCoordinator(store, settings, readiness, runner, runtime)
                     coordinator.recover()
                     from tools.aether_teacher.workflow import restore_selection
@@ -374,7 +375,7 @@ class Controller(QObject):
             "Private runtime: 127.0.0.1:11435\n"
             "Training settings are ceilings, not observed usage.")
         self.workflow.refresh()
-        self.status("Local Llama 3.1 8B ready · Saved profile applies to your next message")
+        self.status("Local Qwen 3.5 4B ready · Saved profile applies to your next message")
 
     def train_review(self):
         self.workflow.review()

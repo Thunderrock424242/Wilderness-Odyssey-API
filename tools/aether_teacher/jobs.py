@@ -190,8 +190,10 @@ class JobCoordinator:
                         limits.ram_mib, limits.timeout_seconds + 180)
                     evidence = self.verify_phase(job)
                 elif phase == "export":
+                    require(self.settings.converter_manifest is not None,"QWEN_CONVERTER_REQUIRED")
                     self.runner.run("export", ["--base-approval", self.settings.approval_path, "--candidate", paths["candidate"],
-                        "--output", paths["merged"], "--name", name, "--memory-mib", "8192", "--timeout-seconds", "1800"], 8192, 1980)
+                        "--output", paths["merged"], "--name", name, "--memory-mib", "16384", "--timeout-seconds", "1800",
+                        "--toolchain-manifest",self.settings.converter_manifest], 16384, 1980)
                     evidence = self.verify_phase(job)
                 elif phase == "import":
                     self.runtime.ensure_started()
@@ -204,7 +206,7 @@ class JobCoordinator:
                     # Use the exact accepted profile; never today's edited draft.
                     system = json.loads(paths["profile"].read_bytes())["systemPrompt"]
                     response = request_json("/api/chat", {"model":name, "messages":[{"role":"system","content":system},
-                        {"role":"user","content":"Please introduce your role in one short sentence."}], "stream":False,
+                        {"role":"user","content":"Please introduce your role in one short sentence."}], "stream":False,"think":False,
                         "keep_alive":0, "options":{"num_predict":128,"num_ctx":8192}}, cancelled=self.runner.cancelled)
                     answer = reply_text(response)
                     raw = encode({"verified":True,"profileSha256":job.binding.profile_sha256,

@@ -137,6 +137,12 @@ def core():
     return module
 
 
+def qwen_core():
+    spec=importlib.util.spec_from_file_location("aether_qwen35",Path(__file__).with_name("qwen35.py"))
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+
 def owned_job(memory_mib):
     spec = importlib.util.spec_from_file_location("aether_local_process", Path(__file__).with_name("local_process.py"))
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
@@ -331,6 +337,10 @@ def import_runtime(args):
     work = STATE / ("runtime-"+uuid.uuid4().hex)
     with TrainingLock(), owned_job(1024) as job, temporary_work(work):
         model_source = merged / "model"; previous_digest = None
+        prequantized=deployment.get("baseModelId")=="qwen3.5:4b"
+        if prequantized:
+            model_source=safe_path(merged/"model.gguf")
+            require(sha(model_source)==deployment.get("ggufSha256"),"QWEN_GGUF_HASH_MISMATCH")
         if args.resume_import_receipt:
             model_source, previous_digest = runtime_blob(store,name)
             current = runtime_show(name,model_source)
@@ -345,7 +355,7 @@ def import_runtime(args):
         process = None; started = time.monotonic()
         try:
             command = [str(executable),"create",name,"-f","Modelfile"]
-            if previous_digest is None: command += ["--quantize","q4_K_M"]
+            if previous_digest is None and not prequantized: command += ["--quantize","q4_K_M"]
             process = subprocess.Popen(command,cwd=work,
                                        env=ollama_environment(os.environ,Path.home()),
                                        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -356,6 +366,7 @@ def import_runtime(args):
             require(process.returncode == 0,"OLLAMA_IMPORT_FAILED")
             verify_manifest(merged); require(sha(merged / "package.json") == merged_hash,"MERGED_PACKAGE_CHANGED")
             blob, digest = runtime_blob(store,name)
+            require(not prequantized or digest==deployment["ggufSha256"],"QWEN_RUNTIME_WEIGHTS_CHANGED")
             require(previous_digest is None or previous_digest == digest,"RUNTIME_WEIGHTS_CHANGED")
             actual_modelfile = runtime_show(name,blob,source_template_hash)
             # Bind the actual rendered runtime template/parameters, not a mutable tag alone.
@@ -591,7 +602,7 @@ def run_training(args):
                     rss = observed_rss(child); peak = max(peak, rss)
                     require(rss <= args.memory_mib * 1048576, "TRAINING_RAM_LIMIT")
                 except psutil.NoSuchProcess: break
-                size = observed_disk_bytes(staged)
+                size = observed_disk_bytes(work)
                 require(size <= 256 * 1048576, "CANDIDATE_DISK_LIMIT")
                 require(native_log.stat().st_size <= 65536, "LOCAL_NATIVE_DIAGNOSTIC_LIMIT")
                 time.sleep(0.5)
@@ -625,6 +636,8 @@ def run_training(args):
 def training_child(path):
     config = read_json(path); require(config["presetId"] in PROFILES)
     profile = PROFILES[config["presetId"]]
+    if config["baseModelId"]=="qwen3.5:4b":
+        profile={**profile,"enableThinking":False}
     require(config["quantization"] == profile["quantization"] and config["device"] == "cuda")
     read_dataset(config["datasetPath"], config["datasetHash"], profile["bounds"][2])
     reviewed_profile = read_profile(config.get("profileSnapshotPath"), config.get("profileSha256"))
@@ -664,12 +677,19 @@ def export(args):
     approved, base = approval(args.base_approval)
     validate_candidate(args.candidate, approved)
     new_output(args.output, [base, args.candidate, args.base_approval]); candidate_name(args.name)
+    if read_json(base/"config.json").get("model_type")=="qwen3_5_text":
+        manifest=getattr(args,"toolchain_manifest",None)
+        require(manifest is not None,"QWEN_CONVERTER_REQUIRED")
+        origin=read_json(base/"source.json")
+        qwen_core().validate_tools(manifest,origin["toolchainManifestSha256"])
+        return bounded_child("_export_qwen",{"base_approval":str(safe_path(args.base_approval)),"candidate":str(safe_path(args.candidate)),
+            "output":str(safe_path(args.output)),"name":args.name,"toolchain_manifest":str(safe_path(manifest))},args.memory_mib,args.timeout_seconds)
     return bounded_child("_export", {"base_approval":str(safe_path(args.base_approval)),"candidate":str(safe_path(args.candidate)),
                          "output":str(safe_path(args.output)),"name":args.name}, args.memory_mib, args.timeout_seconds)
 
 
 def bounded_child(command, config, memory_mib, timeout_seconds):
-    require(command in ("_export", "_import"))
+    require(command in ("_export", "_import", "_prepare_qwen", "_convert_qwen", "_export_qwen"))
     require(1024 <= memory_mib <= 131072 and 10 <= timeout_seconds <= 3600)
     work = STATE / ("operation-" + uuid.uuid4().hex)
     output = safe_path(config["output"])
@@ -694,7 +714,7 @@ def bounded_child(command, config, memory_mib, timeout_seconds):
                 require(time.monotonic()-started <= timeout_seconds,"LOCAL_OPERATION_DEADLINE_EXCEEDED")
                 rss = observed_rss(child); peak = max(peak,rss)
                 require(rss <= memory_mib*1048576,"LOCAL_OPERATION_RAM_LIMIT")
-                size = observed_disk_bytes(staged)
+                size = observed_disk_bytes(work)
                 require(size <= 64 * 1073741824,"LOCAL_OPERATION_DISK_LIMIT")
                 require(native_log.stat().st_size <= 65536,"LOCAL_NATIVE_DIAGNOSTIC_LIMIT")
                 time.sleep(0.5)
@@ -710,7 +730,7 @@ def bounded_child(command, config, memory_mib, timeout_seconds):
                 require(False, failure if re.fullmatch("[A-Za-z0-9_]+", failure) else "LOCAL_OPERATION_FAILED")
             result = read_json(work / "success.json")
             require(not output.exists(), "OUTPUT_ALREADY_EXISTS"); staged.rename(output)
-            result["directory" if command == "_import" else "package"] = str(output)
+            result["directory" if command in ("_import","_prepare_qwen") else "package"] = str(output)
             result["resources"] = {"durationSeconds":time.monotonic()-started,"peakObservedRssMiB":peak/1048576}
             return result
         finally:
@@ -743,6 +763,7 @@ def main():
     t.add_argument("--gpu-memory-mib", type=int, default=11000); t.add_argument("--memory-mib", type=int, default=16384); t.add_argument("--cpu-threads", type=int, default=2); t.add_argument("--timeout-seconds", type=int, default=900)
     e = sub.add_parser("export"); e.add_argument("--base-approval", required=True); e.add_argument("--candidate", required=True); e.add_argument("--output", required=True); e.add_argument("--name", required=True)
     e.add_argument("--memory-mib",type=int,default=24576);e.add_argument("--timeout-seconds",type=int,default=1800)
+    e.add_argument("--toolchain-manifest")
     v = sub.add_parser("verify-package"); v.add_argument("--directory", required=True)
     b = sub.add_parser("bundle"); b.add_argument("--merged-package",required=True); b.add_argument("--model",required=True)
     b.add_argument("--store"); b.add_argument("--output",required=True); b.add_argument("--import-receipt",required=True)
@@ -753,6 +774,8 @@ def main():
     hidden = sub.add_parser("_train", help=argparse.SUPPRESS); hidden.add_argument("config")
     hidden_export = sub.add_parser("_export",help=argparse.SUPPRESS);hidden_export.add_argument("config")
     hidden_import = sub.add_parser("_import",help=argparse.SUPPRESS);hidden_import.add_argument("config")
+    for command in ("_prepare_qwen", "_convert_qwen", "_export_qwen"):
+        sub.add_parser(command,help=argparse.SUPPRESS).add_argument("config")
     args = parser.parse_args()
     configure_local(args.state_directory, args.runtime_port)
     if args.command == "doctor": result = doctor()
@@ -769,6 +792,14 @@ def main():
         # Isolated Python excludes the script directory from sys.path.
         sys.path.insert(0,str(Path(__file__).resolve().parent))
         result=import_child(read_json(args.config));write_json(Path(args.config).parent / "success.json",result);return
+    elif args.command in ("_prepare_qwen", "_convert_qwen", "_export_qwen"):
+        settings=read_json(args.config); module=qwen_core()
+        if args.command=="_prepare_qwen":
+            result=module.prepare(settings["source"],settings["output"],settings["toolchain_manifest"])
+        elif args.command=="_convert_qwen":
+            result=module.convert_base(settings["source"],settings["toolchain_manifest"],settings["output"])
+        else:result=module.export_candidate(settings,Path(args.config).parent)
+        write_json(Path(args.config).parent/"success.json",result);return
     else: training_child(args.config); return
     print(json.dumps(result, indent=2, allow_nan=False))
 
@@ -779,7 +810,7 @@ if __name__ == "__main__":
     except Exception as failure:
         # Local errors stay categorical: no private prompt, target, service token or library diagnostics.
         category = str(failure) if re.fullmatch("[A-Z0-9_]+", str(failure)) else type(failure).__name__.upper()
-        if len(sys.argv) == 3 and sys.argv[1] in ("_train", "_export", "_import"):
+        if len(sys.argv) == 3 and sys.argv[1] in ("_train", "_export", "_import", "_prepare_qwen", "_convert_qwen", "_export_qwen"):
             try:
                 import traceback
                 frames = [{"file":Path(frame.filename).name,"line":frame.lineno,"function":frame.name}

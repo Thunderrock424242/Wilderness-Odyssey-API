@@ -14,6 +14,11 @@ def require(valid, category):
 
 def ollama_compatible_config(config):
     result = dict(config); rope = result.get("rope_parameters")
+    if result.get("model_type")=="qwen3_5_text":
+        require(isinstance(rope,dict) and "rope_theta" in rope,"ROPE_PARAMETERS_REQUIRED")
+        # The pinned upstream Qwen converter consumes the native text config,
+        # including hybrid-attention and MRoPE fields; no Llama shim applies.
+        return result
     require(isinstance(rope,dict) and "rope_theta" in rope,"ROPE_PARAMETERS_REQUIRED")
     # Ollama 0.17's safetensors converter reads the legacy HF field names. Keep
     # modern Transformers fields too, with exactly matching positional settings.
@@ -40,7 +45,7 @@ def merge(base, candidate, output):
         require(not adapter_config.get(key), "UNSUPPORTED_LORA_EXPORT")
     adapter = load_file(candidate / "adapter_model.safetensors")
     config = AutoConfig.from_pretrained(base, local_files_only=True, trust_remote_code=False)
-    require(config.model_type == "llama", "ONLY_LLAMA_EXPORT_SUPPORTED")
+    require(config.model_type in ("llama","qwen3_5_text"), "UNSUPPORTED_EXPORT_ARCHITECTURE")
     with torch.device("meta"):
         model = AutoModelForCausalLM.from_config(config, trust_remote_code=False)
     expected = {name:tuple(t.shape) for name,t in model.state_dict().items()}

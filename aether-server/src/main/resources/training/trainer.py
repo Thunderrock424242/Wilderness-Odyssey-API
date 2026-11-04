@@ -95,19 +95,20 @@ def runtime(c, laptop=False):
     return torch, peft, transformers, base
 
 
-def chat_sample(tokenizer, prompt, target, system_prompt=None):
+def chat_sample(tokenizer, prompt, target, system_prompt=None, enable_thinking=None):
     user = ([{"role": "system", "content": system_prompt}] if system_prompt is not None else [])
     user += [{"role": "user", "content": prompt}]
-    prefix = tokenizer.apply_chat_template(user, tokenize=True, add_generation_prompt=True, return_dict=False)
+    template_options={} if enable_thinking is None else {"enable_thinking":enable_thinking}
+    prefix = tokenizer.apply_chat_template(user, tokenize=True, add_generation_prompt=True, return_dict=False, **template_options)
     full = tokenizer.apply_chat_template(user + [{"role": "assistant", "content": target}],
-                                         tokenize=True, add_generation_prompt=False, return_dict=False)
+                                         tokenize=True, add_generation_prompt=False, return_dict=False, **template_options)
     if full[:len(prefix)] != prefix:
         # BPE can encode the same trailing header whitespace differently when
         # completion text follows it. Preserve the exact inference prefix and
         # encode only the rendered completion suffix, including its end marker.
-        prefix_text = tokenizer.apply_chat_template(user, tokenize=False, add_generation_prompt=True)
+        prefix_text = tokenizer.apply_chat_template(user, tokenize=False, add_generation_prompt=True, **template_options)
         full_text = tokenizer.apply_chat_template(user + [{"role":"assistant", "content":target}],
-                                                   tokenize=False, add_generation_prompt=False)
+                                                   tokenize=False, add_generation_prompt=False, **template_options)
         if not full_text.startswith(prefix_text):
             raise RuntimeError("CHAT_TEMPLATE_PREFIX_MISMATCH")
         return prefix, tokenizer.encode(full_text[len(prefix_text):], add_special_tokens=False)
@@ -129,7 +130,7 @@ def train(c, checked_runtime=None, profile=None):
     samples = []
     for example in examples:
         if profile is not None and profile.get("chatTemplate"):
-            prompt, target = chat_sample(tokenizer, example["prompt"], example["target"], profile.get("systemPrompt"))
+            prompt, target = chat_sample(tokenizer, example["prompt"], example["target"], profile.get("systemPrompt"), profile.get("enableThinking"))
         else:
             prompt = tokenizer.encode(example["prompt"], add_special_tokens=False)
             target = tokenizer.encode(example["target"], add_special_tokens=False)
@@ -193,6 +194,8 @@ def train(c, checked_runtime=None, profile=None):
                 "device": c["device"], "torchVersion": torch.__version__,
                 "transformersVersion": transformers.__version__, "peftVersion": peft.__version__}
     if profile is not None:
+        if "enableThinking" in profile:
+            metadata["enableThinking"]=profile["enableThinking"]
         if "profileSha256" in c:
             metadata["profileSha256"] = c["profileSha256"]
         metadata["quantization"] = c.get("quantization", "none")

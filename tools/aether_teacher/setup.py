@@ -10,6 +10,7 @@ from tools.aether_teacher.domain import RuntimeSettings, digest, encode, local_p
 ENGINE_FILES = (
     "tools/aether/laptop.py", "tools/aether/local_process.py", "tools/aether/gguf_import.py",
     "tools/aether/merge_export.py", "tools/aether/laptop-requirements.txt",
+    "tools/aether/qwen35.py", "tools/aether/qwen35-source.json",
     "aether-server/src/main/resources/training/trainer.py",
 )
 
@@ -66,8 +67,9 @@ def read_settings(workspace):
     path = local_path(workspace / "settings.json")
     require(path.is_file() and path.stat().st_size <= 16384, "SETUP_REQUIRED")
     data = json.loads(path.read_bytes())
-    require(set(data) == set(RuntimeSettings.__dataclass_fields__), "INVALID_SETTINGS")
-    return RuntimeSettings(**{key: value if key == "port" else local_path(Path(value)) for key, value in data.items()})
+    fields=set(RuntimeSettings.__dataclass_fields__)
+    require(set(data) in (fields,fields-{"converter_manifest"}), "INVALID_SETTINGS")
+    return RuntimeSettings(**{key: value if key == "port" or value is None else local_path(Path(value)) for key, value in data.items()})
 
 
 def save_settings(settings):
@@ -80,6 +82,14 @@ def save_settings(settings):
         stream.write(encode({key: str(value) if isinstance(value, Path) else value for key, value in asdict(settings).items()}))
         stream.flush(); os.fsync(stream.fileno())
     temporary.replace(path)
+
+
+def validate_qwen_origin(approval, origin, config, pins):
+    require(approval.get("modelId")==origin.get("ollamaTag")=="qwen3.5:4b" and origin.get("kind")=="official-qwen35-text"
+            and origin.get("textOnly") is True and origin.get("repository")==pins["repository"]
+            and origin.get("revision")==pins["revision"],"APPROVED_QWEN35_REQUIRED")
+    require(config.get("model_type")=="qwen3_5_text" and config.get("hidden_size")==2560
+            and config.get("num_hidden_layers")==32 and not config.get("auto_map"),"QWEN35_4B_TEXT_REQUIRED")
 
 
 class SetupProbe:
@@ -100,8 +110,10 @@ class SetupProbe:
         base = local_path(Path(approval["modelDirectory"]))
         require(base.is_dir(), "APPROVED_BASE_MISSING")
         origin = json.loads((base / "source.json").read_bytes())
-        require(origin.get("ollamaTag") == "llama3.1:8b", "APPROVED_LLAMA31_REQUIRED")
-        private = local_path(settings.workspace_root / "runtime/models")
+        pins=json.loads((settings.engine_root/"tools/aether/qwen35-source.json").read_bytes())
+        validate_qwen_origin(approval,origin,json.loads((base/"config.json").read_bytes()),pins)
+        require(settings.converter_manifest is not None and sha_file(settings.converter_manifest)==origin.get("toolchainManifestSha256"),"QWEN_CONVERTER_REQUIRED")
+        private = local_path(settings.workspace_root / "runtime/qwen35-models")
         require(settings.source_store != private and settings.source_store not in private.parents
                 and private not in settings.source_store.parents, "OVERLAPPING_RUNTIME_STORE")
         from tools.aether_teacher.engine import run_owned

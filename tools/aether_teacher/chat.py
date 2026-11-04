@@ -82,7 +82,7 @@ def request_json(path, payload, timeout=90, cancelled=None):
 
 
 def chat_payload(model_id, profile, context):
-    require(isinstance(model_id, str) and re.fullmatch(r"(?:llama3\.1:8b|aether-candidate:[a-z0-9-]{1,80})", model_id), "UNAPPROVED_MODEL")
+    require(isinstance(model_id, str) and re.fullmatch(r"(?:qwen3\.5:4b|aether-candidate:[a-z0-9-]{1,80})", model_id), "UNAPPROVED_MODEL")
     require(2 <= len(context) <= 12 and context[0] == {"role":"system", "content":compile_profile(profile)}, "INVALID_CONTEXT")
     require(context[-1].get("role") == "user", "INVALID_CONTEXT")
     total = 0
@@ -92,7 +92,7 @@ def chat_payload(model_id, profile, context):
         text(turn["content"], 16000 if role == "assistant" else 4000, 1)
         total += len(turn["content"])
     require(total <= 16000, "CONTEXT_LIMIT")
-    return {"model":model_id, "messages":list(context), "stream":False, "keep_alive":"2m",
+    return {"model":model_id, "messages":list(context), "stream":False, "think":False, "keep_alive":"2m",
             "options":{"num_predict":1024, "num_ctx":8192, "temperature":0.3}}
 
 

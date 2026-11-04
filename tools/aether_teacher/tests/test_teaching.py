@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import threading
+import time
 from types import SimpleNamespace
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
@@ -17,6 +18,8 @@ class TeachingTest(unittest.TestCase):
         for _ in range(500):
             if condition(): return
             QTest.qWait(20)
+            # Qt's native wait can retain the GIL; let the storage worker run.
+            time.sleep(.001)
         self.fail("worker did not complete within ten seconds")
 
     def test_close_while_initial_storage_is_queued_releases_database_and_lease(self):

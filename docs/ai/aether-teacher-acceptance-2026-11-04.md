@@ -1,5 +1,7 @@
 # Aether Teacher acceptance — 2026-11-04
 
+Historical Llama acceptance. The later [Qwen migration record](aether-teacher-qwen-acceptance-2026-11-04.md) supersedes the active model choice and documents authorized removal of the app-owned Llama model/test files. Preserve the results below as evidence of that earlier delivery.
+
 ## Scope and outcome
 
 The native source-launched Windows application completed real local chat and the full reviewed-example training workflow on this laptop. Portable frozen packaging is **not complete**: PyInstaller can assemble the directory, but its actual executable launch fails importing QtWidgets with a DLL missing-procedure error. The working delivery uses an installed GUI interpreter/native source launcher and desktop shortcut. No browser is required.
