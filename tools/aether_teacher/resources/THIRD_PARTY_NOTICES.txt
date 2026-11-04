@@ -1,0 +1,21 @@
+Aether Teacher third-party components
+
+The portable GUI uses Python, PySide6/Qt, Shiboken6, psutil, and the
+PyInstaller bootloader. Model weights and CUDA training packages are not bundled.
+
+Python: Python Software Foundation License
+https://docs.python.org/3/license.html
+PySide6 / Shiboken6: Qt for Python open-source licensing, including LGPLv3
+https://doc.qt.io/qtforpython-6/licenses.html
+Qt: included shared libraries/platform plugins; upstream licenses and source
+https://www.qt.io/licensing/open-source-lgpl-obligations
+https://download.qt.io/official_releases/QtForPython/
+psutil: BSD-3-Clause
+https://github.com/giampaolo/psutil/blob/master/LICENSE
+PyInstaller bootloader: GPL-2.0-or-later with the bootloader exception
+https://pyinstaller.org/en/stable/license.html
+
+See bundled component license texts alongside this notice. Qt shared libraries
+are shipped as separate files in _internal and can be replaced independently.
+No model license is granted by the GUI package. Exported models retain their
+original license and require separate operator review before deployment.

@@ -103,6 +103,22 @@ class StoreTest(unittest.TestCase):
             self.store.append_message(session, "assistant", "界" * 16000)
         self.assertEqual(len(self.store.messages(session)), 87)
 
+    def test_full_session_has_explicit_new_select_export_and_delete_path(self):
+        first=self.store.create_session()
+        for _ in range(100):self.store.append_turn(first,"Q","A")
+        with self.assertRaisesRegex(d.Rejected,"TRANSCRIPT_LIMIT"):
+            self.store.preflight_turn(first,"Next")
+        second=self.store.create_session()
+        self.store.preflight_turn(second,"Next")
+        self.store.select_session(first)
+        output=Path(self.temp.name)/"session-export.json"
+        self.store.export_session(first,output)
+        import json
+        self.assertEqual(len(json.loads(output.read_bytes())["messages"]),200)
+        self.store.delete_session(first)
+        self.assertEqual(self.store.sessions(),[second])
+        self.assertEqual(self.store.setting("session"),second)
+
     def test_unc_store_is_rejected(self):
         with self.assertRaises(d.Rejected):
             Store(Path("//server/share/workspace.sqlite3"))
@@ -116,6 +132,27 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(third.revision,3)
         with self.assertRaises(d.Rejected):
             self.store.select_version("original",second.id,second.revision,0)
+
+    def test_rollback_pair_remains_valid_after_editing_a_selected_candidate_profile(self):
+        profile=self.store.save_profile("A","Brief","Ask")
+        lesson=self.store.save_lesson("Q","A");self.store.review_lessons(((lesson.id,1),))
+        def candidate(profile):
+            data=d.snapshot(profile,tuple(self.store.lessons()),"laptop-qlora-smoke")
+            binding=d.JobBinding(str(uuid.uuid4()),"a"*64,"b"*64,"laptop-qlora-smoke",data.dataset_sha256,data.profile_sha256)
+            job=self.store.accept_job(binding,data)
+            for phase in ("prepare","train","export","import","probe","bundle"):
+                self.store.claim_phase(job.id,phase);self.store.complete_phase(job.id,phase,{"verified":True})
+            return job
+        a=candidate(profile)
+        self.store.select_version(a.id,profile.id,1,0)
+        edited=self.store.save_profile("Edited A","Brief","Ask",expected_revision=1)
+        b=candidate(edited)
+        self.store.select_version(b.id,edited.id,2,1)
+        import json
+        previous=json.loads(self.store.setting("previousSelection"))
+        self.assertEqual(previous["profileRevision"],1)
+        self.store.select_version(previous["version"],previous["profileId"],previous["profileRevision"],2)
+        self.assertEqual(self.store.active_profile().job,"A")
 
 
 if __name__ == "__main__":

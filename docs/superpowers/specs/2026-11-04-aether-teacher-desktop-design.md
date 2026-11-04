@@ -1,6 +1,6 @@
 # Aether Teacher desktop design
 
-Status: desktop direction and simple/Advanced split accepted for preparation. The user explicitly deferred implementation until they return in the morning. Technical proposals below are recorded for review with the implementation plan; do not begin building overnight.
+Status: the user returned and authorized implementation on 2026-11-04. Native laptop UI, real chat, profile/lesson review, durable training, private runtime, comparison/rollback and verified handoff are implemented and tested. The working local delivery uses an installed Python GUI launcher; frozen portable packaging remains incomplete after a real Qt DLL launch failure. See the acceptance record and implementation plan for evidence/limits. The later conditional Qwen 3.5 4B preference retains the verified Llama fallback until the converters support Qwen.
 
 ## Intent and agreed direction
 

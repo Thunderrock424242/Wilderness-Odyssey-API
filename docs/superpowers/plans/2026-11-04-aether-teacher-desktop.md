@@ -10,6 +10,8 @@
 
 **Spec:** [Desktop design](../specs/2026-11-04-aether-teacher-desktop-design.md). Read both documents before implementing.
 
+**Execution status (2026-11-04):** The user returned with “continue.” Tasks 1–7 are implemented; the native source application completed real profile-aware CUDA training, import/probe/comparison/rollback/export and fresh-process candidate restoration. Desktop suite 50/50; standalone server 77/77. Task 8's portable frozen executable is **not complete**: actual QtWidgets import fails despite successful assembly. Deliver the tested local Python GUI launcher/desktop shortcut and retain packaging as an explicit remaining item. See [acceptance](../../ai/aether-teacher-acceptance-2026-11-04.md), [operator guide](../../ai/aether-teacher-desktop.md), and [conditional Qwen assessment](../../ai/aether-teacher-model-compatibility.md). No push, remote deployment or production activation occurred.
+
 ## Start condition and current readiness
 
 The user asked for preparation only and said implementation should start when they return in the morning. **No application scaffolding, dependencies, native build, training, model conversion, or deployment is to run as part of this preparation.** Resume when the user says to start; first surface the storage item below before any large model operation. No wake-up reminder or automatic overnight task was requested.

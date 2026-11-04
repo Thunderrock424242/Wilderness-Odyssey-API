@@ -4,6 +4,9 @@ import json
 import re
 import time
 import uuid
+import socket
+import threading
+import select
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkProxy, QNetworkRequest
 from tools.aether_teacher.domain import Rejected, compile_profile, encode, require, text
@@ -27,30 +30,55 @@ def request_json(path, payload, timeout=90, cancelled=None):
     """Worker-only HTTP helper, also used for runtime readiness and probes."""
     require(path in ("/api/version", "/api/chat", "/api/show", "/api/tags", "/api/ps"))
     connection = http.client.HTTPConnection("127.0.0.1", 11435, timeout=min(timeout, 5))
+    done=threading.Event()
+    active_socket=[None]
+    def cancel_wait():
+        while not done.wait(.05):
+            if cancelled and cancelled.is_set():
+                sock=active_socket[0]
+                if sock is not None:
+                    try:sock.shutdown(socket.SHUT_RDWR)
+                    except OSError:pass
+                return
+    watcher=threading.Thread(target=cancel_wait,daemon=True,name="aether-http-cancel")
+    watcher.start()
+    deadline=time.monotonic()+timeout
     try:
         body = None if payload is None else encode(payload)
         require(body is None or len(body) <= 131072, "REQUEST_LIMIT")
+        require(not cancelled or not cancelled.is_set(),"CANCELLED")
         connection.request("GET" if body is None else "POST", path, body=body,
                            headers={"Content-Type":"application/json"})
-        if connection.sock:
-            connection.sock.settimeout(timeout)
-        started = time.monotonic()
+        active_socket[0]=connection.sock
+        require(not cancelled or not cancelled.is_set(),"CANCELLED")
+        if connection.sock:connection.sock.settimeout(max(.001,deadline-time.monotonic()))
+        # Ollama's non-streaming endpoint may spend most of the deadline
+        # computing before sending headers. Wait cancellably before parsing.
+        while connection.sock and not select.select([connection.sock],[],[],.05)[0]:
+            require(not cancelled or not cancelled.is_set(),"CANCELLED")
+            require(time.monotonic()<deadline,"RUNTIME_DEADLINE")
         response = connection.getresponse()
         require(response.status == 200, "RUNTIME_REQUEST_FAILED")
         raw = bytearray()
-        while chunk := response.read(4096):
+        while True:
+            remaining=deadline-time.monotonic()
+            require(remaining>0,"RUNTIME_DEADLINE")
+            if active_socket[0]:active_socket[0].settimeout(remaining)
+            chunk=response.read(4096)
+            if not chunk:break
             require(not cancelled or not cancelled.is_set(), "CANCELLED")
             raw.extend(chunk)
             require(len(raw) <= 131072, "RUNTIME_RESPONSE_LIMIT")
-            require(time.monotonic() - started <= timeout, "RUNTIME_DEADLINE")
-        require(time.monotonic() - started <= timeout, "RUNTIME_DEADLINE")
+        require(time.monotonic()<=deadline,"RUNTIME_DEADLINE")
         result = strict_json(raw)
         require(isinstance(result, dict), "INVALID_RUNTIME_RESPONSE")
         return result
     except (OSError, http.client.HTTPException):
-        raise Rejected("RUNTIME_UNAVAILABLE") from None
+        raise Rejected("CANCELLED" if cancelled and cancelled.is_set() else "RUNTIME_UNAVAILABLE") from None
     finally:
+        done.set()
         connection.close()
+        watcher.join(timeout=1)
 
 
 def chat_payload(model_id, profile, context):
@@ -133,7 +161,8 @@ class ChatClient(QObject):
     def _finish(self):
         reply = self.reply
         self.timer.stop()
-        self._read()
+        self.buffer.extend(bytes(reply.readAll()))
+        if len(self.buffer)>131072:self.error="RUNTIME_RESPONSE_LIMIT"
         self.reply = None
         try:
             require(self.error is None, self.error or "RUNTIME_REQUEST_FAILED")

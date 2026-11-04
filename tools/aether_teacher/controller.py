@@ -3,7 +3,7 @@ from dataclasses import replace
 from pathlib import Path
 import threading
 from PySide6.QtCore import QObject, Signal, Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QFileDialog
 from tools.aether_teacher.chat import ChatClient, profile_patch
 from tools.aether_teacher.domain import Rejected, bounded_context, local_path, require
 from tools.aether_teacher.store import Store
@@ -34,31 +34,42 @@ class Controller(QObject):
         self.closed = False
         self.stopping = threading.Event()
         self.workflow = None
+        self.lease = None
+        self.chat_pending = False
 
     def _db(self, operation):
         def run():
             if self.store is None:
-                self.store = Store(self.database)
+                from tools.aether_teacher.lease import WorkspaceLease
+                self.lease = WorkspaceLease(self.workspace)
+                try:self.store = Store(self.database)
+                except BaseException:
+                    self.lease.close();self.lease=None
+                    raise
             return operation(self.store)
         return run
 
-    def submit(self, operation, callback, storage=False):
+    def submit(self, operation, callback, storage=False, on_error=None):
         try:
             worker = self.storage if storage else self.operations
             key = worker.submit(self._db(operation) if storage else operation)
-            self.callbacks[key] = (worker, callback)
+            self.callbacks[key] = (worker, callback, on_error)
         except Rejected as error:
+            if on_error:on_error(str(error))
             self.status(str(error))
 
     def _done(self, key, value, error):
         entry = self.callbacks.pop(key, None)
         if entry is None:
             return
-        worker, callback = entry
+        worker, callback, on_error = entry
         worker.pending -= 1
         if self.closed or (self.window is not None and getattr(self.window, "exit_requested", False)):
             return
         if error:
+            if worker is self.operations and self.runtime is None and self.window:
+                self.window.runtime_status.setText("LOCAL WORKSPACE\nSetup needs attention")
+            if on_error:on_error(error)
             self.status(error)
             return
         try:
@@ -68,6 +79,10 @@ class Controller(QObject):
 
     def status(self, message):
         if self.window:
+            message={"TRANSCRIPT_LIMIT":"This chat is full · Start a new session, or export/delete this chat",
+                     "SESSION_LIMIT":"20 chat sessions are saved · Export/delete a session before creating another",
+                     "WORKSPACE_ALREADY_OPEN":"Workspace is already open in another Aether Teacher",
+                     "STORAGE_UNAVAILABLE_OR_FULL":"Private storage is unavailable or full · Export/remove saved material"}.get(message,message)
             self.window.statusBar().showMessage(message.replace("_", " "))
 
     def attach(self, window):
@@ -94,7 +109,8 @@ class Controller(QObject):
     def _boot(self, store):
         profile = store.active_profile() or store.save_profile("Help players.", "Friendly and clear.", "Ask when unsure.")
         sessions = store.sessions()
-        session = sessions[-1] if sessions else store.create_session()
+        session = store.setting("session")
+        if session not in sessions:session=sessions[-1] if sessions else store.create_session()
         return profile, session, store.messages(session), store.lessons()
 
     def _loaded(self, data):
@@ -102,6 +118,7 @@ class Controller(QObject):
         self.window.profile_view.show_profile(self.profile)
         self.window.teaching_view.show_turns(self.turns)
         self.window.lessons_view.show_lessons(lessons)
+        self.refresh_sessions()
         self.status("Local workspace ready · Complete local setup to chat")
         self.workflow.refresh()
         if (self.workspace / "settings.json").is_file():
@@ -161,25 +178,41 @@ class Controller(QObject):
     def send_message(self):
         try:
             require(self.runtime is not None and self.operations.pending == 0, "LOCAL_SETUP_REQUIRED_OR_BUSY")
+            require(not self.chat_pending and self.chat.reply is None,"CHAT_BUSY")
             question = self.window.teaching_view.message.toPlainText()
-            context = bounded_context(self.profile, tuple(self.turns), question)
-            self.proposal_revision = None
-            self.chat.send(self.model, self.profile, context)
-            self.pending_question = question
+            session=self.session
+            self.chat_pending=True
             self.window.teaching_view.send.setEnabled(False)
-            self.window.teaching_view.context_note.setText(f"{len(context)} messages in context · Older turns stay saved locally")
-            self.status("Aether is replying…")
+            def admit(store):
+                store.preflight_turn(session,question)
+                return store.active_profile(),store.messages(session)
+            def send(result):
+                try:
+                    require(session==self.session,"SESSION_CHANGED")
+                    require(self.operations.pending==0 and not self.stopping.is_set(),"FINISH_CURRENT_OPERATION_FIRST")
+                    profile,turns=result
+                    context=bounded_context(profile,tuple(turns),question)
+                    self.proposal_revision=None
+                    self.pending_question=question
+                    self.pending_session=session
+                    self.chat.send(self.model,profile,context)
+                    self.window.teaching_view.context_note.setText(f"{len(context)} messages in context · Older turns stay saved locally")
+                    self.status("Aether is replying…")
+                except Rejected as error:self._storage_chat_error(str(error));self.status(str(error))
+            self.submit(admit,send,storage=True,on_error=self._storage_chat_error)
         except Rejected as error:
             self.status(str(error))
 
     def propose_profile(self):
         try:
             require(self.runtime is not None and self.operations.pending == 0, "LOCAL_SETUP_REQUIRED_OR_BUSY")
+            require(not self.chat_pending and self.chat.reply is None,"CHAT_BUSY")
             prompt = ("Draft job/personality/boundaries from our conversation. Return ONLY JSON with keys "
                       f'profileRevision (the integer {self.profile.revision}), job, personality, boundaries. '
                       "Each text field is at most 1000 UTF-16 units. This is a draft for owner review.")
             context = bounded_context(self.profile, tuple(self.turns), prompt)
             self.chat.send(self.model, self.profile, context, json_format=True)
+            self.chat_pending=True
             self.proposal_revision = self.profile.revision
             self.window.teaching_view.send.setEnabled(False)
             self.status("Drafting profile for your review…")
@@ -189,6 +222,7 @@ class Controller(QObject):
     def _reply(self, operation, answer):
         self.window.teaching_view.send.setEnabled(self.runtime is not None and self.proposal_revision is not None)
         if self.proposal_revision is not None:
+            self.chat_pending=False
             try:
                 require(self.profile.revision == self.proposal_revision, "STALE_PROFILE_PROPOSAL")
                 patch = profile_patch(answer, self.profile.revision)
@@ -204,13 +238,14 @@ class Controller(QObject):
             self.proposal_revision = None
             return
         question = self.pending_question
-        session = self.session
+        session = self.pending_session
         def save(store):
             store.append_turn(session, question, answer)
             return store.messages(session)
-        self.submit(save, self._turn_saved, storage=True)
+        self.submit(save, self._turn_saved, storage=True,on_error=self._storage_chat_error)
 
     def _turn_saved(self, turns):
+        self.chat_pending=False
         self.turns = turns
         self.window.teaching_view.show_turns(turns)
         self.window.teaching_view.message.clear()
@@ -218,18 +253,69 @@ class Controller(QObject):
         self.status("Reply saved locally · Select an answer to correct it")
 
     def _chat_failed(self, operation, error):
+        self.chat_pending=False
         self.window.teaching_view.send.setEnabled(self.runtime is not None)
         self.status(error)
 
+    def _storage_chat_error(self,error):
+        self.chat_pending=False
+        self.window.teaching_view.send.setEnabled(self.runtime is not None and self.operations.pending==0)
+
+    def refresh_sessions(self):
+        self.submit(lambda store:store.sessions(),lambda sessions:self.window.teaching_view.show_sessions(sessions,self.session),storage=True)
+
+    def _session_changed(self,data):
+        self.session,self.turns=data
+        self.window.teaching_view.show_turns(self.turns)
+        self.refresh_sessions()
+        self.status("Chat session ready · Conversations are separate from reviewed lessons")
+
+    def new_session(self):
+        if self.chat_pending:self.status("Finish or cancel the current reply first");return
+        def create(store):
+            session=store.create_session()
+            return session,[]
+        self.submit(create,self._session_changed,storage=True)
+
+    def select_session(self,index):
+        if self.chat_pending:self.status("Finish or cancel the current reply first");self.refresh_sessions();return
+        session=self.window.teaching_view.sessions.itemData(index)
+        if session and session!=self.session:
+            self.submit(lambda store:(session,store.select_session(session)),self._session_changed,storage=True)
+
+    def delete_session(self):
+        if self.chat_pending:self.status("Finish or cancel the current reply first");return
+        session=self.session
+        if QMessageBox.question(self.window,"Delete this chat","Delete this chat's saved messages? Reviewed lessons and accepted training snapshots remain intact.")!=QMessageBox.StandardButton.Yes:return
+        def remove(store):
+            store.delete_session(session)
+            sessions=store.sessions()
+            current=store.setting("session") if sessions else store.create_session()
+            return current,store.messages(current)
+        self.submit(remove,self._session_changed,storage=True)
+
+    def export_session(self):
+        destination,_=QFileDialog.getSaveFileName(self.window,"Export private chat",f"aether-chat-{self.session[:8]}.json","JSON (*.json)")
+        if destination:
+            session=self.session
+            self.submit(lambda store:store.export_session(session,Path(destination)),lambda path:self.status("Private chat exported to "+str(path)),storage=True)
+
     def setup_dialog(self):
+        if self.profile is None or self.lease is None:
+            self.status("Workspace is unavailable · Close any other Aether Teacher using it")
+            return
         from tools.aether_teacher.ui.setup import SetupDialog
         SetupDialog(self).exec()
 
     def connect_runtime(self, settings):
-        if self.operations.pending or self.chat.reply is not None:
+        if self.lease is None:
+            self.status("Workspace ownership is required before local setup")
+            return
+        if self.operations.pending or self.chat.reply is not None or self.chat_pending:
             self.status("Finish or cancel the current operation first")
             return
         self.status("Verifying installed engine and copying the source into private storage…")
+        self.window.runtime_status.setText("LOCAL WORKSPACE\nVerifying local setup…")
         self.window.teaching_view.send.setEnabled(False)
         self.stopping.clear()
         def connect():
@@ -258,17 +344,24 @@ class Controller(QObject):
                 runner.cancelled = self.stopping
                 from tools.aether_teacher.jobs import JobCoordinator
                 with Store(self.database) as store:
-                    JobCoordinator(store, settings, readiness, runner, runtime).recover()
-                return settings, readiness, runtime, runner
+                    coordinator=JobCoordinator(store, settings, readiness, runner, runtime)
+                    coordinator.recover()
+                    from tools.aether_teacher.workflow import restore_selection
+                    restored_profile,restored_model=restore_selection(store,coordinator)
+                return settings, readiness, runtime, runner, restored_profile, restored_model
             except BaseException:
                 runtime.stop()
                 raise
         self.submit(connect, self._connected)
 
     def _connected(self, result):
-        self.settings, self.readiness, self.runtime, self.runner = result
+        self.settings, self.readiness, self.runtime, self.runner, restored_profile, self.model = result
+        if self.profile is None or restored_profile.revision>=self.profile.revision:
+            self.profile=restored_profile
+            self.window.profile_view.show_profile(self.profile)
         self.window.teaching_view.send.setEnabled(True)
         self.window.lessons_view.train.setEnabled(self.readiness["trainingDiskReady"])
+        self.window.runtime_status.setText("LOCAL WORKSPACE\nLocal model ready")
         self.window.advanced_view.resources.setPlainText(
             f"Verified environment: {self.readiness['versions']}\n"
             f"Engine SHA256: {self.readiness['engineSha256']}\n"
@@ -296,6 +389,9 @@ class Controller(QObject):
             self.runtime.cancelled.set()
             self.runtime.stop()
         self.operations.close()
-        if self.store is not None:
-            self.storage.executor.submit(self.store.close).result(timeout=10)
+        def close_storage():
+            if self.store is not None:
+                self.store.close();self.store=None
+        self.storage.executor.submit(close_storage).result(timeout=30)
         self.storage.close()
+        if self.lease:self.lease.close();self.lease=None

@@ -2,6 +2,9 @@ from dataclasses import replace
 import json
 import os
 import unittest
+import threading
+import time
+from http.server import BaseHTTPRequestHandler,HTTPServer
 from tools.aether_teacher.domain import Profile, Rejected, bounded_context
 
 
@@ -33,6 +36,24 @@ class ChatTest(unittest.TestCase):
         self.assertEqual(profile_patch(json.dumps(proposal), 2)["job"], "Help")
         for bad in ({**proposal,"profileRevision":1}, {**proposal,"command":"train"}, {**proposal,"job":"x" * 1001}):
             with self.assertRaises(Rejected): profile_patch(json.dumps(bad), 2)
+
+    def test_worker_http_cancellation_interrupts_waiting_for_response(self):
+        from tools.aether_teacher.chat import request_json
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self,*ignored):pass
+            def do_POST(self):
+                time.sleep(1)
+                try:
+                    self.send_response(200);self.end_headers();self.wfile.write(b'{"done":true}')
+                except OSError:pass
+        server=HTTPServer(("127.0.0.1",11435),Handler)
+        thread=threading.Thread(target=server.handle_request);thread.start()
+        cancelled=threading.Event();timer=threading.Timer(.1,cancelled.set);timer.start()
+        started=time.monotonic()
+        try:
+            with self.assertRaises(Rejected):request_json("/api/chat",{},timeout=2,cancelled=cancelled)
+            self.assertLess(time.monotonic()-started,.7)
+        finally:timer.join();thread.join(timeout=3);server.server_close()
 
 
 if __name__ == "__main__": unittest.main()

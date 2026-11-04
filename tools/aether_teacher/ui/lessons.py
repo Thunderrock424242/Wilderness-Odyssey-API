@@ -14,6 +14,7 @@ class LessonsView(QWidget):
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(("Review", "Question", "Revision"))
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.itemDoubleClicked.connect(self.edit_selected)

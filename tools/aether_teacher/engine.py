@@ -60,14 +60,23 @@ def run_owned(command, memory_mib, timeout_seconds, cancelled=None, cwd=None):
             if process.returncode != 0:
                 # Expose only the CLI's categorical error, never library stderr.
                 category = "ENGINE_FAILED"
-                try:
-                    error = json.loads(buffers[1].decode("utf-8"))
-                    import re
-                    if isinstance(error, dict) and re.fullmatch("[A-Z0-9_]{1,96}", error.get("error", "")):
-                        category = error["error"]
-                except (ValueError, UnicodeError):
-                    pass
-                raise Rejected(category)
+                import re
+                details = {"exitCode":process.returncode}
+                for line in buffers[1].decode("utf-8", errors="replace").splitlines():
+                    try:
+                        error = json.loads(line)
+                        if isinstance(error, dict) and re.fullmatch("[A-Z0-9_]{1,96}", error.get("error", "")):
+                            category = error["error"]
+                        child = error.get("childFailure") if isinstance(error, dict) else None
+                        if isinstance(child, dict):
+                            details.update({k:v for k,v in child.items() if k in ("exitCode","errno","winerror","peakObservedRssMiB") and type(v) in (int,float)})
+                            if re.fullmatch("[A-Z0-9_]{1,96}", child.get("error", "")):
+                                details["childError"] = child["error"]
+                    except (ValueError, TypeError):
+                        pass
+                failure = Rejected(category)
+                failure.details = details
+                raise failure
             try:
                 result = json.loads(buffers[0].decode("utf-8"))
             except (ValueError, UnicodeError):

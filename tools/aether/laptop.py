@@ -579,9 +579,10 @@ def run_training(args):
         environment = child_environment(os.environ)
         started = time.monotonic(); process = None
         try:
-            process = subprocess.Popen([sys.executable, "-I", "-B", str(Path(__file__).resolve()), "_train", str(work / "config.json")],
-                                       env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            job.attach(process)
+            native_log = work / "native.log"
+            with native_log.open("wb") as diagnostics:
+                process = job.start([sys.executable, "-I", "-u", "-B", "-X", "faulthandler", str(Path(__file__).resolve()), "_train", str(work / "config.json")],
+                                    env=environment, stdout=subprocess.DEVNULL, stderr=diagnostics)
             import psutil
             child = psutil.Process(process.pid); peak = 0
             while process.poll() is None:
@@ -592,10 +593,15 @@ def run_training(args):
                 except psutil.NoSuchProcess: break
                 size = observed_disk_bytes(staged)
                 require(size <= 256 * 1048576, "CANDIDATE_DISK_LIMIT")
+                require(native_log.stat().st_size <= 65536, "LOCAL_NATIVE_DIAGNOSTIC_LIMIT")
                 time.sleep(0.5)
             process.wait()
             if process.returncode != 0 or not (work / "success.json").is_file():
-                diagnostic = read_json(work / "failure.json") if (work / "failure.json").is_file() else {"error":"GPU_TRAINING_FAILED"}
+                diagnostic = read_json(work / "failure.json") if (work / "failure.json").is_file() else {
+                    "error":"GPU_TRAINING_FAILED", "exitCode":process.returncode, "peakObservedRssMiB":peak/1048576}
+                require(native_log.stat().st_size <= 65536, "LOCAL_NATIVE_DIAGNOSTIC_LIMIT")
+                if "frames" not in diagnostic:
+                    diagnostic["frames"] = native_frames(native_log.read_text(encoding="utf-8", errors="replace"))
                 print(json.dumps({"childFailure":diagnostic}),file=sys.stderr)
                 failure = diagnostic["error"]
                 require(False, failure if re.fullmatch("[A-Za-z0-9_]+", failure) else "GPU_TRAINING_FAILED")

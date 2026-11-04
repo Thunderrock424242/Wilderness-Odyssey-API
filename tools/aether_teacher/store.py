@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import sqlite3
 import uuid
+import os
 from tools.aether_teacher.domain import (
     JobBinding, JobRecord, Lesson, Profile, Rejected, RunLimits, Snapshot,
     compile_profile, encode, local_path, require, text, validate_binding,
@@ -129,6 +130,7 @@ class Store:
             require(self.connection.execute("SELECT count(*) FROM sessions").fetchone()[0] < 20, "SESSION_LIMIT")
             session = str(uuid.uuid4())
             self.connection.execute("INSERT INTO sessions VALUES(?)", (session,))
+            self._setting("session",session)
         return session
 
     def sessions(self):
@@ -137,6 +139,45 @@ class Store:
     def messages(self, session):
         return [dict(role=row[0], content=row[1]) for row in self.connection.execute(
             "SELECT role,content FROM messages WHERE session=? ORDER BY ordinal", (session,))]
+
+    def select_session(self,session):
+        with self.transaction():
+            require(self.connection.execute("SELECT 1 FROM sessions WHERE id=?",(session,)).fetchone(),"SESSION_MISSING")
+            self._setting("session",session)
+        return self.messages(session)
+
+    def delete_session(self,session):
+        with self.transaction():
+            self.connection.execute("DELETE FROM messages WHERE session=?",(session,))
+            self.connection.execute("DELETE FROM sessions WHERE id=?",(session,))
+            if self.setting("session")==session:
+                sessions=self.sessions()
+                self._setting("session",sessions[-1] if sessions else "")
+
+    def preflight_turn(self,session,question):
+        text(question,4000,1)
+        require(self.connection.execute("SELECT 1 FROM sessions WHERE id=?",(session,)).fetchone(),"SESSION_MISSING")
+        count,size=self.connection.execute("SELECT count(*),coalesce(sum(length(CAST(content AS BLOB))),0) FROM messages WHERE session=?",(session,)).fetchone()
+        require(count<=198 and size+len(question.encode("utf-8"))+48000<=4*1024*1024,"TRANSCRIPT_LIMIT")
+        page_size=self.connection.execute("PRAGMA page_size").fetchone()[0]
+        used=self.connection.execute("PRAGMA page_count").fetchone()[0]-self.connection.execute("PRAGMA freelist_count").fetchone()[0]
+        limit=self.connection.execute("PRAGMA max_page_count").fetchone()[0]
+        require((limit-used)*page_size>=65536,"STORAGE_UNAVAILABLE_OR_FULL")
+
+    def export_session(self,session,destination):
+        require(session in self.sessions(),"SESSION_MISSING")
+        destination=local_path(destination)
+        require(not destination.exists(),"DESTINATION_EXISTS")
+        raw=encode({"schemaVersion":"1.0","sessionId":session,"messages":self.messages(session)})
+        require(len(raw)<=8*1024*1024,"TRANSCRIPT_LIMIT")
+        temporary=destination.with_name(".aether-session-"+uuid.uuid4().hex)
+        try:
+            with temporary.open("xb") as stream:
+                stream.write(raw);stream.flush();os.fsync(stream.fileno())
+            require(not destination.exists(),"DESTINATION_EXISTS")
+            temporary.rename(destination)
+        finally:temporary.unlink(missing_ok=True)
+        return destination
 
     def append_message(self, session, role, content):
         require(role in ("user", "assistant"))
@@ -256,7 +297,11 @@ class Store:
                 require(job is not None and job.state == "completed", "VERSION_NOT_VERIFIED")
                 accepted = json.loads(self.job_snapshot(version).profile_bytes)
                 require(accepted["profileId"] == profile_id and accepted["revision"] == profile_revision, "MODEL_PROFILE_MISMATCH")
-            current["profileId"], current["profileRevision"] = json.loads(self.setting("profile"))
+            # Candidate rollback restores its recorded training configuration.
+            # Later profile edits remain immutable revisions, but must not turn
+            # the previous candidate/configuration pair into an invalid pair.
+            if current["version"] == "original":
+                current["profileId"], current["profileRevision"] = json.loads(self.setting("profile"))
             self._setting("previousSelection", json.dumps(current))
             selection = {"revision":expected_selection_revision+1,"version":version,"profileId":profile_id,"profileRevision":profile_revision}
             self._setting("selection", json.dumps(selection))

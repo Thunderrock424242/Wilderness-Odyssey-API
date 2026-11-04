@@ -1,5 +1,6 @@
 """Durable local workflow; no automatic optimizer replay after a crash."""
 from dataclasses import asdict
+from dataclasses import replace
 import importlib.util
 import json
 import os
@@ -34,6 +35,14 @@ class JobCoordinator:
     def __init__(self, store, settings, readiness, runner, runtime, progress=lambda job: None):
         self.store, self.settings, self.readiness = store, settings, readiness
         self.runner, self.runtime, self.progress = runner, runtime, progress
+
+    def assert_binding(self, job):
+        require(job.binding.engine_sha256 == self.readiness["engineSha256"]
+                and job.binding.base_sha256 == self.readiness["base"]["baseSha256"], "ACCEPTED_BINDING_CHANGED")
+        path=local_path(self.settings.approval_path)
+        require(path.is_file() and path.stat().st_size<=65536,"BASE_APPROVAL_MISSING")
+        current=json.loads(path.read_bytes())
+        require(current.get("baseSha256")==job.binding.base_sha256,"ACCEPTED_BINDING_CHANGED")
 
     def module(self):
         verify_engine(self.settings.engine_root, self.runner.manifest)
@@ -73,6 +82,7 @@ class JobCoordinator:
         return paths
 
     def verify_phase(self, job):
+        self.assert_binding(job)
         module = self.module(); paths = self.paths(job)
         data = self.store.job_snapshot(job.id)
         try:
@@ -82,6 +92,7 @@ class JobCoordinator:
                 if not paths["candidate"].exists(): return None
                 metadata = module.validate_candidate(paths["candidate"], self.readiness["base"])
                 require(metadata["datasetHash"] == data.dataset_sha256 and metadata.get("profileSha256") == data.profile_sha256, "CANDIDATE_INPUT_MISMATCH")
+                require(metadata["approvedBaseSha256"] == job.binding.base_sha256 and metadata["presetId"] == job.binding.preset_id, "CANDIDATE_INPUT_MISMATCH")
                 return {"verified":True, "sha256":sha_file(paths["candidate"] / "package.json")}
             if job.phase == "export":
                 if not paths["merged"].exists(): return None
@@ -118,7 +129,25 @@ class JobCoordinator:
         return None
 
     def recover(self):
+        for job in self.store.jobs():
+            if job.state in ("queued","running","cancel-requested"):
+                try:self.assert_binding(job)
+                except Rejected:self.store.stop_job(job.id,"needs-verification","ACCEPTED_BINDING_CHANGED")
         return recover_records(self.store, self.verify_phase)
+
+    def model_for_job(self, job):
+        require(job is not None and job.state=="completed","VERSION_NOT_VERIFIED")
+        require(self.verify_phase(replace(job,phase="bundle")) is not None,"VERSION_ARTIFACT_CHANGED")
+        paths=self.paths(job);module=self.module()
+        deployment=module.read_json(paths["bundle"]/"deployment.json")
+        receipt=module.read_json(paths["receipt"])
+        self.runtime.ensure_started()
+        blob,actual=module.runtime_blob(self.runtime.store,deployment["candidateName"])
+        require(actual==deployment["ollamaGgufSha256"],"RUNTIME_MODEL_CHANGED")
+        modelfile=module.runtime_show(deployment["candidateName"],blob,receipt.get("sourceTemplateSha256"))
+        module.validate_import_receipt(receipt,deployment["candidateName"],deployment["mergedPackageManifestSha256"],actual,
+                                       digest(modelfile.encode("utf-8")))
+        return deployment["candidateName"]
 
     def cancel(self, job_id):
         job = self.store.cancel_job(job_id)
@@ -130,21 +159,25 @@ class JobCoordinator:
         from tools.aether_teacher.domain import Profile, bounded_context
         job = self.store.get_job(job_id)
         require(job is not None and job.state in ("queued", "running"), "JOB_NOT_RUNNABLE")
-        self.runner.cancelled.clear(); self.runtime.cancelled.clear()
+        paths = self.paths(job)
         try:
+            if self.runner.cancelled.is_set() or self.runtime.cancelled.is_set():
+                return self.store.cancel_job(job_id)
+            self.assert_binding(job)
             paths = self._inputs(job)
             name = "aether-candidate:teacher-" + job.id
             while True:
                 job = self.store.get_job(job_id)
                 if job.state == "cancelled": return job
                 require(not self.runner.cancelled.is_set() and job.state != "cancel-requested", "CANCELLED")
+                self.assert_binding(job)
                 require(self.store.claim_phase(job_id, job.phase), "PHASE_ALREADY_CLAIMED")
                 self.progress(self.store.get_job(job_id))
                 phase = job.phase
                 if phase == "prepare":
                     self.runtime.stop()
                     admit_disk(((self.settings.workspace_root, self.readiness["estimatedRunBytes"]),), floor=60 * 1073741824)
-                    info = self.runner.run("doctor", memory_mib=4096, timeout_seconds=90)
+                    info = self.runner.run("doctor", memory_mib=job.binding.limits.ram_mib, timeout_seconds=90)
                     require(info.get("cudaKernelPassed") is True and info.get("freeGpuMiB", 0) >= job.binding.limits.gpu_mib, "GPU_CAPACITY_UNAVAILABLE")
                     evidence = {"verified":True,"gpu":info}
                 elif phase == "train":
@@ -193,7 +226,14 @@ class JobCoordinator:
             import re
             category = str(error) if re.fullmatch("[A-Z0-9_]{1,96}", str(error)) else "WORKFLOW_FAILED"
             cancelled = self.runner.cancelled.is_set() or self.store.get_job(job_id).state == "cancel-requested"
-            self.runtime.stop()
-            result = self.store.stop_job(job_id, "cancelled" if cancelled else "failed", "CANCELLED" if cancelled else category)
+            try:self.runtime.stop()
+            finally:
+                result = self.store.stop_job(job_id, "cancelled" if cancelled else "failed", "CANCELLED" if cancelled else category)
+            details = getattr(error, "details", None)
+            if isinstance(details, dict):
+                try:
+                    # Optional numeric diagnostics cannot block owned cleanup/state.
+                    (paths["root"] / "failure.json").write_bytes(encode({"error":category, **details}))
+                except (OSError, ValueError):pass
             self.progress(result)
             return result

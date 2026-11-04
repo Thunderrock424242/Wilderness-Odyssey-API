@@ -1,6 +1,6 @@
 """Plain-text conversation; model text never becomes an active link or command."""
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton, QLabel, QComboBox
 
 
 class TeachingView(QWidget):
@@ -8,6 +8,15 @@ class TeachingView(QWidget):
         super().__init__()
         self.turns = []
         layout = QVBoxLayout(self)
+        sessions=QHBoxLayout()
+        self.sessions=QComboBox()
+        self.sessions.currentIndexChanged.connect(controller.select_session)
+        sessions.addWidget(self.sessions,1)
+        self.new_session=QPushButton("New chat")
+        self.new_session.clicked.connect(controller.new_session);sessions.addWidget(self.new_session)
+        export=QPushButton("Export chat…");export.clicked.connect(controller.export_session);sessions.addWidget(export)
+        remove=QPushButton("Delete chat…");remove.clicked.connect(controller.delete_session);sessions.addWidget(remove)
+        layout.addLayout(sessions)
         self.context_note = QLabel("Local chat · reviewed corrections only enter training")
         layout.addWidget(self.context_note)
         self.history = QListWidget()
@@ -45,3 +54,11 @@ class TeachingView(QWidget):
             item = QListWidgetItem(label + "\n" + turn["content"])
             self.history.addItem(item)
         self.history.scrollToBottom()
+
+    def show_sessions(self,sessions,selected):
+        self.sessions.blockSignals(True)
+        self.sessions.clear()
+        for index,session in enumerate(sessions):
+            self.sessions.addItem(f"Chat {index+1} · {session[:8]}",session)
+        self.sessions.setCurrentIndex(self.sessions.findData(selected))
+        self.sessions.blockSignals(False)

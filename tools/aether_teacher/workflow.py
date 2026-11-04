@@ -11,6 +11,15 @@ from tools.aether_teacher.store import Store
 from tools.aether_teacher.setup import admit_disk, sha_file
 
 
+def restore_selection(store,coordinator):
+    selected=store.selection()
+    profile=store.active_profile()
+    require(profile is not None,"PROFILE_MISSING")
+    if selected["version"]=="original":
+        return profile,"llama3.1:8b"
+    return profile,coordinator.model_for_job(store.get_job(selected["version"]))
+
+
 class Workflow(QObject):
     progress = Signal(object)
 
@@ -25,18 +34,33 @@ class Workflow(QObject):
 
     def available(self):
         require(self.c.runtime is not None and self.c.runner is not None, "LOCAL_SETUP_REQUIRED")
-        require(self.c.operations.pending == 0 and self.c.chat.reply is None, "FINISH_CURRENT_OPERATION_FIRST")
+        require(self.c.operations.pending == 0 and self.c.chat.reply is None and not self.c.chat_pending, "FINISH_CURRENT_OPERATION_FIRST")
 
     def refresh(self):
-        self.c.submit(lambda store:(store.jobs(),store.selection()),self._show,storage=True)
+        def inspect(store):
+            import psutil
+            observed={"availableRamMiB":psutil.virtual_memory().available//1048576,"runtimeRssMiB":None}
+            runtime=self.c.runtime
+            if runtime and runtime.process and runtime.process.poll() is None:
+                try:observed["runtimeRssMiB"]=psutil.Process(runtime.process.pid).memory_info().rss//1048576
+                except (psutil.NoSuchProcess,psutil.AccessDenied):pass
+            return store.jobs(),store.selection(),observed
+        self.c.submit(inspect,self._show,storage=True)
 
     def _show(self, data):
-        jobs,selection=data
+        jobs,selection,observed=data
         self.c.window.versions_view.show_jobs(jobs)
         self.c.window.versions_view.selection.setText(f"App selection: {selection['version']} · selection revision {selection['revision']}")
         self.c.window.advanced_view.jobs.setPlainText("\n".join(f"{job.id}\n{job.state} · {job.phase} · {job.error_code or 'No error'}" for job in jobs) or "No training jobs")
         self.c.window.advanced_view.artifacts.setPlainText("\n\n".join(
             f"{job.id}\nBase: {job.binding.base_sha256}\nDataset: {job.binding.dataset_sha256}\nProfile: {job.binding.profile_sha256}\nEngine: {job.binding.engine_sha256}" for job in jobs) or "No candidate artifacts")
+        gpu=next((dict(job.artifact_refs).get("prepare",{}).get("gpu") for job in jobs
+                  if dict(job.artifact_refs).get("prepare",{}).get("gpu")),None)
+        self.c.window.advanced_view.observed.setPlainText(
+            f"Observed available RAM at refresh: {observed['availableRamMiB']} MiB\n"
+            f"Observed owned runtime RSS: {observed['runtimeRssMiB'] if observed['runtimeRssMiB'] is not None else 'unavailable'} MiB\n"
+            f"Last recorded GPU preparation observation: {gpu if gpu else 'unavailable'}\n"
+            "These are observations, separate from the configured memory ceilings.")
 
     def review(self):
         try:
@@ -76,6 +100,8 @@ class Workflow(QObject):
                 admit_disk(((c.workspace,c.readiness["estimatedRunBytes"]),),floor=60*1073741824)
                 job=store.accept_job(binding,data)
                 self.progress.emit(job)
+                if job.state in ("completed","failed","cancelled","interrupted","needs-verification"):
+                    return job
                 coordinator=self.coordinator(store)
                 return coordinator.execute(job.id)
         c.submit(execute,self._finished)
@@ -92,6 +118,7 @@ class Workflow(QObject):
             self.c.status("Candidate verified and ready to test · Choose it explicitly in Versions")
             self.c.window.teaching_view.send.setEnabled(True)
         else:
+            self.c.window.runtime_status.setText("LOCAL WORKSPACE\nRuntime stopped")
             self.c.status(f"{job.state} · {job.error_code} · Existing model selection retained")
         self.refresh()
 
@@ -128,16 +155,11 @@ class Workflow(QObject):
         def select():
             with Store(c.database) as store:
                 coordinator=self.coordinator(store)
-                # Recheck the complete portable bundle before selecting a mutable tag.
-                bundle=coordinator.paths(job)["bundle"]
-                module=coordinator.module();module.verify_manifest(bundle)
-                deployment=module.read_json(bundle/"deployment.json")
                 c.runtime.cancelled.clear();c.runtime.ensure_started()
-                blob,actual=module.runtime_blob(c.runtime.store,deployment["candidateName"])
-                require(actual==deployment["ollamaGgufSha256"],"RUNTIME_MODEL_CHANGED")
+                model=coordinator.model_for_job(job)
                 raw=store.job_snapshot(job.id).profile_bytes;profile=json.loads(raw)
                 store.select_version(job.id,profile["profileId"],profile["revision"],store.selection()["revision"])
-                return store.active_profile(),deployment["candidateName"]
+                return store.active_profile(),model
         c.submit(select,self._selected)
 
     def _selected(self,result):
@@ -153,18 +175,15 @@ class Workflow(QObject):
         c=self.c
         def rollback():
             with Store(c.database) as store:
+                c.runtime.cancelled.clear()
                 previous=json.loads(store.setting("previousSelection","null"))
                 require(previous is not None,"NO_PREVIOUS_SELECTION")
                 version=previous["version"]
                 model="llama3.1:8b"
                 if version!="original":
                     job=store.get_job(version);require(job is not None and job.state=="completed","VERSION_NOT_VERIFIED")
-                    coordinator=self.coordinator(store);module=coordinator.module()
-                    bundle=coordinator.paths(job)["bundle"];module.verify_manifest(bundle)
-                    deployment=module.read_json(bundle/"deployment.json")
-                    _,actual=module.runtime_blob(c.runtime.store,deployment["candidateName"])
-                    require(actual==deployment["ollamaGgufSha256"],"RUNTIME_MODEL_CHANGED")
-                    model=deployment["candidateName"]
+                    coordinator=self.coordinator(store)
+                    model=coordinator.model_for_job(job)
                 c.runtime.cancelled.clear();c.runtime.ensure_started()
                 store.select_version(version,previous["profileId"],previous["profileRevision"],store.selection()["revision"])
                 return store.active_profile(),model
