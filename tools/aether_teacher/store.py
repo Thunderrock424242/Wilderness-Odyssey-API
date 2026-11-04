@@ -88,7 +88,8 @@ class Store:
         with self.transaction():
             old = self.active_profile()
             require(expected_revision == (old.revision if old else 0), "STALE_PROFILE")
-            new = Profile(old.id if old else str(uuid.uuid4()), expected_revision + 1, job, personality, boundaries)
+            next_revision = self.connection.execute("SELECT coalesce(max(revision),0)+1 FROM profiles WHERE id=?", (old.id,)).fetchone()[0] if old else 1
+            new = Profile(old.id if old else str(uuid.uuid4()), next_revision, job, personality, boundaries)
             compile_profile(new)
             self.connection.execute("INSERT INTO profiles VALUES(?,?,?)", (new.id, new.revision, encode(asdict(new))))
             self._setting("profile", json.dumps([new.id, new.revision]))
@@ -147,6 +148,16 @@ class Store:
             require(count < 200 and size + len(content.encode("utf-8")) <= 4 * 1024 * 1024, "TRANSCRIPT_LIMIT")
             self.connection.execute("INSERT INTO messages VALUES(?,?,?,?)", (session, count, role, content))
 
+    def append_turn(self, session, question, answer):
+        text(question, 4000, 1); text(answer, 16000, 1)
+        with self.transaction():
+            require(self.connection.execute("SELECT 1 FROM sessions WHERE id=?", (session,)).fetchone(), "SESSION_MISSING")
+            count, size = self.connection.execute(
+                "SELECT count(*),coalesce(sum(length(CAST(content AS BLOB))),0) FROM messages WHERE session=?", (session,)).fetchone()
+            require(count <= 198 and size + len(question.encode("utf-8")) + len(answer.encode("utf-8")) <= 4 * 1024 * 1024, "TRANSCRIPT_LIMIT")
+            self.connection.executemany("INSERT INTO messages VALUES(?,?,?,?)",
+                                       ((session, count, "user", question), (session, count + 1, "assistant", answer)))
+
     def accept_job(self, binding: JobBinding, data: Snapshot):
         validate_binding(binding, data)
         raw = encode(asdict(binding))
@@ -193,3 +204,61 @@ class Store:
         with self.transaction():
             self.connection.execute("UPDATE jobs SET state=CASE WHEN claimed=0 THEN 'cancelled' ELSE 'cancel-requested' END WHERE id=? AND state IN ('queued','running')", (job_id,))
         return self.get_job(job_id)
+
+    def complete_phase(self, job_id, phase, evidence):
+        require(isinstance(evidence, dict) and evidence.get("verified") is True, "PHASE_NOT_VERIFIED")
+        with self.transaction():
+            row = self.connection.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+            require(row is not None and row["phase"] == phase and row["claimed"] == 1, "PHASE_NOT_CLAIMED")
+            require(row["state"] in ("running", "cancel-requested"), "INVALID_JOB_STATE")
+            artifacts = json.loads(row["artifacts"]); artifacts[phase] = evidence
+            if row["state"] == "cancel-requested":
+                state, next_phase = "cancelled", phase
+            elif phase == PHASES[-1]:
+                state, next_phase = "completed", phase
+            else:
+                state, next_phase = "running", PHASES[PHASES.index(phase) + 1]
+            self.connection.execute("UPDATE jobs SET state=?,phase=?,claimed=0,artifacts=? WHERE id=?",
+                                    (state, next_phase, json.dumps(artifacts), job_id))
+        return self.get_job(job_id)
+
+    def stop_job(self, job_id, state, error):
+        require(state in ("failed", "cancelled", "interrupted", "needs-verification"))
+        import re
+        require(isinstance(error, str) and re.fullmatch("[A-Z0-9_]{1,96}", error), "INVALID_ERROR")
+        with self.transaction():
+            self.connection.execute("UPDATE jobs SET state=?,error=? WHERE id=? AND state NOT IN ('completed','cancelled')", (state, error, job_id))
+        return self.get_job(job_id)
+
+    def phase_claimed(self, job_id):
+        row = self.connection.execute("SELECT claimed FROM jobs WHERE id=?", (job_id,)).fetchone()
+        return bool(row and row[0])
+
+    def retry_job(self, job_id):
+        with self.transaction():
+            row = self.connection.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+            require(row is not None and row["state"] in ("interrupted", "failed"), "RETRY_NOT_AVAILABLE")
+            require(not (row["phase"] == "train" and row["claimed"]), "NEW_TRAINING_ACTION_REQUIRED")
+            require(not self.connection.execute("SELECT 1 FROM jobs WHERE state IN ('queued','running','cancel-requested')").fetchone(), "WORKFLOW_BUSY")
+            self.connection.execute("UPDATE jobs SET state='queued',claimed=0,error=NULL,attempt=? WHERE id=?", (str(uuid.uuid4()), job_id))
+        return self.get_job(job_id)
+
+    def selection(self):
+        return json.loads(self.setting("selection", '{"revision":0,"version":"original"}'))
+
+    def select_version(self, version, profile_id, profile_revision, expected_selection_revision):
+        with self.transaction():
+            current = self.selection()
+            require(current["revision"] == expected_selection_revision, "STALE_SELECTION")
+            self.profile(profile_id, profile_revision)
+            if version != "original":
+                job = self.get_job(version)
+                require(job is not None and job.state == "completed", "VERSION_NOT_VERIFIED")
+                accepted = json.loads(self.job_snapshot(version).profile_bytes)
+                require(accepted["profileId"] == profile_id and accepted["revision"] == profile_revision, "MODEL_PROFILE_MISMATCH")
+            current["profileId"], current["profileRevision"] = json.loads(self.setting("profile"))
+            self._setting("previousSelection", json.dumps(current))
+            selection = {"revision":expected_selection_revision+1,"version":version,"profileId":profile_id,"profileRevision":profile_revision}
+            self._setting("selection", json.dumps(selection))
+            self._setting("profile", json.dumps([profile_id, profile_revision]))
+        return selection

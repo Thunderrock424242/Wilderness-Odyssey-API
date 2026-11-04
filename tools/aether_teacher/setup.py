@@ -23,7 +23,7 @@ def sha_file(path):
 
 
 def engine_manifest(root):
-    return {name: sha_file(Path(root) / name) for name in ENGINE_FILES}
+    return {name: digest(local_path(Path(root) / name).read_bytes().replace(b"\r\n", b"\n")) for name in ENGINE_FILES}
 
 
 def verify_engine(root, manifest):
@@ -33,7 +33,15 @@ def verify_engine(root, manifest):
         require(name in ENGINE_FILES, "INVALID_ENGINE_MANIFEST")
         path = local_path(root / name)
         require(root in path.parents and path.is_file(), "ENGINE_MISSING")
-        require(sha_file(path) == expected, "ENGINE_CHANGED")
+        # Git's Windows checkout may translate line endings, without changing code.
+        require(digest(path.read_bytes().replace(b"\r\n", b"\n")) == expected, "ENGINE_CHANGED")
+
+
+def trusted_manifest():
+    path = Path(__file__).with_name("resources") / "engine-manifest.json"
+    result = json.loads(path.read_bytes())
+    require(set(result) == set(ENGINE_FILES), "INVALID_ENGINE_MANIFEST")
+    return result
 
 
 def admit_disk(requirements, floor=0):

@@ -10,6 +10,15 @@ from tools.aether_teacher.domain import Rejected
 
 
 class RuntimeTest(unittest.TestCase):
+    def test_managed_runtime_has_private_home_and_never_inherits_remote_host(self):
+        from tools.aether_teacher.runtime import runtime_environment
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = runtime_environment(root)
+            self.assertEqual(env["USERPROFILE"], str(root / "home"))
+            self.assertEqual(env["OLLAMA_HOST"], "127.0.0.1:11435")
+            self.assertEqual(env["OLLAMA_MODELS"], str(root / "models"))
+
     def test_occupied_runtime_port_is_left_untouched(self):
         from tools.aether_teacher.runtime import reserve_port
         with socket.socket() as listener:

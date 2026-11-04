@@ -107,6 +107,16 @@ class StoreTest(unittest.TestCase):
         with self.assertRaises(d.Rejected):
             Store(Path("//server/share/workspace.sqlite3"))
 
+    def test_selection_restores_profile_and_future_saves_do_not_collide_with_history(self):
+        first=self.store.save_profile("First","Brief","Ask")
+        second=self.store.save_profile("Second","Brief","Ask",expected_revision=1)
+        self.store.select_version("original",first.id,first.revision,0)
+        self.assertEqual(self.store.active_profile().job,"First")
+        third=self.store.save_profile("Third","Brief","Ask",expected_revision=1)
+        self.assertEqual(third.revision,3)
+        with self.assertRaises(d.Rejected):
+            self.store.select_version("original",second.id,second.revision,0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,43 @@
+"""Technical view of the same bounded workflow used by Lessons."""
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel, QPlainTextEdit, QPushButton, QFormLayout, QComboBox, QSpinBox
+from tools.aether_teacher.domain import PRESETS, RunLimits
+
+
+class AdvancedView(QWidget):
+    def __init__(self, workflow):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        tabs = QTabWidget()
+        layout.addWidget(tabs)
+        training = QWidget(); form = QFormLayout(training)
+        self.preset = QComboBox(); self.preset.addItems(PRESETS)
+        form.addRow("Approved preset", self.preset)
+        self.resolved = QLabel(); self.resolved.setWordWrap(True)
+        form.addRow("Resolved settings", self.resolved)
+        self.preset.currentTextChanged.connect(self.refresh_preset); self.refresh_preset()
+        for key, label, minimum, maximum, value in (("ram", "Training committed RAM / MiB",8192,32768,24576),
+                ("gpu","GPU allocation budget / MiB",4096,15000,11000),("threads","CPU threads",1,8,2),
+                ("timeout","Training deadline / seconds",10,3600,600)):
+            field=QSpinBox();field.setRange(minimum,maximum);field.setValue(value)
+            setattr(self,key,field);form.addRow(label,field)
+        train=QPushButton("Review selected lessons and train…");train.clicked.connect(workflow.review)
+        form.addRow(train)
+        tabs.addTab(training,"Training setup")
+        self.resources=QPlainTextEdit();self.resources.setReadOnly(True)
+        self.resources.setPlainText("Observed GPU/RAM: unavailable until measured\nTraining RAM ceiling: 24576 MiB\nManaged runtime committed-memory ceiling: 32768 MiB\nNo optimizer percentage or quality grade is estimated.")
+        tabs.addTab(self.resources,"Resources")
+        diagnostics=QWidget();box=QVBoxLayout(diagnostics)
+        self.jobs=QPlainTextEdit();self.jobs.setReadOnly(True);box.addWidget(self.jobs)
+        actions=QHBoxLayout()
+        cancel=QPushButton("Cancel current job");cancel.clicked.connect(workflow.cancel);actions.addWidget(cancel)
+        retry=QPushButton("Retry selected interrupted version");retry.clicked.connect(workflow.retry);actions.addWidget(retry)
+        box.addLayout(actions);tabs.addTab(diagnostics,"Jobs & diagnostics")
+        self.artifacts=QPlainTextEdit();self.artifacts.setReadOnly(True)
+        tabs.addTab(self.artifacts,"Artifacts")
+
+    def refresh_preset(self):
+        steps,context,examples=PRESETS[self.preset.currentText()]
+        self.resolved.setText(f"{steps} steps · {context} tokens · up to {examples} examples\nNF4 · rank 4 · alpha 8 · LR 0.0002 · batch 1")
+
+    def limits(self):
+        return RunLimits(self.ram.value(),self.gpu.value(),self.threads.value(),self.timeout.value())

@@ -16,6 +16,8 @@ from tools.aether_teacher.domain import Rejected, require
 def private_environment():
     allowed = {"SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "PATH", "PATHEXT", "COMSPEC", "TEMP", "TMP", "LOCALAPPDATA", "APPDATA"}
     result = {key: value for key, value in os.environ.items() if key.upper() in allowed}
+    # Windows Path.home()/Ollama CLI require an identity path, not credentials.
+    result["USERPROFILE"] = str(Path.home())
     result.update(USERNAME="aether-local", HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
     return result
 

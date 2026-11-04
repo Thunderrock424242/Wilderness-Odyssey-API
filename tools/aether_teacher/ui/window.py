@@ -1,13 +1,34 @@
 """Native shell. All actions are delegated to one controller."""
 from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow, QPushButton,
-    QStackedWidget, QVBoxLayout, QWidget,
+    QStackedWidget, QVBoxLayout, QWidget, QMessageBox,
 )
 
 
+class TeacherWindow(QMainWindow):
+    def closeEvent(self, event):
+        controller = self.controller
+        if controller is not None and not controller.closed:
+            busy = controller.operations.pending or controller.storage.pending or controller.chat.reply is not None
+            if busy:
+                if not getattr(self, "exit_requested", False):
+                    answer = QMessageBox.question(self, "Work is in progress", "Cancel owned work and exit? Choose No to stay.")
+                    if answer != QMessageBox.StandardButton.Yes:
+                        event.ignore(); return
+                    self.exit_requested = True
+                    controller.stopping.set()
+                    controller.chat.cancel()
+                    controller.workflow.cancel()
+                event.ignore()
+                QTimer.singleShot(200, self.close)
+                return
+        event.accept()
+
+
 def create_window(controller: object) -> QMainWindow:
-    window = QMainWindow()
+    window = TeacherWindow()
     window.setWindowTitle("Aether Teacher")
     window.resize(1180, 780)
     window.setMinimumSize(880, 620)
@@ -34,7 +55,7 @@ def create_window(controller: object) -> QMainWindow:
         ("Advanced", "Inspect the local runtime, training settings, jobs, and artifacts."),
     )
     for index, (name, detail) in enumerate(descriptions):
-        button = QPushButton(name)
+        button = QPushButton(name.replace("&", "&&"))
         button.setCheckable(True)
         window.navigation.addButton(button, index)
         navigation_layout.addWidget(button)

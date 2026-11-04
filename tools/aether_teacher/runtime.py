@@ -26,6 +26,15 @@ def reserve_port():
         raise Rejected("RUNTIME_PORT_OCCUPIED") from None
 
 
+def runtime_environment(root):
+    root = local_path(root)
+    environment = private_environment()
+    environment.update(OLLAMA_HOST="127.0.0.1:11435", OLLAMA_MODELS=str(root / "models"),
+                       USERPROFILE=str(root / "home"), HOME=str(root / "home"),
+                       OLLAMA_NUM_PARALLEL="1", OLLAMA_MAX_LOADED_MODELS="1", OLLAMA_NO_CLOUD="1")
+    return environment
+
+
 class ManagedRuntime:
     def __init__(self, settings, origin, memory_mib=32768):
         require(settings.port == 11435)
@@ -50,9 +59,8 @@ class ManagedRuntime:
         require(not self.cancelled.is_set(), "CANCELLED")
         guard = reserve_port()
         self.store.mkdir(parents=True, exist_ok=True)
-        environment = private_environment()
-        environment.update(OLLAMA_HOST="127.0.0.1:11435", OLLAMA_MODELS=str(self.store),
-                           OLLAMA_NUM_PARALLEL="1", OLLAMA_MAX_LOADED_MODELS="1", OLLAMA_NO_CLOUD="1")
+        environment = runtime_environment(self.store.parent)
+        local_path(self.store.parent / "home").mkdir(parents=True, exist_ok=True)
         self.owner = OwnedJob(self.memory_mib)
         try:
             guard.close()
