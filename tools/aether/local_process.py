@@ -7,6 +7,7 @@ This does not change any machine security settings or unrelated processes.
 import ctypes
 from ctypes import wintypes
 import os
+import subprocess
 
 
 class OwnedJob:
@@ -47,6 +48,38 @@ class OwnedJob:
         import psutil
         for child in psutil.Process(process.pid).children(recursive=True):
             self.attach_pid(child.pid)
+
+    def start(self, command, **kwargs):
+        """Assign before the first instruction, including venv launcher children.
+
+        Newer Windows venv redirectors create their own child job. Assigning a
+        running redirector afterwards can conflict with that job's hierarchy.
+        Starting suspended makes our ownership the ancestor of every child job.
+        """
+        flags = kwargs.pop("creationflags", 0)
+        process = subprocess.Popen(command, creationflags=flags | 0x4, **kwargs)
+        try:
+            self.attach_pid(process.pid)
+            import psutil
+            threads = psutil.Process(process.pid).threads()
+            if len(threads) != 1:
+                raise ValueError("SUSPENDED_PROCESS_THREAD_REQUIRED")
+            self.api.OpenThread.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            self.api.OpenThread.restype = wintypes.HANDLE
+            self.api.ResumeThread.argtypes = [wintypes.HANDLE]
+            self.api.ResumeThread.restype = wintypes.DWORD
+            thread = self.api.OpenThread(0x2, False, threads[0].id)
+            try:
+                if not thread or self.api.ResumeThread(thread) == 0xFFFFFFFF:
+                    raise ValueError("SUSPENDED_PROCESS_RESUME_FAILED")
+            finally:
+                if thread:
+                    self.api.CloseHandle(thread)
+            return process
+        except BaseException:
+            process.kill()
+            process.wait(timeout=10)
+            raise
 
     def attach_pid(self, pid):
         handle = self.api.OpenProcess(0x100 | 0x1 | 0x1000,False,pid)  # SET_QUOTA | TERMINATE | QUERY_LIMITED_INFORMATION
