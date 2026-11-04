@@ -37,7 +37,8 @@ class RuntimeTest(unittest.TestCase):
             runtime = ManagedRuntime(settings, origin)
             runtime.import_source("llama3.1:8b")
             self.assertEqual((runtime.store / manifest.relative_to(source)).read_bytes(), manifest.read_bytes())
-            self.assertEqual(len(list((runtime.store / "blobs").iterdir())), 5)
+            # Params and config contain identical bytes and share one digest.
+            self.assertEqual(len(list((runtime.store / "blobs").iterdir())), 4)
             (blobs / layers[2]["digest"].replace(":", "-")).write_bytes(b"tampered")
             with self.assertRaisesRegex(Rejected, "SOURCE_BLOB_CHANGED"):
                 runtime.import_source("llama3.1:8b")
