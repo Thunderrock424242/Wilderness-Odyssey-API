@@ -104,6 +104,7 @@ class Controller(QObject):
             setattr(window, name, view)
             layout.addWidget(view, 1)
         window.findChild(__import__("PySide6.QtWidgets", fromlist=["QPushButton"]).QPushButton, "localSetup").clicked.connect(self.setup_dialog)
+        window.theme_choice.currentIndexChanged.connect(self.save_theme)
         self.submit(self._boot, self._loaded, storage=True)
 
     def _boot(self, store):
@@ -111,10 +112,11 @@ class Controller(QObject):
         sessions = store.sessions()
         session = store.setting("session")
         if session not in sessions:session=sessions[-1] if sessions else store.create_session()
-        return profile, session, store.messages(session), store.lessons()
+        return profile, session, store.messages(session), store.lessons(), store.theme()
 
     def _loaded(self, data):
-        self.profile, self.session, self.turns, lessons = data
+        self.profile, self.session, self.turns, lessons, theme = data
+        self._apply_theme(theme)
         self.window.profile_view.show_profile(self.profile)
         self.window.teaching_view.show_turns(self.turns)
         self.window.lessons_view.show_lessons(lessons)
@@ -128,6 +130,21 @@ class Controller(QObject):
                 self.connect_runtime(self.settings)
             except (OSError, ValueError):
                 self.status("Saved setup needs attention · Open Local setup")
+
+    def _apply_theme(self, theme):
+        from tools.aether_teacher.ui.themes import apply_theme
+        apply_theme(self.window, theme)
+        self.window.theme_choice.setEnabled(True)
+
+    def save_theme(self, index):
+        previous = self.window.theme
+        selected = self.window.theme_choice.currentData()
+        self.window.theme_choice.setEnabled(False)
+        def saved(theme):
+            self._apply_theme(theme)
+            self.status("Appearance saved · " + theme.capitalize() + " mode")
+        self.submit(lambda store: store.save_theme(selected), saved, storage=True,
+                    on_error=lambda error: self._apply_theme(previous))
 
     def save_profile(self):
         view = self.window.profile_view

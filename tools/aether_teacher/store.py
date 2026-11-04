@@ -74,6 +74,16 @@ class Store:
     def _setting(self, key, value):
         self.connection.execute("INSERT OR REPLACE INTO settings VALUES(?,?)", (key, value))
 
+    def theme(self):
+        value = self.setting("theme", "light")
+        return value if value in ("light", "dark") else "light"
+
+    def save_theme(self, value):
+        require(value in ("light", "dark"), "INVALID_THEME")
+        with self.transaction():
+            self._setting("theme", value)
+        return value
+
     def active_profile(self):
         ref = self.setting("profile")
         if not ref:

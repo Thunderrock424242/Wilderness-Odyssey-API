@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow, QPushButton,
-    QStackedWidget, QVBoxLayout, QWidget, QMessageBox,
+    QStackedWidget, QVBoxLayout, QWidget, QMessageBox, QComboBox,
 )
 
 
@@ -85,6 +85,14 @@ def create_window(controller: object) -> QMainWindow:
     window.navigation.idClicked.connect(window.pages.setCurrentIndex)
     window.navigation.button(0).setChecked(True)
     navigation_layout.addStretch()
+    navigation_layout.addWidget(QLabel("Appearance"))
+    window.theme_choice = QComboBox()
+    window.theme_choice.setObjectName("appearance")
+    window.theme_choice.setAccessibleName("Appearance")
+    window.theme_choice.addItem("Light", "light")
+    window.theme_choice.addItem("Dark", "dark")
+    window.theme_choice.setEnabled(False)
+    navigation_layout.addWidget(window.theme_choice)
     setup = QPushButton("Local setup")
     setup.setObjectName("localSetup")
     navigation_layout.addWidget(setup)
@@ -94,15 +102,7 @@ def create_window(controller: object) -> QMainWindow:
     layout.addWidget(window.pages, 1)
     window.setCentralWidget(root)
     window.statusBar().showMessage("Setup required · No model connected")
-    window.setStyleSheet("""
-        QMainWindow, QWidget { background: #f5f5f2; color: #252c30; font-family: 'Segoe UI'; font-size: 14px; }
-        QFrame#sidebar, QFrame#sidebar QLabel { background: #e9ece8; }
-        QLabel#brand { font-size: 23px; font-weight: 600; }
-        QLabel#heading { font-size: 26px; font-weight: 600; margin-bottom: 9px; }
-        QPushButton { padding: 11px 14px; border: 1px solid #cbd2cc; border-radius: 4px; text-align: left; }
-        QPushButton:checked { background: #d6e2d7; border-color: #8ca893; }
-        QPushButton:disabled { color: #858b87; }
-        QStatusBar { border-top: 1px solid #d7ddd7; }
-    """)
+    from tools.aether_teacher.ui.themes import apply_theme
+    apply_theme(window, "light")
     window.controller = controller
     return window

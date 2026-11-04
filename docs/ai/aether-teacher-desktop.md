@@ -16,6 +16,8 @@ The local installation is `%LOCALAPPDATA%/Programs/AetherTeacher`, with an **Aet
 
 New/select/export/delete chat actions manage the bounded local history. Twenty sessions, 200 messages per session, 4 MiB of text per session and a 256 MiB SQLite database are finite limits; capacity never silently deletes lessons or accepted snapshots. Chat export is an explicit private-data export, separate from model export.
 
+Use **Appearance** near the bottom of the sidebar to choose **Light** or **Dark**. The choice is saved in the private workspace and restored on startup; existing workspaces start in Light mode. Both palettes cover the five pages, inputs, lists, tabs and app dialogs. Appearance is independent of model selection, profiles and training bindings. Native operating-system file pickers retain their Windows appearance.
+
 ## Private paths and runtime
 
 The default workspace is `%LOCALAPPDATA%/WildernessOdyssey/AetherTeacher`. `settings.json`, `workspace.sqlite3`, the exclusive application lease, engine staging, jobs and `runtime/` belong there. Settings contain local paths, not service credentials. Do not commit or publish this directory. An explicit `--workspace` argument supports a separate local test workspace; linked/UNC paths are rejected.
