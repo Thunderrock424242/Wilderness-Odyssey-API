@@ -138,10 +138,28 @@ public final class OllamaAdapter implements AutoCloseable {
         return result;
     }
 
+    /** No profile lookup, history, tools, training or retention in this surface adapter. */
+    public String chatDialogue(com.thunder.aether.server.api.ChatRequest input,long deadline) throws Failure {
+        JsonArray messages=new JsonArray();
+        message(messages,"system",prompts.chatGeneration()); message(messages,"user",input.message());
+        JsonObject draft=chat(messages,config.maxOutputTokens(),0.65,deadline);
+        if (!draft.keySet().equals(Set.of("response"))) throw new Failure("INVALID_MODEL_RESPONSE");
+        String answer=string(draft,"response").trim();
+        if (answer.isBlank() || answer.length()>2000 || answer.indexOf(0)>=0) throw new Failure("INVALID_MODEL_RESPONSE");
+        JsonArray verification=new JsonArray();
+        message(verification,"system",prompts.chatVerification(input.message(),answer));
+        message(verification,"user","Verify the candidate now.");
+        JsonObject verdict=chat(verification,32,0,deadline);
+        if (!verdict.keySet().equals(Set.of("approved")) || !verdict.get("approved").isJsonPrimitive()
+                || !verdict.get("approved").getAsJsonPrimitive().isBoolean() || !verdict.get("approved").getAsBoolean())
+            throw new Failure("UNVERIFIED_RESPONSE");
+        return answer;
+    }
+
     private JsonObject chat(JsonArray messages,int tokens,double temperature,long deadline) throws Failure {
         JsonObject request=new JsonObject();
         request.addProperty("model",config.model()); request.addProperty("stream",false);
-        request.addProperty("format","json"); request.addProperty("keep_alive","1h");
+        request.addProperty("format","json"); request.addProperty("think",false); request.addProperty("keep_alive","1h");
         request.add("messages",messages);
         JsonObject options=new JsonObject();
         options.addProperty("num_predict",tokens); options.addProperty("temperature",temperature); request.add("options",options);

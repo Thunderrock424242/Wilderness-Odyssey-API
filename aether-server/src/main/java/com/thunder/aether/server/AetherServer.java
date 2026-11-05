@@ -3,6 +3,7 @@ package com.thunder.aether.server;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.thunder.aether.server.api.GenerateRequest;
+import com.thunder.aether.server.api.ChatRequest;
 import com.thunder.aether.server.api.JsonHttp;
 import com.thunder.aether.server.config.ServerConfig;
 import com.thunder.aether.server.model.PromptCatalog;
@@ -110,7 +111,7 @@ public final class AetherServer implements AutoCloseable {
             Scope required = switch (path) {
                 case "/health", "/ready", "/v1/admin/admission" -> path.equals("/v1/admin/admission")
                         && exchange.getRequestMethod().equals("POST") ? Scope.ADMINISTRATION : Scope.MONITORING;
-                case "/v1/aether/generate", "/v1/aether/status" -> Scope.INFERENCE;
+                case "/v1/aether/generate", "/v1/aether/status", "/v1/aether/chat", "/v1/aether/chat/status" -> Scope.INFERENCE;
                 default -> path.startsWith("/v1/admin/playground/")
                         ? path.equals("/v1/admin/playground/capabilities") && exchange.getRequestMethod().equals("GET") ? Scope.MONITORING : Scope.ADMINISTRATION
                         : path.startsWith("/v1/service/") ? exchange.getRequestMethod().equals("GET") ? Scope.SERVICE_READ : Scope.SERVICE_WRITE : null;
@@ -128,6 +129,12 @@ public final class AetherServer implements AutoCloseable {
                 playground.handle(exchange,this::send,dependency,dependencyCheckedAt,dependencyLatencyMs);return;
             }
             if (path.equals("/v1/admin/admission")) { administer(exchange); return; }
+            if (path.equals("/v1/aether/chat/status")) {
+                if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
+                send(exchange,200,Map.of("schemaVersion","1.0","serverId",config.security().minecraftServerId(),
+                        "model",config.model(),"available",config.activation().permits(config.model())
+                        && admission.allowsInference() && Boolean.TRUE.equals(dependency.get("ready")))); return;
+            }
             if (path.equals("/v1/aether/status")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
                 send(exchange,200,Map.of("available",config.activation().permits(config.model())
@@ -141,7 +148,7 @@ public final class AetherServer implements AutoCloseable {
                 state.putAll(admission.snapshot());
                 send(exchange,200,state); return;
             }
-            if (!path.equals("/ready") && !path.equals("/v1/aether/generate")) { error(exchange,404,"","NOT_FOUND"); return; }
+            if (!path.equals("/ready") && !path.equals("/v1/aether/generate") && !path.equals("/v1/aether/chat")) { error(exchange,404,"","NOT_FOUND"); return; }
             if (path.equals("/ready")) {
                 if (!exchange.getRequestMethod().equals("GET")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
                 Map<String,Object> state=new HashMap<>(dependency);
@@ -183,24 +190,28 @@ public final class AetherServer implements AutoCloseable {
             }
             byte[] body=exchange.getRequestBody().readNBytes(config.maxRequestBytes()+1);
             if (body.length>config.maxRequestBytes()) { error(exchange,413,"","REQUEST_TOO_LARGE"); return; }
-            GenerateRequest request=GenerateRequest.parse(JsonHttp.object(body),prompts.speakers());
-            if (!request.serverId().equals(config.security().minecraftServerId())) {
-                error(exchange,403,request.requestId(),"SERVER_ID_MISMATCH"); return;
+            ChatRequest chat=path.equals("/v1/aether/chat") ? ChatRequest.parse(JsonHttp.object(body)) : null;
+            GenerateRequest request=chat==null ? GenerateRequest.parse(JsonHttp.object(body),prompts.speakers()) : null;
+            String requestId=chat==null ? request.requestId() : chat.requestId();
+            String serverId=chat==null ? request.serverId() : chat.serverId();
+            if (!serverId.equals(config.security().minecraftServerId())) {
+                error(exchange,403,requestId,"SERVER_ID_MISMATCH"); return;
             }
             if (!config.activation().permits(config.model())) {
-                error(exchange,503,request.requestId(),"ACTIVATION_REQUIRED"); return;
+                error(exchange,503,requestId,"ACTIVATION_REQUIRED"); return;
             }
-            if (!admission.allowsInference()) { error(exchange,503,request.requestId(),"INFERENCE_PAUSED"); return; }
+            if (!admission.allowsInference()) { error(exchange,503,requestId,"INFERENCE_PAUSED"); return; }
             long received=System.nanoTime();
             // Queue waiting and both Ollama calls consume one total service deadline.
             long deadline=received+TimeUnit.SECONDS.toNanos(config.timeoutSeconds());
             ScheduledFuture<?> generationTimeout=timers.schedule(exchange::close,config.timeoutSeconds()+1L,TimeUnit.SECONDS);
             try {
-                generations.execute(() -> generate(exchange,request,received,deadline,generationTimeout));
+                generations.execute(() -> { if (chat==null) generate(exchange,request,received,deadline,generationTimeout);
+                    else generateChat(exchange,chat,deadline,generationTimeout); });
                 handedOff=true;
             } catch (RejectedExecutionException overload) {
                 generationTimeout.cancel(false);
-                exchange.getResponseHeaders().set("Retry-After","1"); error(exchange,503,request.requestId(),"OVERLOADED");
+                exchange.getResponseHeaders().set("Retry-After","1"); error(exchange,503,requestId,"OVERLOADED");
             }
         } catch (Exception invalid) {
             error(exchange,400,"","INVALID_REQUEST");
@@ -239,6 +250,20 @@ public final class AetherServer implements AutoCloseable {
         }
     }
 
+    private void generateChat(HttpExchange exchange,ChatRequest request,long deadline,ScheduledFuture<?> timeout) {
+        try {
+            if (closed.get()) { error(exchange,503,request.requestId(),"SHUTTING_DOWN"); return; }
+            if (!admission.allowsInference()) { error(exchange,503,request.requestId(),"INFERENCE_PAUSED"); return; }
+            if (System.nanoTime()>=deadline) { error(exchange,408,request.requestId(),"TIMEOUT"); return; }
+            String response=ollama.chatDialogue(request,deadline);
+            send(exchange,200,Map.of("schemaVersion","1.0","requestId",request.requestId(),
+                    "serverId",config.security().minecraftServerId(),"model",config.model(),"success",true,"response",response));
+        } catch (OllamaAdapter.Failure failure) {
+            error(exchange,failure.code().equals("TIMEOUT") ? 408 : 503,request.requestId(),failure.code());
+        } catch (Exception failure) { error(exchange,503,request.requestId(),"MODEL_ERROR"); }
+        finally { timeout.cancel(false); exchanges.remove(exchange); callers.remove(exchange); exchange.close(); }
+    }
+
     private void administer(HttpExchange exchange) {
         if (exchange.getRequestMethod().equals("GET")) { send(exchange,200,admission.snapshot()); return; }
         if (!exchange.getRequestMethod().equals("POST")) { error(exchange,405,"","METHOD_NOT_ALLOWED"); return; }
@@ -258,7 +283,7 @@ public final class AetherServer implements AutoCloseable {
 
     private void send(HttpExchange exchange, int status, Object body) {
         String path = exchange.getRequestURI().getPath();
-        String operation = Set.of("/health", "/ready", "/v1/aether/status", "/v1/aether/generate", "/v1/admin/admission")
+        String operation = Set.of("/health", "/ready", "/v1/aether/status", "/v1/aether/generate", "/v1/aether/chat", "/v1/aether/chat/status", "/v1/admin/admission")
                 .contains(path) ? path : path.startsWith("/v1/admin/playground/")?"PLAYGROUND":path.startsWith("/v1/service/")?"MAIN_SERVICE":"UNKNOWN";
         Scope caller = callers.get(exchange);
         if (!audit.record(operation, caller == null ? "UNAUTHENTICATED" : caller.name(), status)) {
