@@ -11,6 +11,9 @@ class TeacherWindow(QMainWindow):
     def closeEvent(self, event):
         controller = self.controller
         if controller is not None and not controller.closed:
+            if controller.workspace_transfer:
+                event.ignore()
+                return
             busy = controller.operations.pending or controller.storage.pending or controller.chat.reply is not None
             if busy:
                 if not getattr(self, "exit_requested", False):

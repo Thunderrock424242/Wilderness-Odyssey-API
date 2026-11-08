@@ -1,7 +1,7 @@
 [Setup]
 AppId={{C8EE42BD-95EE-47D5-A8F0-64C854906586}
 AppName=Aether Playground
-AppVersion=1.0.0
+AppVersion=1.0.1
 AppPublisher=Wilderness Odyssey
 DefaultDirName={localappdata}\Programs\Aether Playground
 DefaultGroupName=Aether Playground

@@ -4,10 +4,13 @@ This is the desktop app whose window is titled **Aether Teacher**. The installer
 
 ## Before reinstalling Windows
 
-1. Copy the entire `release/Aether-Playground-Windows` folder to Google Drive or another drive. Keep the `.exe` and **every** `.bin` file together. `SHA256SUMS.txt` lists the hashes for checking your downloaded copy. Check that your backup destination has space for the complete release and your separate private workspace.
-2. Let any Aether training finish and close every Aether window. Press **Win+R**, enter `%LOCALAPPDATA%\WildernessOdyssey`, and locate the `AetherTeacher` folder. This is your private workspace. Back it up separately from the installer. Keep its Drive sharing set to **Restricted**.
-3. Copy the contents of the workspace, including `workspace.sqlite3` and any `-wal` or `-shm` files, `settings.json`, `jobs`, `engine-state`, and `runtime\qwen35-models` if present. You can skip `workspace.lock` and `runtime\home`, which the app recreates. `runtime\home` can contain Ollama's private identity keys. You can also skip `native-smoke.*` and `startup-error.json` diagnostics.
-4. Save exports you put outside the workspace separately. Confirm the release and private workspace have finished uploading and that you can access both from another device or a browser before wiping Windows.
+1. Upload `release/Aether-Playground-Windows.zip` to Google Drive or another drive. You can also copy the complete installer folder. Keep the `.exe` and **every** `.bin` file together. `SHA256SUMS.txt` lists the hashes for checking your downloaded copy.
+2. When Aether is idle, open **Advanced → Backup & restore → Create Backup**. Save the ZIP somewhere outside the Aether workspace. Keep its Drive sharing set to **Restricted**. This archive holds profiles, lessons, chats, appearance, export-folder preference, jobs, and trained candidates. Aether rebuilds the bundled stock-model cache and uses the new installation's runtime paths when you restore.
+3. Save any exports you put outside the workspace separately. Confirm the installer ZIP and private workspace backup have finished uploading and that you can access both before wiping Windows.
+
+### Manual backup for an older version
+
+Let training finish and close Aether. Press **Win+R**, enter `%LOCALAPPDATA%\WildernessOdyssey`, and locate the `AetherTeacher` folder. Copy its contents, including `workspace.sqlite3` and any companion SQLite files, `settings.json`, `jobs`, `engine-state`, and `runtime\qwen35-models`. Aether recreates `workspace.lock` and `runtime\home`. The latter can contain Ollama's private identity keys, so leave it out.
 
 To make a smaller backup for this release, use the PowerShell commands below. They skip the exact 2.7 GB stock Qwen cache file that the installer already contains. Aether verifies and recreates that file after restore. The copy keeps trained candidate files and every other model blob. Change `E:\Aether-Private-Backup` to an empty destination outside the workspace and upload the resulting folder privately.
 
@@ -29,10 +32,16 @@ if ($LASTEXITCODE -ge 8) { throw 'The Aether backup copy failed. Check the roboc
 
 ## Install and restore
 
-1. Use fully updated Windows 11 x64 or Windows 10 22H2 x64. Download the complete release folder to a local drive. Leave at least 30 GB free for the app and its first startup, plus room for your downloaded files and workspace. Aether's training admission check requires at least 60 GiB free in the workspace at run time.
-2. Double-click `Aether-Playground-Setup-x64.exe`. Keep the numbered `.bin` files beside it throughout installation. Approve the Microsoft Visual C++ x64 runtime setup if prompted. This personal build is unsigned, so verify its SHA-256 against your saved copy if Windows shows an unknown publisher. Setup adds **Aether Playground** to Start. Leave **Open Aether Playground** unchecked if restoring a workspace.
-3. Copy the private backup back into `%LOCALAPPDATA%\WildernessOdyssey\AetherTeacher`. If a new blank workspace already exists, close the app and rename that folder first so you can restore into a clean location. Copy the backed-up `AetherTeacher` folder contents directly into the destination, with `workspace.sqlite3` at its top level.
-4. In PowerShell, run the commands below. Use your chosen installation folder if you changed it in Setup. This replaces the old machine's local runtime paths with the bundled paths. It preserves the existing database and artifacts. A fresh installation with no backup can skip this step and open the app from Start.
+1. Use fully updated Windows 11 x64 or Windows 10 22H2 x64. Download the installer ZIP and extract it completely to a local drive. Leave at least 30 GB free for the app and its first startup, plus room for the ZIP, its extracted files, and your workspace. Aether's training admission check requires at least 60 GiB free in the workspace at run time.
+2. Double-click `Aether-Playground-Setup-x64.exe`. Keep the numbered `.bin` files beside it throughout installation. Approve the Microsoft Visual C++ x64 runtime setup if prompted. This personal build is unsigned, so verify its SHA-256 against your saved copy if Windows shows an unknown publisher. Setup adds **Aether Playground** to Start.
+3. Open **Aether Playground** and let local setup finish. Go to **Advanced → Backup & restore → Import Backup**, select your private backup ZIP, and confirm. Aether checks the archive and closes. Reopen the app to finish importing. The workspace it replaced is kept in a sibling `AetherTeacher-before-import-*` folder under `%LOCALAPPDATA%\WildernessOdyssey`.
+4. Confirm your profile, lessons, chat history, and appearance. Open **Advanced** to check runtime readiness, then send a test message. Review any restored local candidate under **Versions**.
+
+If you manually configured runtime assets inside the replaced workspace, find them in the recovery folder and select their new paths in **Local setup**. The bundled installer keeps its runtime assets in the installation folder.
+
+### Restore a manual folder backup
+
+Close Aether. If a new blank workspace already exists, rename that folder first. Copy your backed-up folder contents into `%LOCALAPPDATA%\WildernessOdyssey\AetherTeacher`, with `workspace.sqlite3` at its top level. Run the following in PowerShell to connect the restored workspace to the new installation. Use your chosen installation folder if you changed it in Setup.
 
    ```powershell
    $app = Join-Path $env:LOCALAPPDATA 'Programs\Aether Playground'
@@ -40,7 +49,7 @@ if ($LASTEXITCODE -ge 8) { throw 'The Aether backup copy failed. Check the roboc
    if ($LASTEXITCODE) { throw 'Aether could not rebind the restored workspace.' }
    ```
 
-5. Open **Aether Playground** from Start. Give it time to verify the stock base and copy its chat model into the workspace on first launch. Confirm your profile, lessons, chat history, and appearance. Open **Advanced** to check runtime readiness, then send a test message. Review any restored local candidate under **Versions**.
+Open **Aether Playground** from Start. Give it time to verify the stock base and copy its chat model into the workspace on first launch.
 
 The stock runtime uses the private loopback port `127.0.0.1:11435`. For NVIDIA acceleration and QLoRA training, install the current supported NVIDIA driver for your GPU after Windows setup. The bundled Torch CUDA runtime still needs the system's NVIDIA driver. The small preset checks for about 11,000 MiB of free GPU memory. The tested laptop has an RTX 4090 Laptop GPU with 16 GiB VRAM. Use at least 32 GiB of system RAM for training. CPU inference is available through Ollama and will be slower. The desktop release uses local files and has no server, Discord, or Hugging Face credentials to restore.
 

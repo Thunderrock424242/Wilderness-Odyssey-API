@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import uuid
 import zipfile
 
 from tools.aether import laptop, qwen35
@@ -160,6 +161,25 @@ def compile_installer(work, stage, output):
     print(f"Installer, payload files, and checksums are in {output}")
 
 
+def zip_release(release, output):
+    require((release / "SHA256SUMS.txt").is_file() and not output.exists()
+            and release not in output.parents, "RELEASE_ZIP_DESTINATION")
+    temporary = output.with_name(f".aether-release-{uuid.uuid4().hex}.tmp")
+    try:
+        with zipfile.ZipFile(temporary, "x", compression=zipfile.ZIP_STORED) as archive:
+            for path in sorted(release.rglob("*")):
+                if local_path(path).is_file():
+                    archive.write(path, (Path(release.name) / path.relative_to(release)).as_posix())
+        with zipfile.ZipFile(temporary) as archive:
+            require(archive.testzip() is None, "RELEASE_ZIP_CRC_MISMATCH")
+        digest = sha_file(temporary)
+        temporary.rename(output)
+        output.with_suffix(".zip.sha256").write_text(f"{digest}  {output.name}\n", encoding="ascii")
+        print(f"Verified installer ZIP in {output}")
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work", type=Path, required=True)
@@ -167,6 +187,7 @@ def main():
     parser.add_argument("--rocm", type=Path, help="Verified optional AMD libraries from the same Ollama release")
     parser.add_argument("--stage", type=Path, required=True, help="New build staging directory")
     parser.add_argument("--output", type=Path, required=True, help="New or empty release folder")
+    parser.add_argument("--zip-output", type=Path, help="Optional ZIP of the completed release")
     args = parser.parse_args()
     work, stage, output = map(local_path, (args.work, args.stage, args.output))
     require(not stage.exists() and (not output.exists() or not any(output.iterdir())), "BUILD_OUTPUT_NOT_EMPTY")
@@ -184,6 +205,8 @@ def main():
     copy(license_file, stage / "licenses/Ollama.txt")
     stage_models(stage, ROOT / ".codex-build/aether-qwen")
     compile_installer(work, stage, output)
+    if args.zip_output:
+        zip_release(output, local_path(args.zip_output))
 
 
 if __name__ == "__main__":

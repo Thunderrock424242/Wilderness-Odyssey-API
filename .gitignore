@@ -56,3 +56,5 @@ repo
 **/credentials.env
 /config/wildernessodysseyapi/playtest-diagnostics/
 /release/Aether-Playground-Windows/
+/release/Aether-Playground-Windows.zip
+/release/Aether-Playground-Windows.zip.sha256

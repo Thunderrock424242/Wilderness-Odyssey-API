@@ -53,6 +53,20 @@ class AdvancedView(QWidget):
         handoff_form.addRow(guide)
         tabs.addTab(handoff, "API handoff")
 
+        backups = QWidget()
+        backup_form = QFormLayout(backups)
+        note = QLabel("Save your profiles, lessons, chats, and trained candidates to one ZIP. "
+                      "Keep the file private. Import replaces this workspace after you reopen Aether.")
+        note.setWordWrap(True)
+        backup_form.addRow(note)
+        create = QPushButton("Create Backup…")
+        create.clicked.connect(workflow.create_workspace_backup)
+        backup_form.addRow(create)
+        restore = QPushButton("Import Backup…")
+        restore.clicked.connect(workflow.import_workspace_backup)
+        backup_form.addRow(restore)
+        tabs.addTab(backups, "Backup & restore")
+
     def refresh_preset(self):
         steps,context,examples=PRESETS[self.preset.currentText()]
         self.resolved.setText(f"{steps} steps · {context} tokens · up to {examples} examples\nNF4 · rank 4 · alpha 8 · LR 0.0002 · batch 1")

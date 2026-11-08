@@ -10,13 +10,13 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from tools.aether_teacher.domain import RuntimeSettings, local_path, require
-from tools.aether_teacher.lease import WorkspaceLease
+from tools.aether_teacher.backup import open_workspace
 from tools.aether_teacher.setup import default_workspace, save_settings, trusted_manifest, verify_engine
 
 
 def configure(workspace, replace=False):
     workspace = local_path(workspace)
-    with WorkspaceLease(workspace):
+    with open_workspace(workspace):
         if (workspace / "settings.json").exists() and not replace:
             return
         verify_engine(ROOT, trusted_manifest())

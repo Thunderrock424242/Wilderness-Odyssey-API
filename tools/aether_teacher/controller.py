@@ -36,12 +36,13 @@ class Controller(QObject):
         self.workflow = None
         self.lease = None
         self.chat_pending = False
+        self.workspace_transfer = False
 
     def _db(self, operation):
         def run():
             if self.store is None:
-                from tools.aether_teacher.lease import WorkspaceLease
-                self.lease = WorkspaceLease(self.workspace)
+                from tools.aether_teacher.backup import open_workspace
+                self.lease = open_workspace(self.workspace)
                 try:self.store = Store(self.database)
                 except BaseException:
                     self.lease.close();self.lease=None

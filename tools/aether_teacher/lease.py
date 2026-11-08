@@ -5,9 +5,11 @@ from tools.aether_teacher.domain import Rejected, local_path
 
 
 class WorkspaceLease:
-    def __init__(self, root):
-        root=local_path(root);root.mkdir(parents=True,exist_ok=True)
-        self.stream=local_path(root/"workspace.lock").open("a+b")
+    def __init__(self, root, *, maintenance=False):
+        root=local_path(root)
+        path = root.parent / f".{root.name}.maintenance.lock" if maintenance else root / "workspace.lock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.stream=local_path(path).open("a+b")
         if self.stream.tell()==0:
             self.stream.write(b"0");self.stream.flush();os.fsync(self.stream.fileno())
         self.stream.seek(0)

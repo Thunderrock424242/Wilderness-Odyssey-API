@@ -1,10 +1,11 @@
 """Desktop actions around the durable worker; shared by simple and Advanced UI."""
 from dataclasses import asdict
+from datetime import datetime
 import json
 from pathlib import Path
 import uuid
 from PySide6.QtCore import QObject, Signal, Qt
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPlainTextEdit, QPushButton, QFileDialog
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPlainTextEdit, QPushButton, QFileDialog, QMessageBox
 from tools.aether_teacher.domain import JobBinding, Rejected, bounded_context, compile_profile, digest, encode, require, snapshot
 from tools.aether_teacher.jobs import JobCoordinator
 from tools.aether_teacher.store import Store
@@ -232,6 +233,68 @@ class Workflow(QObject):
         folder = QFileDialog.getExistingDirectory(c.window, "Choose default export folder", field.text())
         if folder:
             c.submit(lambda store: store.save_export_folder(Path(folder)), field.setText, storage=True)
+
+    def _workspace_idle(self):
+        c = self.c
+        if (c.lease is None or c.profile is None or c.storage.pending or c.operations.pending
+                or c.chat.reply is not None or c.chat_pending or c.workspace_transfer):
+            c.status("Wait for the current workspace operation to finish")
+            return False
+        return True
+
+    def _transfer_workspace(self, operation, success, status):
+        if not self._workspace_idle():
+            return
+        c = self.c
+        c.workspace_transfer = True
+        c.window.setEnabled(False)
+        c.status(status)
+
+        def finish():
+            c.workspace_transfer = False
+            c.window.setEnabled(True)
+
+        def completed(result):
+            finish()
+            success(result)
+
+        c.submit(operation, completed, storage=True, on_error=lambda error: finish())
+
+    def create_workspace_backup(self):
+        if not self._workspace_idle():
+            return
+        from tools.aether_teacher.backup import create_backup
+        c = self.c
+        suggested = datetime.now().strftime("Aether-Backup-%Y-%m-%d-%H%M%S.zip")
+        path, _ = QFileDialog.getSaveFileName(c.window, "Save private Aether backup", str(Path.home() / suggested),
+                                             "Aether backup (*.zip)", options=QFileDialog.Option.DontConfirmOverwrite)
+        if path:
+            destination = Path(path)
+            if not destination.suffix:
+                destination = destination.with_suffix(".zip")
+            self._transfer_workspace(lambda store: create_backup(c.workspace, store.connection, destination),
+                                     lambda output: c.status("Backup saved to " + str(output)), "Creating private backup…")
+
+    def import_workspace_backup(self):
+        if not self._workspace_idle():
+            return
+        from tools.aether_teacher.backup import queue_import
+        c = self.c
+        path, _ = QFileDialog.getOpenFileName(c.window, "Open private Aether backup", str(Path.home()),
+                                             "Aether backup (*.zip)")
+        if not path:
+            return
+        answer = QMessageBox.question(c.window, "Replace this workspace?",
+                                      "Aether will keep a recovery copy of your current workspace and close after "
+                                      "checking the ZIP. Reopen Aether to finish importing.")
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        def ready(_):
+            QMessageBox.information(c.window, "Backup verified", "Reopen Aether to finish importing your backup.")
+            c.window.close()
+
+        self._transfer_workspace(lambda store: queue_import(c.workspace, Path(path)), ready, "Checking private backup…")
 
     def export(self):
         try:
