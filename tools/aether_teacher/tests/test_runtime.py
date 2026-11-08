@@ -46,7 +46,18 @@ class RuntimeTest(unittest.TestCase):
             runtime = ManagedRuntime(settings, origin)
             runtime.import_source("qwen3.5:4b")
             with self.assertRaisesRegex(Rejected,"SOURCE_TAG_MISMATCH"):runtime.import_source("llama3.1:8b")
-            self.assertEqual((runtime.store / manifest.relative_to(source)).read_bytes(), manifest.read_bytes())
+            private = runtime.store / manifest.relative_to(source)
+            self.assertEqual(private.read_bytes(), manifest.read_bytes())
+            legacy = json.loads(manifest.read_bytes())
+            legacy["layers"][0]["from"] = r"C:\previous\machine\model.gguf"
+            private.write_text(json.dumps(legacy, indent=2), encoding="utf-8")
+            runtime.import_source("qwen3.5:4b")
+            self.assertEqual(private.read_bytes(), manifest.read_bytes())
+            legacy["layers"][2]["digest"] = "sha256:" + "a" * 64
+            private.write_text(json.dumps(legacy), encoding="utf-8")
+            with self.assertRaisesRegex(Rejected, "PRIVATE_MANIFEST_CHANGED"):
+                runtime.import_source("qwen3.5:4b")
+            private.write_bytes(manifest.read_bytes())
             # Params and config contain identical bytes and share one digest.
             self.assertEqual(len(list((runtime.store / "blobs").iterdir())), 4)
             (blobs / layers[2]["digest"].replace(":", "-")).write_bytes(b"tampered")

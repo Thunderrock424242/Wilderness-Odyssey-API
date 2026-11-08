@@ -12,6 +12,7 @@ import zipfile
 
 from tools.aether import laptop, qwen35
 from tools.aether_teacher.domain import local_path, require
+from tools.aether_teacher.runtime import portable_source_manifest
 from tools.aether_teacher.setup import ENGINE_FILES, sha_file, trusted_manifest, verify_engine
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -73,7 +74,7 @@ def stage_distribution(site, name, target):
             copy(site / relative, target / relative)
 
 
-def stage_python(stage, teacher, training):
+def stage_python(stage, teacher, training=None):
     archive = teacher / "python-3.12.10.nupkg"
     require(sha_file(archive) == PYTHON, "PYTHON_ARCHIVE_CHANGED")
     target = stage / "python"
@@ -83,7 +84,10 @@ def stage_python(stage, teacher, training):
                 continue
             relative = Path(name.removeprefix("tools/"))
             require(not relative.anchor and ".." not in relative.parts, "INVALID_PYTHON_ARCHIVE_PATH")
-            if relative.parts[0] in ("include", "libs") or "site-packages" in relative.parts:
+            if relative.parts[0] in ("include", "libs"):
+                continue
+            if "site-packages" in relative.parts and (
+                    training is not None or not relative.parts[2].startswith("pip")):
                 continue
             destination = target / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -92,12 +96,16 @@ def stage_python(stage, teacher, training):
     site = target / "Lib/site-packages"
     for name in GUI:
         stage_distribution(teacher / ".venv-cpython/Lib/site-packages", name, site)
-    for record in sorted(training.glob("*.dist-info/RECORD")):
-        name = record.parent.name.removesuffix(".dist-info")
-        if not name.startswith("pip-"):
-            stage_distribution(training, name, site)
     require((site / "PySide6/plugins/platforms/qwindows.dll").is_file(), "WINDOWS_QT_PLUGIN_MISSING")
-    require((site / "torch/lib/torch_cuda.dll").is_file(), "PYTORCH_CUDA_MISSING")
+    if training is None:
+        stage_distribution(teacher / ".venv-cpython/Lib/site-packages", "psutil-7.2.2", site)
+        require((site / "pip/__init__.py").is_file(), "SETUP_PIP_MISSING")
+    else:
+        for record in sorted(training.glob("*.dist-info/RECORD")):
+            name = record.parent.name.removesuffix(".dist-info")
+            if not name.startswith("pip-"):
+                stage_distribution(training, name, site)
+        require((site / "torch/lib/torch_cuda.dll").is_file(), "PYTORCH_CUDA_MISSING")
 
 
 def stage_models(stage, qwen):
@@ -127,6 +135,38 @@ def stage_models(stage, qwen):
     copy(source / manifest_path, assets / "source-store" / manifest_path)
 
 
+def stage_online(stage, qwen):
+    recipe = stage / "online"
+    copy(PACKAGE / "online-wheels.json", recipe / "wheels.json")
+    copy(PACKAGE / "online_setup.py", stage / PACKAGE.relative_to(ROOT) / "online_setup.py")
+    copy(ROOT / "docs/ai/aether-playground-online-windows.md", stage / "INSTALL-AND-RESTORE.md")
+    approved, base = laptop.approval(qwen / "base-approval.json")
+    require(base == (qwen / "base").resolve() and approved["baseSha256"] == BASE
+            and approved["modelId"] == "qwen3.5:4b", "UNEXPECTED_APPROVED_BASE")
+    approved.pop("modelDirectory")
+    (recipe / "base-identity.json").write_text(json.dumps(approved), encoding="utf-8")
+    copy(base / "source.json", recipe / "base-source.json")
+    origin = json.loads((base / "source.json").read_bytes())
+    source = qwen / "source-workspace/runtime/qwen35-models"
+    relative = Path("manifests/registry.ollama.ai/library/qwen3.5/4b")
+    manifest = portable_source_manifest(json.loads((source / relative).read_bytes()))
+    model = "sha256:" + origin["sourceGgufSha256"]
+    require(any(layer["digest"] == model for layer in manifest["layers"]), "SOURCE_MODEL_CHANGED")
+    store = recipe / "source-store"
+    for layer in [manifest["config"], *manifest["layers"]]:
+        digest = layer["digest"]
+        require(re.fullmatch(r"sha256:[0-9a-f]{64}", digest), "INVALID_SOURCE_BLOB")
+        if digest == model:
+            continue
+        require(0 < layer["size"] <= 65536, "ONLINE_RECIPE_BLOB_TOO_LARGE")
+        path = Path("blobs") / digest.replace(":", "-")
+        require(sha_file(source / path) == digest[7:], "SOURCE_BLOB_CHANGED")
+        copy(source / path, store / path)
+    target = store / relative
+    target.parent.mkdir(parents=True)
+    target.write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
+
+
 def verify_payload(stage):
     for path in stage.rglob("*"):
         relative = path.relative_to(stage)
@@ -135,13 +175,14 @@ def verify_payload(stage):
                                         "credentials", "id_ed25519", "id_rsa", "direct_url.json", "__pycache__"}
                         for part in relative.parts), f"Private or host-specific payload: {relative}")
         require(path.suffix.lower() not in {".sqlite", ".sqlite3", ".pem", ".key", ".pfx", ".p12"}
-                or relative.as_posix() == "python/Lib/site-packages/certifi/cacert.pem",
+                or relative.as_posix() in {"python/Lib/site-packages/certifi/cacert.pem",
+                                           "python/Lib/site-packages/pip/_vendor/certifi/cacert.pem"},
                 f"Unexpected credential or database file: {relative}")
         if path.suffix in (".safetensors", ".gguf"):
             require(relative.parts[:2] == ("models", "base"), "UNAPPROVED_MODEL_PAYLOAD")
 
 
-def compile_installer(work, stage, output):
+def compile_installer(work, stage, output, online=False):
     prerequisite = work / "vc_redist.x64.exe"
     require(sha_file(prerequisite) == VC_REDIST, "VC_REDIST_CHANGED")
     for name, expected in DEVELOPER_TOOLS.items():
@@ -150,8 +191,9 @@ def compile_installer(work, stage, output):
     print(f"Verified staged application in {stage}", flush=True)
     output.mkdir(parents=True, exist_ok=True)
     require(not any(output.iterdir()), "RELEASE_FOLDER_NOT_EMPTY")
+    flags = ["/DOnlineEdition=1"] if online else []
     subprocess.run([str(work / "inno/ISCC.exe"), "/Qp", f"/O{output}", f"/DPayload={stage}",
-                    f"/DPrerequisite={prerequisite}", str(PACKAGE / "windows.iss")], check=True)
+                    f"/DPrerequisite={prerequisite}", *flags, str(PACKAGE / "windows.iss")], check=True)
     copy(stage / "INSTALL-AND-RESTORE.md", output / "INSTALL-AND-RESTORE.md")
     for name in DEVELOPER_TOOLS:
         copy(work / "developer-tools" / name, output / "developer-tools" / name)
@@ -183,11 +225,12 @@ def zip_release(release, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work", type=Path, required=True)
-    parser.add_argument("--ollama", type=Path, required=True, help="Verified Ollama 0.17.7 Windows x64 portable tree")
+    parser.add_argument("--ollama", type=Path, help="Verified Ollama 0.17.7 Windows x64 portable tree for offline setup")
     parser.add_argument("--rocm", type=Path, help="Verified optional AMD libraries from the same Ollama release")
     parser.add_argument("--stage", type=Path, required=True, help="New build staging directory")
     parser.add_argument("--output", type=Path, required=True, help="New or empty release folder")
     parser.add_argument("--zip-output", type=Path, help="Optional ZIP of the completed release")
+    parser.add_argument("--online", action="store_true", help="Build the small download edition")
     args = parser.parse_args()
     work, stage, output = map(local_path, (args.work, args.stage, args.output))
     require(not stage.exists() and (not output.exists() or not any(output.iterdir())), "BUILD_OUTPUT_NOT_EMPTY")
@@ -197,14 +240,18 @@ def main():
     stage_app(stage)
     teacher = ROOT / ".codex-build/aether-teacher"
     training = ROOT / ".codex-build/aether-laptop/.venv/Lib/site-packages"
-    stage_python(stage, teacher, training)
-    copy(args.ollama / "ollama.exe", stage / "ollama/ollama.exe")
-    copy_tree(args.ollama / "lib", stage / "ollama/lib")
-    if args.rocm:
-        copy_tree(args.rocm / "lib", stage / "ollama/lib")
+    stage_python(stage, teacher, None if args.online else training)
+    if args.online:
+        stage_online(stage, ROOT / ".codex-build/aether-qwen")
+    else:
+        require(args.ollama is not None, "OLLAMA_BUILD_INPUT_REQUIRED")
+        copy(args.ollama / "ollama.exe", stage / "ollama/ollama.exe")
+        copy_tree(args.ollama / "lib", stage / "ollama/lib")
+        if args.rocm:
+            copy_tree(args.rocm / "lib", stage / "ollama/lib")
+        stage_models(stage, ROOT / ".codex-build/aether-qwen")
     copy(license_file, stage / "licenses/Ollama.txt")
-    stage_models(stage, ROOT / ".codex-build/aether-qwen")
-    compile_installer(work, stage, output)
+    compile_installer(work, stage, output, online=args.online)
     if args.zip_output:
         zip_release(output, local_path(args.zip_output))
 

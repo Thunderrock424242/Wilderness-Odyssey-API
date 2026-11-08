@@ -14,18 +14,29 @@ from tools.aether_teacher.backup import open_workspace
 from tools.aether_teacher.setup import default_workspace, save_settings, trusted_manifest, verify_engine
 
 
+def runtime_home():
+    if not (ROOT / "online/wheels.json").is_file():
+        return ROOT
+    from tools.aether_teacher.packaging.online_setup import READY
+    runtime = local_path(ROOT / "online-runtime")
+    marker = local_path(runtime / "ready")
+    require(marker.is_file() and marker.read_bytes() == READY, "ONLINE_RUNTIME_NOT_READY")
+    return runtime
+
+
 def configure(workspace, replace=False):
     workspace = local_path(workspace)
     with open_workspace(workspace):
         if (workspace / "settings.json").exists() and not replace:
             return
         verify_engine(ROOT, trusted_manifest())
-        assets = ROOT / "models"
+        runtime = runtime_home()
+        assets = runtime / "models"
         base = local_path(assets / "base")
         source_store = local_path(assets / "source-store")
         converter = local_path(assets / "toolchain/toolchain.json")
-        python = ROOT / "python/python.exe"
-        ollama = ROOT / "ollama/ollama.exe"
+        python = runtime / "python/python.exe"
+        ollama = runtime / "ollama/ollama.exe"
         require(all(path.is_file() for path in (base / "config.json", converter, python, ollama,
                     source_store / "manifests/registry.ollama.ai/library/qwen3.5/4b")),
                 "INSTALLED_ASSETS_MISSING")
@@ -47,13 +58,17 @@ def main():
     options = parser.parse_args()
     workspace = options.workspace or default_workspace()
     try:
+        runtime_home()
         configure(workspace, replace=options.configure)
     except Exception as error:
         if sys.stderr is not None:
             print(str(error), file=sys.stderr)
         else:
             from ctypes import windll
-            windll.user32.MessageBoxW(None, "Close other Aether windows and check the installation.\n" + str(error),
+            message = ("Open Download Aether Runtime from Start and finish the one-time setup."
+                       if str(error) == "ONLINE_RUNTIME_NOT_READY" else
+                       "Close other Aether windows and check the installation.\n" + str(error))
+            windll.user32.MessageBoxW(None, message,
                                       "Aether Playground", 0x10)
         return 1
     if options.configure:

@@ -1,23 +1,33 @@
 [Setup]
+#ifdef OnlineEdition
+AppId={{1A32EC6B-0CAC-4FC1-A4F4-096B16587062}
+AppName=Aether Playground Online
+AppVersion=1.0.1
+DefaultDirName={localappdata}\Programs\Aether Playground Online
+DefaultGroupName=Aether Playground Online
+OutputBaseFilename=Aether-Playground-Online-Setup-x64
+DiskSpanning=no
+#else
 AppId={{C8EE42BD-95EE-47D5-A8F0-64C854906586}
 AppName=Aether Playground
 AppVersion=1.0.1
-AppPublisher=Wilderness Odyssey
 DefaultDirName={localappdata}\Programs\Aether Playground
 DefaultGroupName=Aether Playground
+OutputBaseFilename=Aether-Playground-Setup-x64
+DiskSpanning=yes
+DiskSliceSize=2000000000
+SlicesPerDisk=20
+#endif
+AppPublisher=Wilderness Odyssey
 DisableProgramGroupPage=yes
 AllowNoIcons=yes
 PrivilegesRequired=lowest
 MinVersion=10.0.19045
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
-OutputBaseFilename=Aether-Playground-Setup-x64
 Compression=lzma2/fast
 LZMANumBlockThreads=6
 SolidCompression=yes
-DiskSpanning=yes
-DiskSliceSize=2000000000
-SlicesPerDisk=20
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayIcon={app}\python\pythonw.exe
@@ -31,11 +41,27 @@ Source: "{#Prerequisite}"; DestName: "vc_redist.x64.exe"; Flags: dontcopy noencr
 Source: "{#Payload}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
+#ifdef OnlineEdition
+Name: "{group}\Aether Playground Online"; Filename: "{app}\python\pythonw.exe"; Parameters: "-I -B ""{app}\tools\aether_teacher\packaging\windows_entry.py"""; WorkingDir: "{app}"
+Name: "{userdesktop}\Aether Playground Online"; Filename: "{app}\python\pythonw.exe"; Parameters: "-I -B ""{app}\tools\aether_teacher\packaging\windows_entry.py"""; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\Download Aether Runtime"; Filename: "{app}\python\python.exe"; Parameters: "-I -B ""{app}\tools\aether_teacher\packaging\online_setup.py"" --wait-on-error"; WorkingDir: "{app}"
+#else
 Name: "{group}\Aether Playground"; Filename: "{app}\python\pythonw.exe"; Parameters: "-I -B ""{app}\tools\aether_teacher\packaging\windows_entry.py"""; WorkingDir: "{app}"
 Name: "{userdesktop}\Aether Playground"; Filename: "{app}\python\pythonw.exe"; Parameters: "-I -B ""{app}\tools\aether_teacher\packaging\windows_entry.py"""; WorkingDir: "{app}"; Tasks: desktopicon
+#endif
 
 [Run]
+#ifdef OnlineEdition
+Filename: "{app}\python\python.exe"; Parameters: "-I -B ""{app}\tools\aether_teacher\packaging\online_setup.py"" --wait-on-error"; WorkingDir: "{app}"; Description: "Download and prepare the Aether runtime (about 15 GB)"; Flags: postinstall nowait skipifsilent
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\online-runtime"
+Type: filesandordirs; Name: "{app}\online-download-cache"
+Type: filesandordirs; Name: "{app}\online-installing"
+Type: files; Name: "{app}\.online-runtime.maintenance.lock"
+#else
 Filename: "{app}\python\pythonw.exe"; Parameters: "-I -B ""{app}\tools\aether_teacher\packaging\windows_entry.py"""; WorkingDir: "{app}"; Description: "Open Aether Playground"; Flags: postinstall unchecked nowait skipifsilent
+#endif
 
 [Code]
 function VcRuntimePresent: Boolean;

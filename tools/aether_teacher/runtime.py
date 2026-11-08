@@ -35,6 +35,18 @@ def runtime_environment(root):
     return environment
 
 
+def portable_source_manifest(manifest):
+    """Ollama can record an absolute import path on its model layer."""
+    require(isinstance(manifest, dict) and isinstance(manifest.get("layers"), list), "PRIVATE_MANIFEST_CHANGED")
+    layers = []
+    for layer in manifest["layers"]:
+        require(isinstance(layer, dict), "PRIVATE_MANIFEST_CHANGED")
+        if layer.get("mediaType") == "application/vnd.ollama.image.model":
+            layer = {key: value for key, value in layer.items() if key != "from"}
+        layers.append(layer)
+    return {**manifest, "layers": layers}
+
+
 class ManagedRuntime:
     def __init__(self, settings, origin, memory_mib=32768):
         require(settings.port == 11435)
@@ -133,6 +145,21 @@ class ManagedRuntime:
         require(source_manifest.read_bytes() == raw, "SOURCE_MANIFEST_CHANGED")
         destination = local_path(self.store / relative)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        require(not destination.exists() or destination.read_bytes() == raw, "PRIVATE_MANIFEST_CHANGED")
-        destination.write_bytes(raw)
+        if destination.exists():
+            require(destination.stat().st_size <= 65536, "PRIVATE_MANIFEST_CHANGED")
+            previous = destination.read_bytes()
+            if previous != raw:
+                from tools.aether_teacher.chat import strict_json
+                require(portable_source_manifest(strict_json(previous)) == portable_source_manifest(manifest),
+                        "PRIVATE_MANIFEST_CHANGED")
+        else:
+            previous = None
+        if previous != raw:
+            temporary = destination.with_name(f".aether-manifest-{uuid.uuid4().hex}")
+            try:
+                with temporary.open("xb") as stream:
+                    stream.write(raw)
+                temporary.replace(destination)
+            finally:
+                temporary.unlink(missing_ok=True)
         return {"model":source_tag, "modelSha256":self.origin["sourceGgufSha256"]}
