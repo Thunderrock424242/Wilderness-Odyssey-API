@@ -1,5 +1,5 @@
 """Technical view of the same bounded workflow used by Lessons."""
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel, QPlainTextEdit, QPushButton, QFormLayout, QComboBox, QSpinBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel, QPlainTextEdit, QPushButton, QFormLayout, QComboBox, QSpinBox, QLineEdit
 from tools.aether_teacher.domain import PRESETS, RunLimits
 
 
@@ -38,6 +38,20 @@ class AdvancedView(QWidget):
         box.addLayout(actions);tabs.addTab(diagnostics,"Jobs & diagnostics")
         self.artifacts=QPlainTextEdit();self.artifacts.setReadOnly(True)
         tabs.addTab(self.artifacts,"Artifacts")
+        handoff = QWidget()
+        handoff_form = QFormLayout(handoff)
+        self.export_folder = QLineEdit()
+        self.export_folder.setReadOnly(True)
+        self.export_folder.setPlaceholderText("Choose a folder when exporting")
+        handoff_form.addRow("Default export folder", self.export_folder)
+        browse = QPushButton("Choose export folder…")
+        browse.clicked.connect(workflow.choose_export_folder)
+        handoff_form.addRow(browse)
+        guide = QLabel("Export a verified candidate from Versions. Copy the exported package to private "
+                       "storage on your API's inference host, then review and import it there.")
+        guide.setWordWrap(True)
+        handoff_form.addRow(guide)
+        tabs.addTab(handoff, "API handoff")
 
     def refresh_preset(self):
         steps,context,examples=PRESETS[self.preset.currentText()]

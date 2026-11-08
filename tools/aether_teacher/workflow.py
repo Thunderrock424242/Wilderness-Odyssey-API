@@ -223,13 +223,24 @@ class Workflow(QObject):
                 return "\n\n".join(results)
         c.submit(compare,c.window.versions_view.answers.setPlainText)
 
+    def choose_export_folder(self):
+        c = self.c
+        if c.lease is None or c.profile is None:
+            c.status("Open the workspace before choosing an export folder")
+            return
+        field = c.window.advanced_view.export_folder
+        folder = QFileDialog.getExistingDirectory(c.window, "Choose default export folder", field.text())
+        if folder:
+            c.submit(lambda store: store.save_export_folder(Path(folder)), field.setText, storage=True)
+
     def export(self):
         try:
             self.available()
             job=self.c.window.versions_view.selected()
             require(job is not None and job.state=="completed","SELECT_A_VERIFIED_VERSION")
         except Rejected as error:self.c.status(str(error));return
-        parent=QFileDialog.getExistingDirectory(self.c.window,"Choose parent folder for a new export")
+        parent=QFileDialog.getExistingDirectory(self.c.window,"Choose parent folder for a new export",
+                                                self.c.window.advanced_view.export_folder.text())
         if not parent:return
         destination=Path(parent)/("aether-teacher-"+job.id)
         c=self.c;c.runner.cancelled.clear()

@@ -1,6 +1,8 @@
 # Aether Teacher desktop
 
-A native Windows/PySide6 teaching workspace for the installed Llama 3.1 8B and the existing reviewed local Aether training engine. It uses a Windows application window, not a browser. Minecraft, website, gateway and bot contracts are unchanged.
+A native Windows/PySide6 teaching workspace for Qwen 3.5 4B and the reviewed local Aether training engine.
+
+For a clean Windows installation, use the [Aether Playground installer and restore guide](aether-playground-windows.md). Its Start menu entry is **Aether Playground** and the desktop window is titled **Aether Teacher**. The source-launch notes below describe the earlier developer installation.
 
 The local installation is `%LOCALAPPDATA%/Programs/AetherTeacher`, with an **Aether Teacher** shortcut on the desktop. Its source copy is separate from the repository; update that owned installation explicitly when delivering later source changes. The shortcut currently uses the prepared `.codex-build/aether-teacher/.venv-cpython/Scripts/pythonw.exe` GUI environment. Keep that environment, the registered training interpreter/libraries and reviewed engine/base in place; deleting the repository's entire `.codex-build` directory would remove required local dependencies.
 
@@ -45,7 +47,7 @@ Training defaults: RAM/commit ceiling 24576 MiB, GPU allocation budget 11000 MiB
 
 Qwen export ceiling is 16384 MiB/1800 seconds; merge and converter processes run sequentially. The native converter's diagnostics are drained with a finite 16 MiB total/32 KiB tail, without forwarding raw private diagnostics to the UI. Runtime import has an independent 32768 MiB committed-memory ceiling and an 1800-second deadline. Full-run admission requires at least 60 GiB and the larger calculated peak estimate on each involved volume. These are ceilings/admission rules, not a promise that another machine fits. Keep model operations serialized.
 
-The laptop launcher uses the separate GUI environment containing Qt/Python/psutil, without importing CUDA/Torch into the GUI. It needs the registered reviewed engine and training environment for training. There is no automatic clean-machine dependency installer.
+The developer source launcher uses a separate GUI environment containing Qt, Python, and psutil. It needs the registered reviewed engine and training environment for training. The Windows installer bundles these dependencies.
 
 ## Build and validation
 
@@ -62,7 +64,7 @@ For source-launch acceptance, `launch.py --smoke-check --workspace <new-private-
 
 The project-local diagnostic training interpreter `.codex-build/aether-teacher/.venv-training-cpython` uses CPython 3.12.10 with a private `.pth` referencing the existing version-checked training libraries in `.codex-build/aether-laptop/.venv`. It leaves the original environment unchanged. The installed stack is Torch 2.11.0+cu128, Transformers 5.16.1, PEFT 0.18.1, bitsandbytes 0.50.2, psutil 7.2.2 and gguf 0.19.0. This linkage is local setup, not a self-contained training distribution; do not remove the referenced environment.
 
-Native access violations were observed in the bundled CPython 3.12.14 training and packaging processes. Official CPython completed the verified training run. Packaging builds were intermittent even under official CPython; a bounded 16 MiB build-thread stack and a consistent bundled MSVC runtime family were tested, but the frozen GUI launch still failed. The portable executable remains unfinished. No global Python, PATH, registry, ACL, antivirus, pagefile or other security setting was changed. These observations do not establish a hardware diagnosis.
+The earlier frozen prototype encountered native access violations with CPython 3.12.14 and a Qt DLL error with the official interpreter. The Windows installer uses the official CPython 3.12.10 runtime and the native source launcher.
 
 ## Deployment boundary
 

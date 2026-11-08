@@ -112,11 +112,12 @@ class Controller(QObject):
         sessions = store.sessions()
         session = store.setting("session")
         if session not in sessions:session=sessions[-1] if sessions else store.create_session()
-        return profile, session, store.messages(session), store.lessons(), store.theme()
+        return profile, session, store.messages(session), store.lessons(), store.theme(), store.export_folder()
 
     def _loaded(self, data):
-        self.profile, self.session, self.turns, lessons, theme = data
+        self.profile, self.session, self.turns, lessons, theme, export_folder = data
         self._apply_theme(theme)
+        self.window.advanced_view.export_folder.setText(export_folder)
         self.window.profile_view.show_profile(self.profile)
         self.window.teaching_view.show_turns(self.turns)
         self.window.lessons_view.show_lessons(lessons)

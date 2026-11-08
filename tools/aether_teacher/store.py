@@ -84,6 +84,16 @@ class Store:
             self._setting("theme", value)
         return value
 
+    def export_folder(self):
+        return self.setting("exportFolder", "")
+
+    def save_export_folder(self, path):
+        folder = local_path(path)
+        require(folder.is_dir(), "EXPORT_FOLDER_MISSING")
+        with self.transaction():
+            self._setting("exportFolder", str(folder))
+        return str(folder)
+
     def active_profile(self):
         ref = self.setting("profile")
         if not ref:

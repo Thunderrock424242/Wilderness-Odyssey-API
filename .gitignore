@@ -55,3 +55,4 @@ repo
 /deploy/docker/state/
 **/credentials.env
 /config/wildernessodysseyapi/playtest-diagnostics/
+/release/Aether-Playground-Windows/
